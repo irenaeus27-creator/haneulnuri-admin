@@ -65,6 +65,7 @@ const menuGroups: MenuGroup[] = [
       { label: "코스관리", href: "/course-catalog", icon: "course" },
       { label: "문서/서약서관리", href: "/document-agreements", icon: "document" },
       { label: "파일/사진 URL", href: "/file-assets", icon: "image" },
+  { label: "시스템 점검", href: "/system-health", icon: Settings },
       { label: "설정관리", href: "/settings", icon: "settings" },
     ],
   },
