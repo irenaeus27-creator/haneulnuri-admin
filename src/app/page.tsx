@@ -444,15 +444,54 @@ function text(value: unknown, fallback = "") {
   return raw || fallback;
 }
 
+
+function parseDashboardLogDate(log: Record<string, unknown>) {
+  const raw = text(log.createdAt) || text(log.updatedAt) || text(log.timestamp) || text(log.date);
+  const parsed = Date.parse(raw.replace(" ", "T"));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isGenericDashboardLog(log: Record<string, unknown>) {
+  const action = text(log.action).toLowerCase();
+  const targetSheet = text(log.targetSheet).toLowerCase();
+  const message = text(log.message).trim();
+  const targetId = text(log.targetId).trim();
+
+  const genericActions = new Set(["append", "update", "add", "edit"]);
+  const genericMessages = new Set(["", "bookings", "users", "students", "예약 정보 변경", "회원 정보 변경", "교육생 정보 변경"]);
+
+  if (targetSheet === "bookings" && genericActions.has(action)) {
+    const hasMeaningfulMessage =
+      message &&
+      !genericMessages.has(message.toLowerCase()) &&
+      (message.includes("·") || message.includes("예약") || /\d{4}-\d{2}-\d{2}/.test(message));
+
+    if (!hasMeaningfulMessage && !targetId) return true;
+    if (!hasMeaningfulMessage && targetId) return true;
+  }
+
+  return false;
+}
+
 function dashboardLogTitle(log: Record<string, unknown>) {
-  const action = text(log.action);
+  const action = text(log.action).toLowerCase();
   const targetSheet = text(log.targetSheet);
+  const message = text(log.message);
+  const status = text(log.status);
 
   if (targetSheet === "bookings") {
-    if (action === "append" || action === "add" || action === "create") return "예약 생성";
+    const combined = `${message} ${status}`.replace(/\s/g, "");
+
+    if (combined.includes("취소")) return "예약 취소";
+    if (combined.includes("반려")) return "예약 반려";
+    if (combined.includes("기상취소")) return "기상 취소";
+    if (combined.includes("확정") || action === "approvebooking") return "예약 확정";
+    if (combined.includes("요청") || combined.includes("승인대기")) return "예약 요청";
+
+    if (action === "append" || action === "add" || action === "create") return "예약 등록";
     if (action === "update" || action === "edit") return "예약 수정";
-    if (action === "approveBooking") return "예약 확정";
-    if (action === "cancelBooking") return "예약 취소";
+    if (action === "cancelbooking") return "예약 취소";
+
     return "예약 변경";
   }
 
@@ -470,7 +509,7 @@ function dashboardLogTitle(log: Record<string, unknown>) {
     return "교육생 변경";
   }
 
-  return action || "변경 내역";
+  return text(log.action) || "변경 내역";
 }
 
 function dashboardLogDetail(log: Record<string, unknown>) {
@@ -478,15 +517,25 @@ function dashboardLogDetail(log: Record<string, unknown>) {
   const targetSheet = text(log.targetSheet);
   const targetId = text(log.targetId);
 
-  if (message && message !== targetSheet && message !== targetId) return message;
+  if (message && message !== targetSheet && message !== targetId) {
+    return message
+      .replace(/^bookings$/i, "예약관리")
+      .replace(/^users$/i, "회원관리")
+      .replace(/^students$/i, "교육생관리");
+  }
 
-  if (targetSheet === "bookings") return targetId ? `예약 ID ${targetId}` : "예약 정보 변경";
-  if (targetSheet === "users") return targetId ? `회원 ID ${targetId}` : "회원 정보 변경";
-  if (targetSheet === "students") return targetId ? `교육생 ID ${targetId}` : "교육생 정보 변경";
+  if (targetSheet === "bookings") return targetId ? `예약 정보 · ${targetId}` : "예약 정보 변경";
+  if (targetSheet === "users") return targetId ? `회원 정보 · ${targetId}` : "회원 정보 변경";
+  if (targetSheet === "students") return targetId ? `교육생 정보 · ${targetId}` : "교육생 정보 변경";
 
   return targetSheet || "시스템 변경";
 }
 
+function normalizeDashboardLogs(logs: Record<string, unknown>[]) {
+  return [...logs]
+    .filter((log) => !isGenericDashboardLog(log))
+    .sort((a, b) => parseDashboardLogDate(b) - parseDashboardLogDate(a));
+}
 
 
 function normalizeDate(value: unknown) {
@@ -1366,7 +1415,7 @@ function aircraftStatusClass(row: Row) {
 }
 
 function buildRecentActivities(logs: Row[], notifications: Row[], bookings: Row[]) {
-  const logItems = logs.map((log) => ({
+  const logItems = normalizeDashboardLogs(logs as Record<string, unknown>[]).map((log) => ({
     time: text(log.createdAt || log.timestamp || log.updatedAt),
     title: text(log.action || log.message || log.title, "운영 기록"),
     detail: text(log.targetSheet || log.targetId || log.userName || log.status, ""),
@@ -2607,7 +2656,7 @@ function RecentActivityPanel({
     <ContentCard className={`flex min-h-0 flex-col p-4 ${className}`}>
       <div className="mb-3 flex shrink-0 items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-[#10213f]">최근 변경 내역</h3>
+          <h3 className="text-lg font-bold text-[#10213f]">최근 작업 내역</h3>
           <p className="mt-1 text-xs font-medium text-[#61758f]">예약·회원·교육생 기준 최근 작업</p>
         </div>
         <Link href="/logs" className="text-xs font-semibold text-[#1264f4]">로그 보기 ›</Link>
@@ -2615,7 +2664,7 @@ function RecentActivityPanel({
 
       {activities.length === 0 ? (
         <div className="flex min-h-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-[#dbe5f1] bg-[#f8fbff] p-5 text-center text-sm font-medium text-[#6f8199]">
-          최근 변경 내역이 없습니다.
+          최근 작업 내역이 없습니다.
         </div>
       ) : (
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
