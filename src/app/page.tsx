@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import ContentCard from "@/components/ContentCard";
 import PageContainer from "@/components/PageContainer";
 import { DashboardWeatherDetailClient, DashboardWeatherSummaryClient } from "@/components/DashboardWeatherClient";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { formatBookingDate as sharedFormatBookingDate, formatBookingTime as sharedFormatBookingTime } from "@/lib/formatDateTime";
 
 type Row = Record<string, unknown>;
@@ -331,6 +332,120 @@ function normalizeRows(value: unknown): Row[] {
   return Array.isArray(value) ? value as Row[] : [];
 }
 
+function normalizeSupabaseCamelKey(key: string) {
+  return key.replace(/_([a-z0-9])/g, (_, char: string) => char.toUpperCase());
+}
+
+function normalizeSupabaseRow(row: Row) {
+  const result: Row = {};
+
+  Object.entries(row || {}).forEach(([key, value]) => {
+    result[normalizeSupabaseCamelKey(key)] = value ?? "";
+  });
+
+  return result;
+}
+
+function normalizeSupabaseRows(rows: Row[] | null | undefined, options?: { bookingAlias?: boolean }) {
+  return (rows || []).map((row) => {
+    const next = normalizeSupabaseRow(row);
+
+    if (options?.bookingAlias) {
+      if (next.aircraftName && !next.aircraft) next.aircraft = next.aircraftName;
+      if (next.userName && !next.name) next.name = next.userName;
+      if (next.instructorName && !next.instructor) next.instructor = next.instructorName;
+      if (next.bookingId && !next.id) next.id = next.bookingId;
+    }
+
+    return next;
+  });
+}
+
+async function selectDashboardSupabaseRows(table: string, options?: {
+  orderColumn?: string;
+  ascending?: boolean;
+  limit?: number;
+}) {
+  const supabase = getSupabaseServerClient();
+  let query = supabase.from(table).select("*");
+
+  if (options?.orderColumn) {
+    query = query.order(options.orderColumn, { ascending: options.ascending ?? true });
+  }
+
+  if (options?.limit) query = query.limit(options.limit);
+
+  const { data, error } = await query;
+  if (error) throw new Error(`${table} 직접 조회 실패: ${error.message}`);
+
+  return normalizeSupabaseRows(data as Row[]);
+}
+
+async function safeGetDashboardDataDirect(): Promise<Required<DashboardApiResponse>> {
+  const today = todayText();
+  const fromDate = addDays(today, -2);
+  const toDate = addDays(today, 30);
+  const supabase = getSupabaseServerClient();
+
+  const [
+    bookingResult,
+    userResult,
+    aircraft,
+    instructors,
+    instructorSchedules,
+    notifications,
+    logs,
+    trainingCharges,
+  ] = await Promise.all([
+    supabase
+      .from("bookings")
+      .select("*")
+      .gte("booking_date", fromDate)
+      .lte("booking_date", toDate)
+      .order("booking_date", { ascending: true })
+      .order("start_time", { ascending: true }),
+    supabase
+      .from("users")
+      .select("*")
+      .in("status", ["승인대기", "요청", "대기", "pending"])
+      .order("created_at", { ascending: false })
+      .limit(20),
+    selectDashboardSupabaseRows("aircraft", { orderColumn: "aircraft_id", ascending: true }),
+    selectDashboardSupabaseRows("instructors", { orderColumn: "instructor_id", ascending: true }),
+    selectDashboardSupabaseRows("instructor_schedules", { orderColumn: "instructor_name", ascending: true, limit: 80 }),
+    selectDashboardSupabaseRows("notifications", { orderColumn: "created_at", ascending: false, limit: 8 }),
+    selectDashboardSupabaseRows("logs", { orderColumn: "created_at", ascending: false, limit: 20 }),
+    selectDashboardSupabaseRows("training_charges", { orderColumn: "charge_date", ascending: false, limit: 12 }),
+  ]);
+
+  if (bookingResult.error) throw new Error(`bookings 직접 조회 실패: ${bookingResult.error.message}`);
+  if (userResult.error) throw new Error(`users 직접 조회 실패: ${userResult.error.message}`);
+
+  return {
+    bookings: normalizeSupabaseRows(bookingResult.data as Row[], { bookingAlias: true }),
+    users: normalizeSupabaseRows(userResult.data as Row[]),
+    aircraft,
+    instructors,
+    students: [],
+    notifications,
+    instructorSchedules,
+    trainingCharges,
+    logs,
+  };
+}
+
+function hasAnyDashboardData(data: Required<DashboardApiResponse>) {
+  return (
+    data.bookings.length > 0 ||
+    data.users.length > 0 ||
+    data.aircraft.length > 0 ||
+    data.instructors.length > 0 ||
+    data.notifications.length > 0 ||
+    data.logs.length > 0
+  );
+}
+
+
 async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
   const emptyData: Required<DashboardApiResponse> = {
     bookings: [],
@@ -360,7 +475,7 @@ async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
     const raw = (await response.json()) as DashboardApiResponse & { data?: DashboardApiResponse };
     const dashboardData = raw.data && typeof raw.data === "object" ? raw.data : raw;
 
-    return {
+    const normalizedData = {
       bookings: normalizeRows(dashboardData.bookings),
       users: normalizeRows(dashboardData.users),
       aircraft: normalizeRows(dashboardData.aircraft),
@@ -371,9 +486,23 @@ async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
       trainingCharges: normalizeRows(dashboardData.trainingCharges),
       logs: normalizeRows(dashboardData.logs),
     };
+
+    // Vercel 서버 컴포넌트에서 자기 자신 API를 fetch하지 못하거나
+    // BASE_URL 설정이 엇갈리는 경우 화면이 빈 대시보드로 렌더링되는 것을 방지합니다.
+    if (!hasAnyDashboardData(normalizedData)) {
+      return await safeGetDashboardDataDirect();
+    }
+
+    return normalizedData;
   } catch (error) {
-    console.error("대시보드 데이터를 불러오지 못했습니다.", error);
-    return emptyData;
+    console.error("대시보드 API 호출 실패, Supabase 직접 조회로 전환합니다.", error);
+
+    try {
+      return await safeGetDashboardDataDirect();
+    } catch (directError) {
+      console.error("Supabase 직접 대시보드 조회도 실패했습니다.", directError);
+      return emptyData;
+    }
   }
 }
 

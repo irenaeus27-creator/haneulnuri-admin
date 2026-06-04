@@ -34,17 +34,25 @@ function mapRows(rows: Row[] | null | undefined, options?: { bookingAlias?: bool
   });
 }
 
-function dateText(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+function todayText() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
+function addDaysText(dateText: string, days: number) {
+  const [year, month, day] = dateText.split("-").map(Number);
+  const next = new Date(year, month - 1, day);
   next.setDate(next.getDate() + days);
-  return next;
+
+  return [
+    next.getFullYear(),
+    String(next.getMonth() + 1).padStart(2, "0"),
+    String(next.getDate()).padStart(2, "0"),
+  ].join("-");
 }
 
 async function selectTable(table: string, options?: {
@@ -121,10 +129,9 @@ export async function GET() {
   const startedAt = Date.now();
 
   try {
-    const now = new Date();
-    const today = dateText(now);
-    const fromDate = dateText(addDays(now, -1));
-    const toDate = dateText(addDays(now, 14));
+    const today = todayText();
+    const fromDate = addDaysText(today, -2);
+    const toDate = addDaysText(today, 30);
 
     const [
       bookings,
@@ -142,7 +149,7 @@ export async function GET() {
       selectTable("instructors", { orderColumn: "instructor_id", ascending: true }),
       selectInstructorSchedules(today),
       selectTable("notifications", { orderColumn: "created_at", ascending: false, limit: 8 }),
-      selectTable("logs", { orderColumn: "created_at", ascending: false, limit: 8 }),
+      selectTable("logs", { orderColumn: "created_at", ascending: false, limit: 20 }),
       selectTable("training_charges", { orderColumn: "charge_date", ascending: false, limit: 12 }),
     ]);
 
