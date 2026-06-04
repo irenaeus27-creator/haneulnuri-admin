@@ -567,6 +567,33 @@ function bookingTimeLabelForConflict(item: BookingRow | BookingForm) {
   return `${formatBookingSummaryTimeRange(item.startTime, item.endTime)}${resourceRange.includes("PFI") ? ` / 점유 ${resourceRange}` : ""}`;
 }
 
+
+function isPfiConflictBooking(item: BookingRow | BookingForm) {
+  const bookingType = formValue((item as BookingRow | BookingForm).bookingType).toUpperCase();
+  const memo = formValue((item as BookingRow | BookingForm).memo).toUpperCase();
+
+  return bookingType === "PFI" || memo.includes("PFI");
+}
+
+function bookingConflictIdentityKey(item: BookingRow | BookingForm) {
+  return [
+    normalizeDate((item as BookingRow | BookingForm).bookingDate),
+    normalizeTime((item as BookingRow | BookingForm).startTime),
+    normalizeTime((item as BookingRow | BookingForm).endTime),
+    formValue((item as BookingRow | BookingForm).bookingType),
+    formValue((item as BookingRow | BookingForm).aircraftId || (item as BookingRow).aircraftName || (item as BookingRow).aircraft),
+    formValue((item as BookingRow | BookingForm).instructorId || (item as BookingRow).instructorName),
+    formValue((item as BookingRow | BookingForm).userName || (item as BookingRow).name || (item as BookingRow).customerName),
+    formValue((item as BookingRow | BookingForm).phone),
+  ].join("|");
+}
+
+function isSameRecentlySavedBooking(form: BookingForm, booking: BookingRow, recentKey: string) {
+  if (!recentKey) return false;
+  return bookingConflictIdentityKey(form) === recentKey && bookingConflictIdentityKey(booking) === recentKey;
+}
+
+
 type ConflictWarning = {
   type: "aircraft" | "instructor";
   message: string;
@@ -1079,6 +1106,7 @@ export default function BookingsPage() {
   const [calendarResizeDrag, setCalendarResizeDrag] = useState<CalendarResizeDrag>(null);
   const [error, setError] = useState("");
   const [operationMessage, setOperationMessage] = useState("");
+  const [lastSavedConflictKey, setLastSavedConflictKey] = useState("");
 
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("전체");
@@ -1492,7 +1520,10 @@ export default function BookingsPage() {
     ].filter(Boolean);
 
     bookings.forEach((booking) => {
+      if (isPfiConflictBooking(booking)) return;
+      if (isPfiConflictBooking(form)) return;
       if (form.bookingId && formValue(booking.bookingId) === form.bookingId) return;
+      if (isSameRecentlySavedBooking(form, booking, lastSavedConflictKey)) return;
       if (isFinalHiddenStatus(booking.status)) return;
       if (normalizeDate(booking.bookingDate) !== targetDate) return;
 
@@ -1542,7 +1573,7 @@ export default function BookingsPage() {
     });
 
     return Array.from(unique.values());
-  }, [bookings, form]);
+  }, [bookings, form, lastSavedConflictKey]);
 
   const conflictWarningMessages = useMemo(
     () => conflictWarnings.map((warning) => warning.message),
@@ -1937,6 +1968,7 @@ export default function BookingsPage() {
   }
 
   function startCreate() {
+    setLastSavedConflictKey("");
     setDurationMinutes(60);
     setForm({
       ...emptyForm,
@@ -2897,7 +2929,7 @@ export default function BookingsPage() {
       }
 
       if (conflictWarningMessages.length > 0) {
-        const ok = window.confirm(`예약 중복 가능성이 있습니다.\n- ${conflictWarningMessages.join("\n- ")}\n\n그래도 저장할까요?`);
+        const ok = window.confirm(`예약 일정 중복 가능성이 있습니다.\n- ${conflictWarningMessages.join("\n- ")}\n\n그래도 저장할까요?`);
         if (!ok) return;
       }
 
@@ -3012,6 +3044,7 @@ export default function BookingsPage() {
 
       const savedDate = payload.bookingDate;
       const savedType = payload.bookingType;
+      setLastSavedConflictKey(bookingConflictIdentityKey(payload));
       await loadData(true, true);
       setDateFilter(savedDate);
       setDurationMinutes(savedType.includes("체험") ? 30 : savedType.includes("렌탈") ? durationMinutes : 60);
@@ -4018,8 +4051,8 @@ export default function BookingsPage() {
             ) : conflictWarnings.length > 0 ? (
               <div className={`rounded-[14px] border px-3 py-2 text-[13px] font-medium ${hasAircraftConflict ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
                 <div className="font-semibold">
-                  {hasAircraftConflict ? "일정 중복 확인" : "교관 일정 중복 경고"}
-                  <span className="ml-1 font-normal">선택한 시간에 이미 등록된 일정이 있는지 저장 전 한 번 더 확인합니다.</span>
+                  {hasAircraftConflict ? "일정 중복 확인" : "교관 일정 중복 확인"}
+                  <span className="ml-1 font-normal">저장 전 한 번 더 확인합니다.</span>
                 </div>
                 <div className="mt-1 space-y-0.5">
                   {conflictWarnings.slice(0, 3).map((warning) => (
