@@ -444,6 +444,103 @@ function text(value: unknown, fallback = "") {
   return raw || fallback;
 }
 
+function isGenericRecentLogItem(log: Record<string, unknown>) {
+  const action = text(log.action).trim().toLowerCase();
+  const targetSheet = text(log.targetSheet).trim().toLowerCase();
+  const message = text(log.message).trim().toLowerCase();
+  const targetId = text(log.targetId).trim();
+
+  const isGenericAction = action === "append" || action === "update" || action === "add" || action === "edit";
+  const isGenericTarget = targetSheet === "bookings" || targetSheet === "users" || targetSheet === "students";
+  const hasUsefulMessage =
+    Boolean(message) &&
+    message !== targetSheet &&
+    message !== "bookings" &&
+    message !== "users" &&
+    message !== "students" &&
+    (message.includes("예약") || message.includes("확정") || message.includes("취소") || message.includes("·") || /\d{4}-\d{2}-\d{2}/.test(message));
+
+  if (isGenericAction && isGenericTarget && !hasUsefulMessage) return true;
+  if (isGenericAction && isGenericTarget && targetId && !hasUsefulMessage) return true;
+
+  return false;
+}
+
+function recentLogTitle(log: Record<string, unknown>) {
+  const action = text(log.action).trim().toLowerCase();
+  const targetSheet = text(log.targetSheet).trim();
+  const message = text(log.message);
+  const status = text(log.status);
+  const combined = `${message} ${status}`.replace(/\s/g, "");
+
+  if (targetSheet === "bookings") {
+    if (combined.includes("기상취소")) return "기상 취소";
+    if (combined.includes("취소")) return "예약 취소";
+    if (combined.includes("반려")) return "예약 반려";
+    if (combined.includes("확정")) return "예약 확정";
+    if (combined.includes("요청") || combined.includes("승인대기")) return "예약 요청";
+    if (action === "append" || action === "add" || action === "create") return "예약 등록";
+    if (action === "update" || action === "edit") return "예약 수정";
+    return "예약 변경";
+  }
+
+  if (targetSheet === "users") {
+    if (combined.includes("승인")) return "회원 승인";
+    if (combined.includes("반려")) return "회원 반려";
+    if (action === "append" || action === "add" || action === "create") return "회원 등록";
+    if (action === "update" || action === "edit") return "회원 수정";
+    return "회원 변경";
+  }
+
+  if (targetSheet === "students") {
+    if (action === "append" || action === "add" || action === "create") return "교육생 등록";
+    if (action === "update" || action === "edit") return "교육생 수정";
+    return "교육생 변경";
+  }
+
+  if (action === "append") return "정보 등록";
+  if (action === "update") return "정보 수정";
+
+  return text(log.action) || "변경 내역";
+}
+
+function recentLogDetail(log: Record<string, unknown>) {
+  const message = text(log.message).trim();
+  const targetSheet = text(log.targetSheet).trim().toLowerCase();
+  const targetId = text(log.targetId).trim();
+
+  if (
+    message &&
+    message.toLowerCase() !== targetSheet &&
+    message.toLowerCase() !== "bookings" &&
+    message.toLowerCase() !== "users" &&
+    message.toLowerCase() !== "students"
+  ) {
+    return message;
+  }
+
+  if (targetSheet === "bookings") return targetId ? `예약 정보 · ${targetId}` : "예약 정보 변경";
+  if (targetSheet === "users") return targetId ? `회원 정보 · ${targetId}` : "회원 정보 변경";
+  if (targetSheet === "students") return targetId ? `교육생 정보 · ${targetId}` : "교육생 정보 변경";
+
+  return text(log.targetSheet) || "시스템 변경";
+}
+
+function recentLogTimeValue(log: Record<string, unknown>) {
+  const raw = text(log.createdAt) || text(log.updatedAt) || text(log.timestamp);
+  const parsed = Date.parse(raw.replace(" ", "T"));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function visibleRecentLogs(logs: Record<string, unknown>[], limit = 6) {
+  return [...logs]
+    .filter((log) => !isGenericRecentLogItem(log))
+    .sort((a, b) => recentLogTimeValue(b) - recentLogTimeValue(a))
+    .slice(0, limit);
+}
+
+
+
 
 function parseDashboardLogDate(log: Record<string, unknown>) {
   const raw = text(log.createdAt) || text(log.updatedAt) || text(log.timestamp) || text(log.date);
