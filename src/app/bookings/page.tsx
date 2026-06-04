@@ -146,6 +146,7 @@ type CalendarDragSelection = {
 type CalendarMoveDrag = {
   bookingId: string;
   startX: number;
+  timelineWidth: number;
   deltaSteps: number;
   originalStartTime: string;
   originalEndTime: string;
@@ -154,6 +155,7 @@ type CalendarMoveDrag = {
 type CalendarResizeDrag = {
   bookingId: string;
   startX: number;
+  timelineWidth: number;
   deltaSteps: number;
   originalStartTime: string;
   originalEndTime: string;
@@ -2508,12 +2510,42 @@ export default function BookingsPage() {
     return calendarMovePreviewTimes(booking);
   }
 
-  function calendarStepFromDelta(deltaX: number) {
-    const width = calendarTimelineRef.current?.getBoundingClientRect().width || 0;
+  function calendarStepFromDelta(deltaX: number, timelineWidth?: number) {
+    const width = timelineWidth || calendarTimelineRef.current?.getBoundingClientRect().width || 0;
     if (!width) return 0;
 
     const slotWidth = width / 26;
     return Math.round(deltaX / slotWidth);
+  }
+
+  function clampCalendarMoveSteps(originalStartTime: string, originalEndTime: string, deltaSteps: number) {
+    const startMinutes = timeToMinutes(originalStartTime);
+    const endMinutes = timeToMinutes(originalEndTime);
+
+    if (startMinutes < 0 || endMinutes < 0) return 0;
+
+    const minSteps = Math.ceil(((7 * 60) - startMinutes) / 30);
+    const maxSteps = Math.floor(((20 * 60) - endMinutes) / 30);
+
+    return Math.max(minSteps, Math.min(maxSteps, deltaSteps));
+  }
+
+  function clampCalendarResizeSteps(originalStartTime: string, originalEndTime: string, deltaSteps: number) {
+    const startMinutes = timeToMinutes(originalStartTime);
+    const endMinutes = timeToMinutes(originalEndTime);
+
+    if (startMinutes < 0 || endMinutes < 0) return 0;
+
+    const minSteps = Math.ceil((startMinutes + 30 - endMinutes) / 30);
+    const maxSteps = Math.floor(((20 * 60) - endMinutes) / 30);
+
+    return Math.max(minSteps, Math.min(maxSteps, deltaSteps));
+  }
+
+  function calendarTimelineWidthFromEvent(event: React.MouseEvent) {
+    const target = event.currentTarget as HTMLElement;
+    const timeline = target.closest("[data-calendar-timeline='true']") as HTMLElement | null;
+    return timeline?.getBoundingClientRect().width || calendarTimelineRef.current?.getBoundingClientRect().width || 0;
   }
 
   function sameBookingPerson(a: BookingRow, b: BookingRow) {
@@ -2692,6 +2724,7 @@ export default function BookingsPage() {
     setCalendarMoveDrag({
       bookingId,
       startX: event.clientX,
+      timelineWidth: calendarTimelineWidthFromEvent(event),
       deltaSteps: 0,
       originalStartTime: normalizeTime(booking.startTime),
       originalEndTime: normalizeTime(booking.endTime),
@@ -2701,7 +2734,8 @@ export default function BookingsPage() {
   function updateCalendarMoveDrag(event: React.MouseEvent) {
     if (!calendarMoveDrag) return;
 
-    const deltaSteps = calendarStepFromDelta(event.clientX - calendarMoveDrag.startX);
+    const rawDeltaSteps = calendarStepFromDelta(event.clientX - calendarMoveDrag.startX, calendarMoveDrag.timelineWidth);
+    const deltaSteps = clampCalendarMoveSteps(calendarMoveDrag.originalStartTime, calendarMoveDrag.originalEndTime, rawDeltaSteps);
 
     if (deltaSteps === calendarMoveDrag.deltaSteps) return;
 
@@ -2813,6 +2847,7 @@ export default function BookingsPage() {
     setCalendarResizeDrag({
       bookingId,
       startX: event.clientX,
+      timelineWidth: calendarTimelineWidthFromEvent(event),
       deltaSteps: 0,
       originalStartTime: normalizeTime(booking.startTime),
       originalEndTime: normalizeTime(booking.endTime),
@@ -2822,7 +2857,8 @@ export default function BookingsPage() {
   function updateCalendarResizeDrag(event: React.MouseEvent) {
     if (!calendarResizeDrag) return;
 
-    const deltaSteps = calendarStepFromDelta(event.clientX - calendarResizeDrag.startX);
+    const rawDeltaSteps = calendarStepFromDelta(event.clientX - calendarResizeDrag.startX, calendarResizeDrag.timelineWidth);
+    const deltaSteps = clampCalendarResizeSteps(calendarResizeDrag.originalStartTime, calendarResizeDrag.originalEndTime, rawDeltaSteps);
 
     if (deltaSteps === calendarResizeDrag.deltaSteps) return;
 
@@ -3534,6 +3570,7 @@ export default function BookingsPage() {
 
                         <div
                           ref={calendarTimelineRef}
+                          data-calendar-timeline="true"
                           className="relative min-w-[980px] min-h-[86px] border-l border-[#dce7f3]"
                           onMouseMove={(event) => {
                             updateCalendarMoveDrag(event);
@@ -3541,8 +3578,6 @@ export default function BookingsPage() {
                           }}
                           onMouseLeave={() => {
                             cancelCalendarDrag();
-                            setCalendarMoveDrag(null);
-                            setCalendarResizeDrag(null);
                           }}
                         >
                           <div className="absolute inset-0 grid" style={{ gridTemplateColumns: "repeat(26, minmax(0, 1fr))" }}>
