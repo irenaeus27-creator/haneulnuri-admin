@@ -2524,6 +2524,22 @@ export default function BookingsPage() {
     );
   }
 
+
+  async function rollbackBookingsView(message?: string) {
+    if (message) {
+      setError(message);
+    }
+
+    setOperationMessage("저장 실패로 최신 예약 정보를 다시 불러오는 중입니다...");
+
+    try {
+      await loadData(true, true);
+    } finally {
+      setOperationMessage("");
+      setMovingBookingId(null);
+    }
+  }
+
   function beginCalendarMoveDrag(event: React.MouseEvent, booking: BookingRow) {
     event.preventDefault();
     event.stopPropagation();
