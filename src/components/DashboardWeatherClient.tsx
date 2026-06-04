@@ -105,18 +105,20 @@ function useWeather(initialWeather?: WeatherData) {
       load(true);
     }
 
+    // 서버에서 받은 initialWeather가 있으면 클라이언트에서 같은 Open-Meteo 요청을 다시 보내지 않습니다.
+    // 기존 구조는 요약 카드와 그래프가 마운트되면서 open-meteo를 중복 호출해 대시보드 첫 로딩을 늦췄습니다.
+    if (initialWeather?.ok && initialWeather.current) {
+      setLoading(false);
+      return () => {
+        alive = false;
+      };
+    }
+
     load(true);
 
     retryTimer1 = setTimeout(() => {
       if (!weather?.ok) load(true);
-    }, 800);
-
-    retryTimer2 = setTimeout(() => {
-      if (!weather?.ok) load(true);
-    }, 2500);
-
-    document.addEventListener("visibilitychange", reloadWhenVisible);
-    window.addEventListener("focus", reloadWhenFocused);
+    }, 1200);
 
     return () => {
       alive = false;

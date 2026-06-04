@@ -1,383 +1,194 @@
 import { NextResponse } from "next/server";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+type Row = Record<string, unknown>;
 
-
-function sleepRetry(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function toCamelKey(key: string) {
+  return key.replace(/_([a-z0-9])/g, (_, char: string) => char.toUpperCase());
 }
 
-async function fetchWithRetry(input: RequestInfo | URL, init: RequestInit, context: string, retryCount = 1) {
-  let lastError: unknown = null;
-
-  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
-    try {
-      const response = await fetchWithApiTimeout(input, init);
-
-      if (response.ok || attempt >= retryCount) {
-        return response;
-      }
-
-      lastError = new Error(`${context} 응답 오류: ${response.status}`);
-    } catch (error) {
-      lastError = error;
-
-      if (attempt >= retryCount) {
-        throw error;
-      }
-    }
-
-    await sleepRetry(450 * (attempt + 1));
-  }
-
-  throw lastError instanceof Error ? lastError : new Error(`${context} 요청에 실패했습니다.`);
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BASE_URL || "";
-
-
-
-
-const API_NO_STORE_HEADERS = { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" };
-const APPS_SCRIPT_TIMEOUT_MS = 12_000;
-const APPS_SCRIPT_RETRY_COUNT = 1;
-
-function sleepApiRetry(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function fetchWithApiTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  let lastError: unknown = null;
-
-  for (let attempt = 0; attempt <= APPS_SCRIPT_RETRY_COUNT; attempt += 1) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), APPS_SCRIPT_TIMEOUT_MS);
-
-    try {
-      const response = await globalThis.fetch(input, {
-        ...init,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timer);
-
-      if (response.ok || attempt >= APPS_SCRIPT_RETRY_COUNT) {
-        return response;
-      }
-
-      lastError = new Error(`Apps Script 응답 오류: ${response.status}`);
-    } catch (error) {
-      clearTimeout(timer);
-
-      if (error instanceof Error && error.name === "AbortError") {
-        lastError = new Error("Apps Script 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.");
-      } else {
-        lastError = error;
-      }
-
-      if (attempt >= APPS_SCRIPT_RETRY_COUNT) {
-        throw lastError instanceof Error ? lastError : new Error("Apps Script 요청에 실패했습니다.");
-      }
-    }
-
-    await sleepApiRetry(450 * (attempt + 1));
-  }
-
-  throw lastError instanceof Error ? lastError : new Error("Apps Script 요청에 실패했습니다.");
-}
-
-const NO_STORE_HEADERS = { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" };
-const CACHE_TTL_MS = 10_000;
-const DASHBOARD_SHEETS = [
-  "bookings",
-  "users",
-  "aircraft",
-  "instructors",
-  "students",
-  "notifications",
-  "instructorSchedules",
-  "trainingCharges",
-  "logs",
-] as const;
-
-type SheetName = (typeof DASHBOARD_SHEETS)[number];
-type ApiObject = Record<string, unknown>;
-type DashboardData = Record<SheetName, ApiObject[]>;
-
-let cachedDashboard:
-  | {
-      expiresAt: number;
-      data: DashboardData;
-      source: "getDashboardData" | "fallback";
-    }
-  | undefined;
-
-function emptyDashboardData(): DashboardData {
-  return DASHBOARD_SHEETS.reduce((acc, sheetName) => {
-    acc[sheetName] = [];
-    return acc;
-  }, {} as DashboardData);
-}
-
-function normalizeRows(data: unknown, sheetName?: string): ApiObject[] {
-  if (Array.isArray(data)) return data as ApiObject[];
-
-  if (data && typeof data === "object") {
-    const obj = data as ApiObject;
-
-    if (sheetName && Array.isArray(obj[sheetName])) return obj[sheetName] as ApiObject[];
-    if (Array.isArray(obj.data)) return obj.data as ApiObject[];
-    if (Array.isArray(obj.rows)) return obj.rows as ApiObject[];
-    if (Array.isArray(obj.values)) return obj.values as ApiObject[];
-  }
-
-  return [];
-}
-
-function normalizeSheetTime(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    const totalMinutes = Math.round((value % 1) * 24 * 60);
-    const hour = Math.floor(totalMinutes / 60) % 24;
-    const minute = totalMinutes % 60;
-
-    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
-  }
-
-  const raw = String(value ?? "").trim();
-  if (!raw) return "";
-
-  if (/T\d{2}:\d{2}/.test(raw) && /(?:Z|[+-]\d{2}:?\d{2})$/.test(raw)) {
-    const date = new Date(raw);
-
-    if (!Number.isNaN(date.getTime())) {
-      return new Intl.DateTimeFormat("ko-KR", {
-        timeZone: "Asia/Seoul",
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      }).format(date).replace(/^24:/, "00:");
-    }
-  }
-
-  const match = raw.match(/(\d{1,2}):(\d{1,2})/);
-  if (!match) return raw.slice(0, 5);
-
-  return `${String(Number(match[1])).padStart(2, "0")}:${String(Number(match[2])).padStart(2, "0")}`;
-}
-
-function normalizeDashboardTimes(data: DashboardData): DashboardData {
-  return {
-    ...data,
-    bookings: data.bookings.map((booking) => ({
-      ...booking,
-      startTime: normalizeSheetTime(booking.startTime),
-      endTime: normalizeSheetTime(booking.endTime),
-    })),
-  };
-}
-
-function normalizeDashboardData(data: unknown): DashboardData | null {
-  if (!data || typeof data !== "object") return null;
-
-  const obj = data as ApiObject;
-  const source =
-    obj.dashboard && typeof obj.dashboard === "object"
-      ? (obj.dashboard as ApiObject)
-      : obj.data && typeof obj.data === "object" && !Array.isArray(obj.data)
-        ? (obj.data as ApiObject)
-        : obj;
-
-  const dashboard = emptyDashboardData();
-  let hasAnySheet = false;
-
-  DASHBOARD_SHEETS.forEach((sheetName) => {
-    const rows = normalizeRows(source[sheetName], sheetName);
-    dashboard[sheetName] = rows;
-    hasAnySheet = hasAnySheet || rows.length > 0 || Array.isArray(source[sheetName]);
+function toCamelObject(row: Row) {
+  const result: Row = {};
+  Object.entries(row || {}).forEach(([key, value]) => {
+    result[toCamelKey(key)] = value ?? "";
   });
-
-  return hasAnySheet ? normalizeDashboardTimes(dashboard) : null;
+  return result;
 }
 
-async function readJsonResponse(response: Response, context: string) {
-  const rawText = await response.text();
-
-  if (!rawText.trim()) {
-    throw new Error(`${context} 응답이 비어 있습니다.`);
-  }
-
-  try {
-    return JSON.parse(rawText) as unknown;
-  } catch {
-    throw new Error(`${context} 응답을 JSON으로 변환하지 못했습니다.`);
-  }
+function withBookingAliases(row: Row) {
+  const next = { ...row };
+  if (next.aircraftName && !next.aircraft) next.aircraft = next.aircraftName;
+  if (next.userName && !next.name) next.name = next.userName;
+  if (next.instructorName && !next.instructor) next.instructor = next.instructorName;
+  if (next.bookingId && !next.id) next.id = next.bookingId;
+  return next;
 }
 
-async function fetchAppsScriptDashboardData() {
-  if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
-  }
-
-  const url = new URL(API_URL);
-  url.searchParams.set("action", "getDashboardData");
-  url.searchParams.set("_ts", String(Date.now()));
-
-  const response = await fetchWithRetry(url.toString(), {
-    method: "GET",
-    cache: "no-store",
-  }, "Apps Script", 1);
-
-  if (!response.ok) {
-    throw new Error(`Apps Script API 오류: ${response.status}`);
-  }
-
-  const parsedData = await readJsonResponse(response, "getDashboardData");
-
-  if (
-    parsedData &&
-    typeof parsedData === "object" &&
-    "success" in parsedData &&
-    (parsedData as ApiObject).success === false
-  ) {
-    throw new Error(
-      String((parsedData as ApiObject).message || "") ||
-        "getDashboardData가 실패 응답을 반환했습니다."
-    );
-  }
-
-  const dashboard = normalizeDashboardData(parsedData);
-
-  if (!dashboard) {
-    throw new Error("getDashboardData 응답에 대시보드 시트 데이터가 없습니다.");
-  }
-
-  return dashboard;
+function mapRows(rows: Row[] | null | undefined, options?: { bookingAlias?: boolean }) {
+  return (rows || []).map((row) => {
+    const camel = toCamelObject(row);
+    return options?.bookingAlias ? withBookingAliases(camel) : camel;
+  });
 }
 
-async function fetchSheet(sheetName: SheetName) {
-  if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
-  }
-
-  try {
-    const url = new URL(API_URL);
-    url.searchParams.set("action", "getDashboardData");
-  url.searchParams.set("_ts", String(Date.now()));
-    url.searchParams.set("sheet", sheetName);
-
-    const response = await fetchWithRetry(url.toString(), {
-      method: "GET",
-      cache: "no-store",
-    }, "Apps Script", 1);
-
-    if (!response.ok) {
-      throw new Error(`Apps Script API 오류: ${response.status}`);
-    }
-
-    const parsedData = await readJsonResponse(response, `${sheetName} 시트`);
-
-    if (
-      parsedData &&
-      typeof parsedData === "object" &&
-      "success" in parsedData &&
-      (parsedData as ApiObject).success === false
-    ) {
-      throw new Error(
-        String((parsedData as ApiObject).message || "") ||
-          `${sheetName} 시트를 불러오지 못했습니다.`
-      );
-    }
-
-    return normalizeRows(parsedData, sheetName);
-  } catch (error) {
-    console.error(`[dashboard fallback ${sheetName} error]`, error);
-    return [];
-  }
+function dateText(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
-async function fetchFallbackDashboardData() {
-  const entries = await Promise.all(
-    DASHBOARD_SHEETS.map(async (sheetName) => [sheetName, await fetchSheet(sheetName)] as const)
-  );
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
 
-  const data = entries.reduce((acc, [sheetName, rows]) => {
-    acc[sheetName] = rows;
-    return acc;
-  }, emptyDashboardData());
+async function selectTable(table: string, options?: {
+  orderColumn?: string;
+  ascending?: boolean;
+  limit?: number;
+}) {
+  const supabase = getSupabaseServerClient();
 
-  return normalizeDashboardTimes(data);
+  let query = supabase.from(table).select("*");
+
+  if (options?.orderColumn) {
+    query = query.order(options.orderColumn, { ascending: options.ascending ?? true });
+  }
+
+  if (options?.limit) {
+    query = query.limit(options.limit);
+  }
+
+  const { data, error } = await query;
+
+  if (error) throw new Error(`${table} 조회 실패: ${error.message}`);
+
+  return mapRows(data as Row[]);
+}
+
+async function selectBookings(fromDate: string, toDate: string) {
+  const supabase = getSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("*")
+    .gte("booking_date", fromDate)
+    .lte("booking_date", toDate)
+    .order("booking_date", { ascending: true })
+    .order("start_time", { ascending: true });
+
+  if (error) throw new Error(`bookings 조회 실패: ${error.message}`);
+
+  return mapRows(data as Row[], { bookingAlias: true });
+}
+
+async function selectPendingUsers() {
+  const supabase = getSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .or("status.eq.승인대기,status.eq.요청,status.eq.대기,status.eq.pending")
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) throw new Error(`users 조회 실패: ${error.message}`);
+
+  return mapRows(data as Row[]);
+}
+
+async function selectInstructorSchedules(today: string) {
+  const supabase = getSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("instructor_schedules")
+    .select("*")
+    .or(`schedule_date.is.null,schedule_date.eq.${today}`)
+    .order("instructor_name", { ascending: true })
+    .limit(80);
+
+  if (error) throw new Error(`instructor_schedules 조회 실패: ${error.message}`);
+
+  return mapRows(data as Row[]);
 }
 
 export async function GET() {
+  const startedAt = Date.now();
+
   try {
-    if (!API_URL) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message: "NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.",
-          source: "none",
-          ...emptyDashboardData(),
-        },
-        { status: 500 }
-      );
-    }
+    const now = new Date();
+    const today = dateText(now);
+    const fromDate = dateText(addDays(now, -1));
+    const toDate = dateText(addDays(now, 14));
 
-    if (cachedDashboard && cachedDashboard.expiresAt > Date.now()) {
-      return NextResponse.json({
-      ultraLightDashboard: true,
-      lightweightDashboard: true,
-        ok: true,
-        source: cachedDashboard.source,
-        cached: true,
-        cacheTtlSeconds: Math.ceil((cachedDashboard.expiresAt - Date.now()) / 1000),
-        ...cachedDashboard.data,
-      });
-    }
+    const [
+      bookings,
+      users,
+      aircraft,
+      instructors,
+      instructorSchedules,
+      notifications,
+      logs,
+      trainingCharges,
+    ] = await Promise.all([
+      selectBookings(fromDate, toDate),
+      selectPendingUsers(),
+      selectTable("aircraft", { orderColumn: "aircraft_id", ascending: true }),
+      selectTable("instructors", { orderColumn: "instructor_id", ascending: true }),
+      selectInstructorSchedules(today),
+      selectTable("notifications", { orderColumn: "created_at", ascending: false, limit: 8 }),
+      selectTable("logs", { orderColumn: "created_at", ascending: false, limit: 8 }),
+      selectTable("training_charges", { orderColumn: "charge_date", ascending: false, limit: 12 }),
+    ]);
 
-    let source: "getDashboardData" | "fallback" = "getDashboardData";
-    let data: DashboardData;
-
-    try {
-      data = await fetchAppsScriptDashboardData();
-      if (data.logs.length === 0) {
-        data.logs = await fetchSheet("logs");
-      }
-    } catch (error) {
-      console.warn("[dashboard getDashboardData fallback]", error instanceof Error ? error.message : error);
-      source = "fallback";
-      data = await fetchFallbackDashboardData();
-    }
-
-    cachedDashboard = {
-      expiresAt: Date.now() + CACHE_TTL_MS,
-      data,
-      source,
+    const data = {
+      bookings,
+      users,
+      aircraft,
+      instructors,
+      students: [],
+      notifications,
+      instructorSchedules,
+      trainingCharges,
+      logs,
     };
 
     return NextResponse.json({
-      lightweightDashboard: true,
       ok: true,
-      source,
-      cached: false,
-      cacheTtlSeconds: CACHE_TTL_MS / 1000,
+      success: true,
+      source: "supabase",
+      service: "skynuri-dashboard-fast",
+      range: { today, fromDate, toDate },
+      elapsedMs: Date.now() - startedAt,
       ...data,
+      data,
+      counts: {
+        bookings: bookings.length,
+        users: users.length,
+        aircraft: aircraft.length,
+        instructors: instructors.length,
+        instructorSchedules: instructorSchedules.length,
+        notifications: notifications.length,
+        logs: logs.length,
+        trainingCharges: trainingCharges.length,
+      },
     });
   } catch (error) {
-    console.error("[dashboard GET error]", error);
-
     return NextResponse.json(
       {
         ok: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "대시보드 데이터를 불러오지 못했습니다.",
-        source: "error",
-        ...emptyDashboardData(),
+        success: false,
+        source: "supabase",
+        service: "skynuri-dashboard-fast",
+        message: error instanceof Error ? error.message : "대시보드 조회에 실패했습니다.",
+        elapsedMs: Date.now() - startedAt,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

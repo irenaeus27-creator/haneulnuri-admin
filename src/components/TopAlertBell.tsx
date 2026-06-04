@@ -81,20 +81,13 @@ export function usePendingApprovals() {
 
     async function load() {
       try {
-        const [bookingRes, userRes] = await Promise.all([
-          fetch("/api/bookings", { cache: "no-store" }),
-          fetch("/api/users", { cache: "no-store" }),
-        ]);
-
-        const bookingText = await bookingRes.text();
-        const userText = await userRes.text();
-
-        const bookingData = bookingText.trim() ? JSON.parse(bookingText) : {};
-        const userData = userText.trim() ? JSON.parse(userText) : {};
+        const response = await fetch("/api/pending-approvals", { cache: "no-store" });
+        const rawText = await response.text();
+        const data = rawText.trim() ? JSON.parse(rawText) : {};
 
         if (!cancelled) {
-          setBookings(Array.isArray(bookingData.bookings) ? bookingData.bookings : []);
-          setUsers(Array.isArray(userData.users) ? userData.users : []);
+          setBookings(Array.isArray(data.bookings) ? data.bookings : []);
+          setUsers(Array.isArray(data.users) ? data.users : []);
         }
       } catch {
         if (!cancelled) {

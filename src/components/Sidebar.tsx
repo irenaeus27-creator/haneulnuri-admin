@@ -284,6 +284,7 @@ export default function Sidebar() {
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={false}
                     className={`group flex items-center justify-between rounded-2xl px-3 py-1.5 text-[14px] font-semibold transition ${
                       active
                         ? "bg-[linear-gradient(135deg,#eaf3ff_0%,#dbeafe_100%)] text-blue-700 shadow-[0_12px_28px_rgba(37,99,235,0.12)] ring-1 ring-blue-100"
