@@ -330,7 +330,7 @@ async function fetchSheet(sheetName: string, optional = true) {
   }
 
   const url = new URL(API_URL);
-  url.searchParams.set("action", "getSheet");
+  url.searchParams.set("action", "getTrainingLogsPageData");
   url.searchParams.set("sheet", sheetName);
 
   const response = await fetchWithApiTimeout(url.toString(), {
@@ -442,6 +442,7 @@ export async function GET(request: NextRequest) {
   try {
     if (!shouldBypassRouteCache(request) && trainingLogsGetCache && trainingLogsGetCache.expiresAt > Date.now()) {
       return NextResponse.json({
+      lightweightAction: "getTrainingLogsPageData",
         ...trainingLogsGetCache.data,
         cached: true,
         cacheTtlSeconds: Math.ceil((trainingLogsGetCache.expiresAt - Date.now()) / 1000),

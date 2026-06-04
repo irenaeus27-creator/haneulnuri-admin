@@ -113,7 +113,7 @@ async function fetchSheet(sheetName: string, optional = false) {
 
   try {
     const url = new URL(API_URL);
-    url.searchParams.set("action", "getSheet");
+    url.searchParams.set("action", "getUsersPageData");
     url.searchParams.set("sheet", sheetName);
     url.searchParams.set("_ts", String(Date.now()));
 
@@ -410,6 +410,7 @@ export async function GET(request: NextRequest) {
   try {
     if (!shouldBypassRouteCache(request) && usersGetCache && usersGetCache.expiresAt > Date.now()) {
       return NextResponse.json({
+      lightweightAction: "getUsersPageData",
         ...usersGetCache.data,
         cached: true,
         cacheTtlSeconds: Math.ceil((usersGetCache.expiresAt - Date.now()) / 1000),
