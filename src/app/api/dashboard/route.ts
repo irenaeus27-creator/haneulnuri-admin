@@ -3,7 +3,41 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+
+
+function sleepRetry(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(input: RequestInfo | URL, init: RequestInit, context: string, retryCount = 1) {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+
+      if (response.ok || attempt >= retryCount) {
+        return response;
+      }
+
+      lastError = new Error(`${context} 응답 오류: ${response.status}`);
+    } catch (error) {
+      lastError = error;
+
+      if (attempt >= retryCount) {
+        throw error;
+      }
+    }
+
+    await sleepRetry(450 * (attempt + 1));
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(`${context} 요청에 실패했습니다.`);
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BASE_URL || "";
+
+const NO_STORE_HEADERS = { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" };
 const CACHE_TTL_MS = 10_000;
 const DASHBOARD_SHEETS = [
   "bookings",
@@ -139,10 +173,10 @@ async function fetchAppsScriptDashboardData() {
   url.searchParams.set("action", "getDashboardData");
   url.searchParams.set("_ts", String(Date.now()));
 
-  const response = await fetch(url.toString(), {
+  const response = await fetchWithRetry(url.toString(), {
     method: "GET",
     cache: "no-store",
-  });
+  }, "Apps Script", 1);
 
   if (!response.ok) {
     throw new Error(`Apps Script API 오류: ${response.status}`);
@@ -182,10 +216,10 @@ async function fetchSheet(sheetName: SheetName) {
   url.searchParams.set("_ts", String(Date.now()));
     url.searchParams.set("sheet", sheetName);
 
-    const response = await fetch(url.toString(), {
+    const response = await fetchWithRetry(url.toString(), {
       method: "GET",
       cache: "no-store",
-    });
+    }, "Apps Script", 1);
 
     if (!response.ok) {
       throw new Error(`Apps Script API 오류: ${response.status}`);
@@ -241,6 +275,7 @@ export async function GET() {
 
     if (cachedDashboard && cachedDashboard.expiresAt > Date.now()) {
       return NextResponse.json({
+      lightweightDashboard: true,
         ok: true,
         source: cachedDashboard.source,
         cached: true,
@@ -270,6 +305,7 @@ export async function GET() {
     };
 
     return NextResponse.json({
+      lightweightDashboard: true,
       ok: true,
       source,
       cached: false,
