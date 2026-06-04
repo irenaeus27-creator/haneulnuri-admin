@@ -109,6 +109,16 @@ const FALLBACK_AIRCRAFT = [
   "HL-C283",
 ];
 
+function getAppBaseUrl() {
+  const explicitBaseUrl = text(process.env.NEXT_PUBLIC_BASE_URL, "").replace(/\/$/, "");
+  if (explicitBaseUrl) return explicitBaseUrl;
+
+  const vercelUrl = text(process.env.VERCEL_URL, "").replace(/\/$/, "");
+  if (vercelUrl) return `https://${vercelUrl}`;
+
+  return "http://localhost:3000";
+}
+
 function normalizeRows(value: unknown): Row[] {
   return Array.isArray(value) ? value as Row[] : [];
 }
@@ -127,7 +137,7 @@ async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
   };
 
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const baseUrl = getAppBaseUrl();
 
     const [dashboardResult, bookingsResult] = await Promise.allSettled([
       fetch(`${baseUrl}/api/dashboard?_ts=${Date.now()}`, { cache: "no-store" }),
@@ -179,7 +189,7 @@ async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
 
 async function safeGetWeatherData(): Promise<WeatherData> {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    const baseUrl = getAppBaseUrl();
     const response = await fetch(`${baseUrl}/api/weather/open-meteo`, {
       cache: "no-store",
     });
@@ -786,10 +796,14 @@ function bookingAircraftKeys(row: Row) {
 function bookingMatchesAircraftResource(row: Row, resource: Row) {
   const resourceKeys = calendarResourceKeys(resource);
   const bookingKeys = bookingAircraftKeys(row);
+  const normalizedResourceKeys = resourceKeys.map(normalizeAircraftKey).filter(Boolean);
+  const normalizedBookingKeys = bookingKeys.map(normalizeAircraftKey).filter(Boolean);
 
   return (
     bookingKeys.some((key) => resourceKeys.includes(key)) ||
-    resourceKeys.some((key) => bookingKeys.includes(key))
+    resourceKeys.some((key) => bookingKeys.includes(key)) ||
+    normalizedBookingKeys.some((key) => normalizedResourceKeys.includes(key)) ||
+    normalizedResourceKeys.some((key) => normalizedBookingKeys.includes(key))
   );
 }
 
@@ -917,6 +931,55 @@ function buildAircraftRows(aircraft: Row[]) {
   if (rows.length > 0) return rows.sort((a, b) => a.localeCompare(b, "ko"));
 
   return FALLBACK_AIRCRAFT;
+}
+
+function addAircraftResourceKeysToSet(target: Set<string>, resource: Row) {
+  calendarResourceKeys(resource).forEach((key) => {
+    const normalized = normalizeAircraftKey(key);
+    if (normalized) target.add(normalized);
+  });
+
+  const displayName = aircraftDisplay(resource);
+  const normalizedDisplayName = normalizeAircraftKey(displayName);
+  if (normalizedDisplayName) target.add(normalizedDisplayName);
+}
+
+function buildDashboardAircraftResources(aircraft: Row[], bookings: Row[], aircraftLookup: Map<string, string>) {
+  const resources = aircraft
+    .filter(shouldShowDashboardAircraft)
+    .sort((a, b) => aircraftDisplay(a).localeCompare(aircraftDisplay(b), "ko"));
+
+  const seen = new Set<string>();
+  resources.forEach((resource) => addAircraftResourceKeysToSet(seen, resource));
+
+  bookings
+    .filter(isActiveBooking)
+    .forEach((booking) => {
+      const displayName = getBookingAircraftName(booking, aircraftLookup);
+      const normalizedDisplayName = normalizeAircraftKey(displayName);
+
+      if (!normalizedDisplayName || displayName === "미배정") return;
+      if (seen.has(normalizedDisplayName)) return;
+
+      const syntheticResource: Row = {
+        aircraftId: text(booking.aircraftId || displayName),
+        aircraftName: displayName,
+        aircraft: displayName,
+        registrationNo: displayName,
+        status: "운항 가능",
+        active: "TRUE",
+      };
+
+      resources.push(syntheticResource);
+      addAircraftResourceKeysToSet(seen, syntheticResource);
+
+      bookingAircraftKeys(booking).forEach((key) => {
+        const normalized = normalizeAircraftKey(key);
+        if (normalized) seen.add(normalized);
+      });
+    });
+
+  return resources.sort((a, b) => aircraftDisplay(a).localeCompare(aircraftDisplay(b), "ko"));
 }
 
 function buildDailyChart(bookings: Row[], today: string): DailyPoint[] {
@@ -1334,7 +1397,7 @@ async function updateDashboardBookingStatus(formData: FormData) {
   if (!nextStatus) return;
 
   const booking = JSON.parse(rawBooking) as Row;
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  const baseUrl = getAppBaseUrl();
 
   await fetch(`${baseUrl}/api/bookings`, {
     method: "POST",
@@ -2471,9 +2534,7 @@ export default async function DashboardPage({
   const selectedDate = dateOptions.some((option) => option.value === requestedDate) ? requestedDate : today;
   const selectedInstructor = firstParam(params.instructor) || "all";
   const aircraftLookup = createAircraftLookup(aircraft);
-  const visibleDashboardAircraft = aircraft
-    .filter(shouldShowDashboardAircraft)
-    .sort((a, b) => aircraftDisplay(a).localeCompare(aircraftDisplay(b), "ko"));
+  const visibleDashboardAircraft = buildDashboardAircraftResources(aircraft, bookings, aircraftLookup);
   const scheduleItems = buildScheduleItems(bookings, visibleDashboardAircraft, selectedDate);
   const filteredScheduleItems = selectedInstructor === "all"
     ? scheduleItems
