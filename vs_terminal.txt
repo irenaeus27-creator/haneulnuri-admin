@@ -1,0 +1,1041 @@
+{
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings?_ts=1780530428998 200 in 5.3s (next.js: 3ms, application-code: 5.3s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings 200 in 9.8s (next.js: 5ms, application-code: 9.8s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings?_ts=1780530431681 200 in 4.7s (next.js: 2ms, application-code: 4.7s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings?_ts=1780530439462 200 in 9.3s (next.js: 1947µs, application-code: 9.3s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings?_ts=1780530454450 200 in 6.8s (next.js: 1713µs, application-code: 6.8s)
+[HN_BOOKING_TRACE_API_IN] {
+  action: 'updateBooking',
+  bookingId: 'BKG-20260604045508-PSIJ7',
+  startTime: '17:00',
+  endTime: '18:00',
+  bookingDate: '2026-06-04'
+}
+[HN_BOOKING_TRACE_API_OUT] {
+  action: 'updateBooking',
+  bookingId: 'BKG-20260604045508-PSIJ7',
+  startTime: '17:00',
+  endTime: '18:00',
+  bookingDate: '2026-06-04'
+}
+[browser] [HN_BOOKING_TRACE_DRAG_PAYLOAD] {
+  bookingId: 'BKG-20260604045508-PSIJ7',
+  newEnd: '18:00',
+  newStart: '17:00',
+  updatedEndTime: '18:00',
+  updatedStartTime: '17:00'
+} (src/app/bookings/page.tsx:2576:15)
+ POST /api/bookings?_ts=1780530468134 200 in 2.4s (next.js: 2ms, application-code: 2.4s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings?_ts=1780530464572 200 in 6.2s (next.js: 1809µs, application-code: 6.2s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings?_ts=1780530468151 200 in 5.9s (next.js: 1694µs, application-code: 5.9s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings?_ts=1780530469464 200 in 4.9s (next.js: 1978µs, application-code: 4.9s)
+[HN_BOOKING_TRACE_API_IN] {
+  action: 'updateBooking',
+  bookingId: 'BKG-20260604045508-PSIJ7',
+  startTime: '09:30',
+  endTime: '10:30',
+  bookingDate: '2026-06-04'
+}
+[HN_BOOKING_TRACE_API_OUT] {
+  action: 'updateBooking',
+  bookingId: 'BKG-20260604045508-PSIJ7',
+  startTime: '09:30',
+  endTime: '10:30',
+  bookingDate: '2026-06-04'
+}
+[browser] [HN_BOOKING_TRACE_DRAG_PAYLOAD] {
+  bookingId: 'BKG-20260604045508-PSIJ7',
+  newEnd: '10:30',
+  newStart: '09:30',
+  updatedEndTime: '10:30',
+  updatedStartTime: '09:30'
+} (src/app/bookings/page.tsx:2576:15)
+ POST /api/bookings?_ts=1780530478699 200 in 2.9s (next.js: 2ms, application-code: 2.9s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings?_ts=1780530478716 200 in 6.0s (next.js: 1901µs, application-code: 6.0s)
+ GET /api/users 200 in 1780ms (next.js: 6ms, application-code: 1774ms)
+ GET /api/users 200 in 3.0s (next.js: 9ms, application-code: 3.0s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings?_ts=1780530484451 200 in 4.4s (next.js: 6ms, application-code: 4.4s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings 200 in 4.8s (next.js: 3ms, application-code: 4.8s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings 200 in 5.4s (next.js: 1920µs, application-code: 5.4s)
+[HN_BOOKING_TRACE_API_IN] {
+  action: 'updateBooking',
+  bookingId: 'BKG-20260604045508-PSIJ7',
+  startTime: '09:00',
+  endTime: '10:00',
+  bookingDate: '2026-06-04'
+}
+[HN_BOOKING_TRACE_API_OUT] {
+  action: 'updateBooking',
+  bookingId: 'BKG-20260604045508-PSIJ7',
+  startTime: '09:00',
+  endTime: '10:00',
+  bookingDate: '2026-06-04'
+}
+[browser] [HN_BOOKING_TRACE_DRAG_PAYLOAD] {
+  bookingId: 'BKG-20260604045508-PSIJ7',
+  newEnd: '10:00',
+  newStart: '09:00',
+  updatedEndTime: '10:00',
+  updatedStartTime: '09:00'
+} (src/app/bookings/page.tsx:2576:15)
+ POST /api/bookings?_ts=1780530494207 200 in 2.5s (next.js: 2ms, application-code: 2.4s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings?_ts=1780530494223 200 in 7.8s (next.js: 1790µs, application-code: 7.8s)
+[HN_BOOKING_TRACE_API_GET] [
+  {
+    bookingId: 'BKG-20260603134944-331R1',
+    bookingDate: '2026-06-03',
+    startTime: '17:00',
+    endTime: '18:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603140942-BOI3B',
+    bookingDate: '2026-06-03',
+    startTime: '15:00',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603142559-MYAA1',
+    bookingDate: '2026-06-04',
+    startTime: '11:00',
+    endTime: '12:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144624-P9424',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603144803-JDQ8Z',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145340-MGDA8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603145613-P27V8',
+    bookingDate: '2026-06-03',
+    startTime: '14:00',
+    endTime: '15:00',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603150606-TPE4S',
+    bookingDate: '2026-06-04',
+    startTime: '14:30',
+    endTime: '15:30',
+    userName: '조예준'
+  },
+  {
+    bookingId: 'BKG-20260603225302-BNL1V',
+    bookingDate: '2026-06-03',
+    startTime: '15:30',
+    endTime: '16:30',
+    userName: '강은우'
+  },
+  {
+    bookingId: 'BKG-20260603230217-ER7MH',
+    bookingDate: '2026-06-03',
+    startTime: '10:00',
+    endTime: '11:00',
+    userName: '이승민'
+  }
+]
+ GET /api/bookings?_ts=1780530499450 200 in 4.1s (next.js: 2ms, application-code: 4.1s)
+PS C:\Users\user\haneulnuri-admin> 

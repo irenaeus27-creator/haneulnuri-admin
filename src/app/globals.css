@@ -1,0 +1,237 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5f8fc;
+  --foreground: #10213f;
+  --primary: #1264f4;
+  --line: #dbe5f1;
+  --font-weight-ui: 600;
+  --font-weight-strong: 700;
+  --font-pretendard: "Pretendard Variable", Pretendard, system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", "Segoe UI", sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-pretendard);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  font-family: var(--font-pretendard);
+}
+
+html {
+  font-family: var(--font-pretendard);
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 22% 0%, rgba(18,100,244,0.08), transparent 30%),
+    linear-gradient(180deg, #f8fbff 0%, #f3f7fc 100%);
+  color: var(--foreground);
+  font-family: var(--font-pretendard);
+  font-feature-settings: "kern";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body *,
+button,
+input,
+select,
+textarea,
+table {
+  font-family: var(--font-pretendard);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+::selection {
+  background: rgba(18,100,244,0.16);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #eef3f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c7d4e6;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #aebed3;
+}
+
+.ui-input {
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid #dbe5f1;
+  background: #fff;
+  padding: 0 14px;
+  color: #243b63;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.ui-input::placeholder {
+  color: #9aa9bd;
+  font-weight: 500;
+}
+
+.ui-input:focus {
+  border-color: #8bb8ff;
+  box-shadow: 0 0 0 4px rgba(18,100,244,.08);
+}
+
+.ui-input:disabled {
+  background: #f2f6fb;
+  color: #95a5ba;
+}
+
+.ui-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ui-label > span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #395270;
+}
+
+.ui-card {
+  border: 1px solid rgba(219,229,241,0.95);
+  background: rgba(255,255,255,0.96);
+  border-radius: 22px;
+  box-shadow: 0 12px 30px rgba(16, 33, 63, 0.055);
+}
+
+.ui-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  color: #253a5c;
+}
+
+.ui-table thead {
+  background: linear-gradient(180deg, #f9fbfe 0%, #f4f8fd 100%);
+  color: #314965;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ui-table th {
+  padding: 15px 16px;
+  white-space: nowrap;
+  border-bottom: 1px solid #dbe5f1;
+}
+
+.ui-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #edf2f7;
+  font-size: 14px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.ui-table tbody tr:hover {
+  background: #f8fbff;
+}
+
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  border-radius: 999px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 700;
+  transition: transform .15s ease, background .15s ease, border-color .15s ease;
+}
+
+.ui-btn:hover {
+  transform: translateY(-1px);
+}
+
+.ui-btn-primary {
+  background: #1264f4;
+  color: #fff;
+  box-shadow: 0 9px 18px rgba(18,100,244,0.18);
+}
+
+.ui-btn-primary:hover {
+  background: #0b56dc;
+}
+
+.ui-btn-outline {
+  border: 1px solid #d6e0ee;
+  background: #fff;
+  color: #405875;
+}
+
+.ui-btn-danger {
+  border: 1px solid #ffd4d7;
+  background: #fff;
+  color: #f04452;
+}
+
+.ui-page-size {
+  border-radius: 12px;
+  border: 1px solid #dbe5f1;
+  background: #fff;
+  padding: 9px 13px;
+  color: #36506d;
+  font-size: 13px;
+  font-weight: 700;
+}
