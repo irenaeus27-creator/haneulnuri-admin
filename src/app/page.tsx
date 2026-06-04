@@ -119,6 +119,79 @@ function getAppBaseUrl() {
   return "http://localhost:3000";
 }
 
+function extractDashboardRows(data: unknown, sheetName: string) {
+  if (!data || typeof data !== "object") return [];
+
+  const obj = data as Row;
+
+  if (Array.isArray(obj[sheetName])) return obj[sheetName] as Row[];
+
+  const nestedData = obj.data;
+  if (nestedData && typeof nestedData === "object" && Array.isArray((nestedData as Row)[sheetName])) {
+    return (nestedData as Row)[sheetName] as Row[];
+  }
+
+  const dashboard = obj.dashboard;
+  if (dashboard && typeof dashboard === "object" && Array.isArray((dashboard as Row)[sheetName])) {
+    return (dashboard as Row)[sheetName] as Row[];
+  }
+
+  return [];
+}
+
+function normalizeDashboardBookingRows(rows: Row[]) {
+  return rows.map((row) => ({
+    ...row,
+    bookingDate: normalizeDate(getBookingDateValue(row)),
+    requestDate: normalizeDate(row.requestDate),
+    startTime: normalizeTime(getBookingStartValue(row)),
+    endTime: normalizeTime(getBookingEndValue(row)),
+    bufferEndTime: normalizeTime(row.bufferEndTime),
+  }));
+}
+
+async function safeFetchAppsScriptDashboardData(): Promise<Partial<DashboardApiResponse & BookingsApiResponse>> {
+  const apiUrl = text(process.env.NEXT_PUBLIC_API_URL, "");
+
+  if (!apiUrl) return {};
+
+  try {
+    const url = new URL(apiUrl);
+    url.searchParams.set("action", "getAllData");
+    url.searchParams.set("_ts", String(Date.now()));
+
+    const response = await fetch(url.toString(), { cache: "no-store" });
+
+    if (!response.ok) {
+      console.warn(`Apps Script 직접 호출 오류: ${response.status}`);
+      return {};
+    }
+
+    const rawText = await response.text();
+    if (!rawText.trim()) return {};
+
+    const parsed = JSON.parse(rawText) as unknown;
+
+    return {
+      bookings: normalizeDashboardBookingRows(extractDashboardRows(parsed, "bookings")),
+      users: extractDashboardRows(parsed, "users"),
+      aircraft: extractDashboardRows(parsed, "aircraft"),
+      instructors: extractDashboardRows(parsed, "instructors"),
+      students: extractDashboardRows(parsed, "students"),
+      notifications: extractDashboardRows(parsed, "notifications"),
+      instructorSchedules: extractDashboardRows(parsed, "instructorSchedules"),
+      trainingCharges: extractDashboardRows(parsed, "trainingCharges"),
+      logs: extractDashboardRows(parsed, "logs"),
+      settings: extractDashboardRows(parsed, "settings"),
+      courseCatalog: extractDashboardRows(parsed, "courseCatalog"),
+      rentalPilots: extractDashboardRows(parsed, "rentalPilots"),
+    };
+  } catch (error) {
+    console.warn("Apps Script 직접 대시보드 호출 실패", error);
+    return {};
+  }
+}
+
 function normalizeRows(value: unknown): Row[] {
   return Array.isArray(value) ? value as Row[] : [];
 }
@@ -137,6 +210,22 @@ async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
   };
 
   try {
+    const directData = await safeFetchAppsScriptDashboardData();
+
+    if (normalizeRows(directData.bookings).length > 0 || normalizeRows(directData.aircraft).length > 0) {
+      return {
+        bookings: normalizeRows(directData.bookings),
+        users: normalizeRows(directData.users),
+        aircraft: normalizeRows(directData.aircraft),
+        instructors: normalizeRows(directData.instructors),
+        students: normalizeRows(directData.students),
+        notifications: normalizeRows(directData.notifications),
+        instructorSchedules: normalizeRows(directData.instructorSchedules),
+        trainingCharges: normalizeRows(directData.trainingCharges),
+        logs: normalizeRows(directData.logs),
+      };
+    }
+
     const baseUrl = getAppBaseUrl();
 
     const [dashboardResult, bookingsResult] = await Promise.allSettled([
@@ -149,18 +238,10 @@ async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
 
     if (dashboardResult.status === "fulfilled" && dashboardResult.value.ok) {
       dashboardData = (await dashboardResult.value.json()) as DashboardApiResponse;
-    } else if (dashboardResult.status === "fulfilled") {
-      console.warn(`대시보드 API 오류: ${dashboardResult.value.status}`);
-    } else {
-      console.warn("대시보드 API 호출 실패", dashboardResult.reason);
     }
 
     if (bookingsResult.status === "fulfilled" && bookingsResult.value.ok) {
       bookingCalendarData = (await bookingsResult.value.json()) as BookingsApiResponse;
-    } else if (bookingsResult.status === "fulfilled") {
-      console.warn(`예약관리 API 오류: ${bookingsResult.value.status}`);
-    } else {
-      console.warn("예약관리 API 호출 실패", bookingsResult.reason);
     }
 
     return {
