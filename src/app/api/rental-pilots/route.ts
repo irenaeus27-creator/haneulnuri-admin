@@ -1,92 +1,107 @@
 import { NextRequest, NextResponse } from "next/server";
-import { normalizeSettingsRows } from "@/lib/settingsOptions";
+import { JsonRecord, buildId, insertRow, nowIso, pickAllowed, selectRows, text, updateRow } from "@/lib/supabase/route-helpers";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BASE_URL || "";
-type ApiObject = Record<string, unknown>;
+const TABLE = "rental_pilots";
+const ID_COLUMN = "pilot_id";
+const PREFIX = "RP";
+const RESPONSE_KEY = "rentalPilots";
+const SERVICE = "skynuri-supabase-rental-pilots";
+const ORDER_COLUMN = "pilot_id";
+const ALLOWED_COLUMNS = ["pilot_id", "user_id", "name", "phone", "email", "license_type", "license_no", "assigned_aircraft_ids", "status", "memo", "created_at", "updated_at"];
 
-function normalizeRows(data: unknown, key?: string): ApiObject[] {
-  if (Array.isArray(data)) return data as ApiObject[];
-  if (data && typeof data === "object") {
-    const obj = data as ApiObject;
-    if (key && Array.isArray(obj[key])) return obj[key] as ApiObject[];
-    if (Array.isArray(obj.data)) return obj.data as ApiObject[];
-    if (Array.isArray(obj.rows)) return obj.rows as ApiObject[];
-  }
-  return [];
-}
+function normalize(input: JsonRecord, isCreate = false) {
+  const now = nowIso();
+  const id = text(input.pilotId || input.pilot_id) || buildId(PREFIX);
+  const row: JsonRecord = { [ID_COLUMN]: id };
 
-async function fetchSheet(sheetName: string, optional = false) {
-  if (!API_URL) throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
-  try {
-    const url = new URL(API_URL);
-    url.searchParams.set("action", "getSheet");
-    url.searchParams.set("sheet", sheetName);
-    const response = await fetch(url.toString(), { method: "GET", cache: "no-store" });
-    const rawText = await response.text();
-    if (!response.ok) throw new Error(`Apps Script API 오류: ${response.status}`);
-    if (!rawText.trim()) return [];
-    const parsedData = JSON.parse(rawText) as unknown;
-    if (parsedData && typeof parsedData === "object" && "success" in parsedData && (parsedData as ApiObject).success === false) {
-      if (optional) return [];
-      throw new Error(String((parsedData as ApiObject).message || `${sheetName} 시트를 불러오지 못했습니다.`));
-    }
-    return normalizeRows(parsedData, sheetName);
-  } catch (error) {
-    if (optional) return [];
-    throw error;
-  }
-}
-
-async function postToAppsScript(action: string, data: ApiObject) {
-  if (!API_URL) throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
-  const response = await fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action, data }),
-    cache: "no-store",
+  ALLOWED_COLUMNS.forEach((column) => {
+    const camel = column.replace(/_([a-z0-9])/g, (_: string, char: string) => char.toUpperCase());
+    const value = input[camel] ?? input[column];
+    if (value !== undefined) row[column] = value;
   });
-  const rawText = await response.text();
-  if (!response.ok) throw new Error(`Apps Script API 오류: ${response.status}`);
-  if (!rawText.trim()) throw new Error("Apps Script 응답이 비어 있습니다.");
-  const parsedData = JSON.parse(rawText) as ApiObject;
-  if (parsedData && parsedData.success === false) throw new Error(String(parsedData.message || "Apps Script 처리에 실패했습니다."));
-  return parsedData;
+
+  if (ALLOWED_COLUMNS.includes("created_at") && isCreate && !row.created_at) row.created_at = now;
+  if (ALLOWED_COLUMNS.includes("updated_at")) row.updated_at = now;
+
+  return pickAllowed(row, ALLOWED_COLUMNS);
+}
+
+async function handlePost(body: JsonRecord) {
+  const action = text(body.action);
+  const data = (body.data || body) as JsonRecord;
+
+  if (action.startsWith("add") || action === "addRow") {
+    const saved = await insertRow(TABLE, normalize(data, true));
+    return { message: "렌탈기장을 등록했습니다.", [RESPONSE_KEY]: saved, data: saved };
+  }
+
+  if (action.startsWith("update") || action === "updateRow") {
+    const row = normalize(data, false);
+    const id = text(data.pilotId || data.pilot_id || row[ID_COLUMN]);
+    const saved = await updateRow(TABLE, ID_COLUMN, id, row);
+    return { message: "렌탈기장을 수정했습니다.", [RESPONSE_KEY]: saved, data: saved };
+  }
+
+  throw new Error(`지원하지 않는 action입니다: ${action}`);
 }
 
 export async function GET() {
-  try {
-    const [rentalPilots, users, rawSettings, aircraft] = await Promise.all([
-      fetchSheet("rentalPilots"),
-      fetchSheet("users", true),
-      fetchSheet("settings", true),
-      fetchSheet("aircraft", true),
-    ]);
-    const settings = normalizeSettingsRows(rawSettings);
+  const startedAt = Date.now();
 
-    return NextResponse.json({ ok: true, rentalPilots, users, settings, aircraft });
+  try {
+    const rows = await selectRows(TABLE, { orderColumn: ORDER_COLUMN, ascending: true });
+
+    return NextResponse.json({
+      ok: true,
+      success: true,
+      source: "supabase",
+      service: SERVICE,
+      [RESPONSE_KEY]: rows,
+      data: { [RESPONSE_KEY]: rows },
+      counts: { [RESPONSE_KEY]: rows.length },
+      elapsedMs: Date.now() - startedAt,
+    });
   } catch (error) {
-    console.error("[rental-pilots GET error]", error);
     return NextResponse.json(
-      { ok: false, message: error instanceof Error ? error.message : "렌탈 기장 데이터를 불러오지 못했습니다.", rentalPilots: [], users: [], settings: [], aircraft: [] },
+      {
+        ok: false,
+        success: false,
+        source: "supabase",
+        message: error instanceof Error ? error.message : "조회에 실패했습니다.",
+        elapsedMs: Date.now() - startedAt,
+      },
       { status: 500 }
     );
   }
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
+
   try {
-    const body = await request.json();
-    const mode = String(body.mode || "").trim();
-    const data = (body.data || {}) as ApiObject;
-    if (mode === "add") return NextResponse.json({ ok: true, result: await postToAppsScript("addRentalPilot", data) });
-    if (mode === "update") return NextResponse.json({ ok: true, result: await postToAppsScript("updateRentalPilot", data) });
-    return NextResponse.json({ ok: false, message: `지원하지 않는 mode입니다: ${mode}` }, { status: 400 });
+    const body = (await request.json()) as JsonRecord;
+    const result = await handlePost(body);
+
+    return NextResponse.json({
+      ok: true,
+      success: true,
+      source: "supabase",
+      service: SERVICE,
+      elapsedMs: Date.now() - startedAt,
+      ...result,
+    });
   } catch (error) {
-    console.error("[rental-pilots POST error]", error);
     return NextResponse.json(
-      { ok: false, message: error instanceof Error ? error.message : "렌탈 기장 정보를 저장하지 못했습니다." },
+      {
+        ok: false,
+        success: false,
+        source: "supabase",
+        message: error instanceof Error ? error.message : "처리에 실패했습니다.",
+        elapsedMs: Date.now() - startedAt,
+      },
       { status: 500 }
     );
   }

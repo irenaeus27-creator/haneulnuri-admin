@@ -1,159 +1,77 @@
 import { NextRequest, NextResponse } from "next/server";
-import { normalizeSettingsRows } from "@/lib/settingsOptions";
+import { JsonRecord, buildId, insertRow, nowIso, pickAllowed, selectRows, text, updateRow } from "@/lib/supabase/route-helpers";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BASE_URL || "";
+const TABLE = "course_catalog";
+const ID_COLUMN = "course_id";
+const PREFIX = "CRS";
+const RESPONSE_KEY = "courseCatalog";
+const SERVICE = "skynuri-supabase-course-catalog";
+const ORDER_COLUMN = "course_id";
+const ALLOWED_COLUMNS = ["course_id", "course_name", "course_type", "license_type", "default_minutes", "default_amount", "active", "memo", "created_at", "updated_at"];
 
-type ApiObject = Record<string, unknown>;
+function normalize(input: JsonRecord, isCreate = false) {
+  const now = nowIso();
+  const id = text(input.courseId || input.course_id) || buildId(PREFIX);
+  const row: JsonRecord = { [ID_COLUMN]: id };
 
-function normalizeRows(data: unknown, key?: string): ApiObject[] {
-  if (Array.isArray(data)) {
-    return data as ApiObject[];
-  }
-
-  if (data && typeof data === "object") {
-    const obj = data as ApiObject;
-
-    if (key && Array.isArray(obj[key])) {
-      return obj[key] as ApiObject[];
-    }
-
-    if (Array.isArray(obj.data)) {
-      return obj.data as ApiObject[];
-    }
-
-    if (Array.isArray(obj.rows)) {
-      return obj.rows as ApiObject[];
-    }
-  }
-
-  return [];
-}
-
-async function fetchSheet(sheetName: string) {
-  if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
-  }
-
-  const url = new URL(API_URL);
-  url.searchParams.set("action", "getSheet");
-  url.searchParams.set("sheet", sheetName);
-
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    cache: "no-store",
+  ALLOWED_COLUMNS.forEach((column) => {
+    const camel = column.replace(/_([a-z0-9])/g, (_: string, char: string) => char.toUpperCase());
+    const value = input[camel] ?? input[column];
+    if (value !== undefined) row[column] = value;
   });
 
-  const rawText = await response.text();
+  if (ALLOWED_COLUMNS.includes("created_at") && isCreate && !row.created_at) row.created_at = now;
+  if (ALLOWED_COLUMNS.includes("updated_at")) row.updated_at = now;
 
-  if (!response.ok) {
-    throw new Error(`Apps Script API 오류: ${response.status}`);
-  }
-
-  if (!rawText.trim()) {
-    throw new Error(`${sheetName} 시트 응답이 비어 있습니다.`);
-  }
-
-  let parsedData: unknown;
-
-  try {
-    parsedData = JSON.parse(rawText);
-  } catch {
-    throw new Error(`${sheetName} 시트 응답을 JSON으로 변환하지 못했습니다.`);
-  }
-
-  if (
-    parsedData &&
-    typeof parsedData === "object" &&
-    "success" in parsedData &&
-    (parsedData as ApiObject).success === false
-  ) {
-    throw new Error(
-      String((parsedData as ApiObject).message || "") ||
-        `${sheetName} 시트를 불러오지 못했습니다.`
-    );
-  }
-
-  return normalizeRows(parsedData, sheetName);
+  return pickAllowed(row, ALLOWED_COLUMNS);
 }
 
-async function postToAppsScript(action: string, data: ApiObject) {
-  if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
+async function handlePost(body: JsonRecord) {
+  const action = text(body.action);
+  const data = (body.data || body) as JsonRecord;
+
+  if (action.startsWith("add") || action === "addRow") {
+    const saved = await insertRow(TABLE, normalize(data, true));
+    return { message: "교육과정을 등록했습니다.", [RESPONSE_KEY]: saved, data: saved };
   }
 
-  const response = await fetch(API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/plain;charset=utf-8",
-    },
-    body: JSON.stringify({
-      action,
-      data,
-    }),
-    cache: "no-store",
-  });
-
-  const rawText = await response.text();
-
-  if (!response.ok) {
-    throw new Error(`Apps Script API 오류: ${response.status}`);
+  if (action.startsWith("update") || action === "updateRow") {
+    const row = normalize(data, false);
+    const id = text(data.courseId || data.course_id || row[ID_COLUMN]);
+    const saved = await updateRow(TABLE, ID_COLUMN, id, row);
+    return { message: "교육과정을 수정했습니다.", [RESPONSE_KEY]: saved, data: saved };
   }
 
-  if (!rawText.trim()) {
-    throw new Error("Apps Script 응답이 비어 있습니다.");
-  }
-
-  let parsedData: unknown;
-
-  try {
-    parsedData = JSON.parse(rawText);
-  } catch {
-    throw new Error("Apps Script 응답을 JSON으로 변환하지 못했습니다.");
-  }
-
-  if (
-    parsedData &&
-    typeof parsedData === "object" &&
-    "success" in parsedData &&
-    (parsedData as ApiObject).success === false
-  ) {
-    throw new Error(
-      String((parsedData as ApiObject).message || "") ||
-        "Apps Script 처리에 실패했습니다."
-    );
-  }
-
-  return parsedData;
+  throw new Error(`지원하지 않는 action입니다: ${action}`);
 }
 
 export async function GET() {
-  try {
-    const [courseCatalog, rawSettings] = await Promise.all([
-      fetchSheet("courseCatalog"),
-      fetchSheet("settings"),
-    ]);
+  const startedAt = Date.now();
 
-    const settings = normalizeSettingsRows(rawSettings);
+  try {
+    const rows = await selectRows(TABLE, { orderColumn: ORDER_COLUMN, ascending: true });
 
     return NextResponse.json({
       ok: true,
-      courseCatalog,
-      settings,
+      success: true,
+      source: "supabase",
+      service: SERVICE,
+      [RESPONSE_KEY]: rows,
+      data: { [RESPONSE_KEY]: rows },
+      counts: { [RESPONSE_KEY]: rows.length },
+      elapsedMs: Date.now() - startedAt,
     });
   } catch (error) {
-    console.error("[course-catalog GET error]", error);
-
     return NextResponse.json(
       {
         ok: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "코스 데이터를 불러오지 못했습니다.",
-        courseCatalog: [],
-        settings: [],
+        success: false,
+        source: "supabase",
+        message: error instanceof Error ? error.message : "조회에 실패했습니다.",
+        elapsedMs: Date.now() - startedAt,
       },
       { status: 500 }
     );
@@ -161,57 +79,28 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
+
   try {
-    const body = await request.json();
+    const body = (await request.json()) as JsonRecord;
+    const result = await handlePost(body);
 
-    const mode = String(body.mode || "").trim();
-    const data = (body.data || {}) as ApiObject;
-
-    if (!mode) {
-      return NextResponse.json(
-        {
-          ok: false,
-          message: "mode 값이 필요합니다.",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (mode === "add") {
-      const result = await postToAppsScript("addCourse", data);
-
-      return NextResponse.json({
-        ok: true,
-        result,
-      });
-    }
-
-    if (mode === "update") {
-      const result = await postToAppsScript("updateCourse", data);
-
-      return NextResponse.json({
-        ok: true,
-        result,
-      });
-    }
-
-    return NextResponse.json(
-      {
-        ok: false,
-        message: `지원하지 않는 mode입니다: ${mode}`,
-      },
-      { status: 400 }
-    );
+    return NextResponse.json({
+      ok: true,
+      success: true,
+      source: "supabase",
+      service: SERVICE,
+      elapsedMs: Date.now() - startedAt,
+      ...result,
+    });
   } catch (error) {
-    console.error("[course-catalog POST error]", error);
-
     return NextResponse.json(
       {
         ok: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "코스 정보를 저장하지 못했습니다.",
+        success: false,
+        source: "supabase",
+        message: error instanceof Error ? error.message : "처리에 실패했습니다.",
+        elapsedMs: Date.now() - startedAt,
       },
       { status: 500 }
     );
