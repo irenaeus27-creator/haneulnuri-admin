@@ -404,38 +404,37 @@ async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
 
 async function safeGetWeatherData(): Promise<WeatherData> {
   try {
-    const baseUrl = getAppBaseUrl();
-    const response = await fetch(`${baseUrl}/api/weather/open-meteo?_ts=${Date.now()}`, {
-      cache: "no-store",
-    });
-
-    if (response.ok) {
-      const data = (await response.json()) as WeatherData;
-      if (data.ok && data.current) return data;
-    }
-
     return await fetchOpenMeteoDirect();
   } catch (error) {
-    console.error("날씨 정보를 내부 API에서 불러오지 못해 직접 호출을 시도합니다.", error);
+    console.error("날씨 정보를 직접 불러오지 못했습니다.", error);
 
     try {
-      return await fetchOpenMeteoDirect();
-    } catch (directError) {
-      console.error("날씨 정보를 불러오지 못했습니다.", directError);
-      return {
-        ok: false,
-        source: "Open-Meteo",
-        current: null,
-        runway: null,
-        windComponents: null,
-        decision: {
-          label: "확인 필요",
-          tone: "slate",
-          message: "날씨 정보를 불러오지 못했습니다.",
-        },
-        hourly: [],
-      };
+      const baseUrl = getAppBaseUrl();
+      const response = await fetch(`${baseUrl}/api/weather/open-meteo?_ts=${Date.now()}`, {
+        cache: "no-store",
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as WeatherData;
+        if (data.ok && data.current) return data;
+      }
+    } catch (routeError) {
+      console.error("날씨 정보를 내부 API에서도 불러오지 못했습니다.", routeError);
     }
+
+    return {
+      ok: false,
+      source: "Open-Meteo",
+      current: null,
+      runway: null,
+      windComponents: null,
+      decision: {
+        label: "확인 필요",
+        tone: "slate",
+        message: "날씨 정보를 불러오지 못했습니다.",
+      },
+      hourly: [],
+    };
   }
 }
 
@@ -1739,7 +1738,7 @@ function ReservationChart({ data }: { data: DailyPoint[] }) {
           return (
             <g key={index}>
               <line x1={left} y1={y} x2={width - right} y2={y} stroke="#dbe5f1" />
-              <text x={left - 10} y={y + 4} textAnchor="end" fontSize="11" fontWeight="850" fill="#6f8199">
+              <text x={left - 10} y={y + 4} textAnchor="end" fontSize="14" fontWeight="850" fill="#6f8199">
                 {Math.round((max / 5) * index)}
               </text>
             </g>
@@ -1759,7 +1758,7 @@ function ReservationChart({ data }: { data: DailyPoint[] }) {
             <text x={point.x} y={height - 24} textAnchor="middle" fontSize="10" fontWeight="850" fill="#10b981">
               {point.flightHours}h
             </text>
-            <text x={point.x} y={height - 9} textAnchor="middle" fontSize="11" fontWeight="850" fill="#536985">
+            <text x={point.x} y={height - 9} textAnchor="middle" fontSize="14" fontWeight="850" fill="#536985">
               {point.date.slice(5).replace("-", "/")}
             </text>
           </g>
@@ -1867,7 +1866,7 @@ function ScheduleGraph({
   const currentTimeLeft = ((currentTimeMinutes - SCHEDULE_START_MIN) / SCHEDULE_TOTAL_MIN) * 100;
 
   return (
-    <ContentCard className="flex h-full min-h-[520px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
+    <ContentCard className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="flex flex-col gap-4 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-[-0.02em] text-[#10213f]">운항 일정</h2>
@@ -2337,8 +2336,8 @@ function WeatherLineChart({
     <div className="rounded-[22px] border border-[#dfe8f5] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] px-4 py-4 shadow-[0_10px_30px_rgba(20,46,80,0.05)]">
       <div className="mb-2.5 flex items-start justify-between gap-2">
         <div>
-          <p className="text-[18px] font-bold tracking-[-0.02em] text-[#10213f]">{title}</p>
-          <p className="mt-0.5 text-[13px] font-medium text-[#61758f]">{subtitle}</p>
+          <p className="text-[17px] font-bold tracking-[-0.02em] text-[#10213f]">{title}</p>
+          <p className="mt-0.5 text-[12px] font-medium text-[#61758f]">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {series.map((item) => {
@@ -2348,14 +2347,14 @@ function WeatherLineChart({
             return (
               <span
                 key={item.key}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 px-3.5 py-1.5 text-[14px] font-bold text-[#31455f] shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[13px] font-bold text-[#31455f] shadow-sm"
               >
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.solid }} />
                 {item.label} {latest}
               </span>
             );
           })}
-          <span className="ml-1 shrink-0 text-[16px] font-bold text-[#263b55]">{unit}</span>
+          <span className="ml-1 shrink-0 text-[14px] font-bold text-[#263b55]">{unit}</span>
         </div>
       </div>
 
@@ -2397,7 +2396,7 @@ function WeatherLineChart({
                 y={yAt(tick) + 5}
                 textAnchor="end"
                 fill="#263b55"
-                fontSize="22"
+                fontSize="20"
                 fontWeight="850"
               >
                 {tick}
@@ -2421,7 +2420,7 @@ function WeatherLineChart({
                   y={height - 14}
                   textAnchor="middle"
                   fill="#263b55"
-                  fontSize="22"
+                  fontSize="20"
                   fontWeight="850"
                 >
                   {row.label}
@@ -2501,11 +2500,11 @@ function WeatherDetailPanel({ weather }: { weather: WeatherData }) {
   const hasWeatherRows = sourceRows.some((item) => !item.missing);
 
   return (
-    <ContentCard className="flex h-full min-h-[520px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
+    <ContentCard className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="flex shrink-0 items-center justify-between px-5 py-3.5">
         <div>
-          <h3 className="text-[18px] font-bold tracking-[-0.02em] text-[#10213f]">시간별 기상 그래프</h3>
-          <p className="mt-0.5 text-[13px] font-medium text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
+          <h3 className="text-[17px] font-bold tracking-[-0.02em] text-[#10213f]">시간별 기상 그래프</h3>
+          <p className="mt-0.5 text-[12px] font-medium text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
         </div>
         <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">Open-Meteo</span>
       </div>
@@ -2854,7 +2853,7 @@ export default async function DashboardPage({
           />
 
           <div className="grid min-h-0 items-stretch gap-4 grid-cols-[560px_430px_288px]">
-            <MiniTable title="다가오는 예약" href="/bookings" headers={["예약자", "시간", "유형", "항공기", "교관", "상태"]} className="h-full min-h-[520px]">
+            <MiniTable title="다가오는 예약" href="/bookings" headers={["예약자", "시간", "유형", "항공기", "교관", "상태"]} className="h-full min-h-[430px]">
             {upcomingBookings.length === 0 ? (
             <tr><td colSpan={6} className="text-center text-[#6f8199]">다가오는 예약이 없습니다.</td></tr>
             ) : (
@@ -2905,7 +2904,7 @@ export default async function DashboardPage({
 
             <WeatherDetailPanel weather={weather} />
 
-            <InstructorAssignmentSummaryPanel items={instructorAssignmentSummary} className="h-full min-h-[520px]" />
+            <InstructorAssignmentSummaryPanel items={instructorAssignmentSummary} className="h-full min-h-[430px]" />
           </div>
         </div>
 
@@ -2917,7 +2916,7 @@ export default async function DashboardPage({
             todayBookings={todayBookings.filter((booking) => getDisplayBookingStatus(booking) === "확정").length}
             weather={weather}
           />
-          <RecentActivityPanel activities={recentActivities} className="h-full min-h-[520px]" />
+          <RecentActivityPanel activities={recentActivities} className="h-full min-h-[430px]" />
         </div>
       </div>
       </div>
