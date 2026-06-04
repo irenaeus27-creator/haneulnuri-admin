@@ -14,7 +14,7 @@ async function fetchWithRetry(input: RequestInfo | URL, init: RequestInit, conte
 
   for (let attempt = 0; attempt <= retryCount; attempt += 1) {
     try {
-      const response = await fetch(input, init);
+      const response = await fetchWithApiTimeout(input, init);
 
       if (response.ok || attempt >= retryCount) {
         return response;
@@ -36,6 +36,57 @@ async function fetchWithRetry(input: RequestInfo | URL, init: RequestInit, conte
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BASE_URL || "";
+
+
+
+
+const API_NO_STORE_HEADERS = { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" };
+const APPS_SCRIPT_TIMEOUT_MS = 12_000;
+const APPS_SCRIPT_RETRY_COUNT = 1;
+
+function sleepApiRetry(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithApiTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= APPS_SCRIPT_RETRY_COUNT; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), APPS_SCRIPT_TIMEOUT_MS);
+
+    try {
+      const response = await globalThis.fetch(input, {
+        ...init,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timer);
+
+      if (response.ok || attempt >= APPS_SCRIPT_RETRY_COUNT) {
+        return response;
+      }
+
+      lastError = new Error(`Apps Script 응답 오류: ${response.status}`);
+    } catch (error) {
+      clearTimeout(timer);
+
+      if (error instanceof Error && error.name === "AbortError") {
+        lastError = new Error("Apps Script 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.");
+      } else {
+        lastError = error;
+      }
+
+      if (attempt >= APPS_SCRIPT_RETRY_COUNT) {
+        throw lastError instanceof Error ? lastError : new Error("Apps Script 요청에 실패했습니다.");
+      }
+    }
+
+    await sleepApiRetry(450 * (attempt + 1));
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Apps Script 요청에 실패했습니다.");
+}
 
 const NO_STORE_HEADERS = { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" };
 const CACHE_TTL_MS = 10_000;
