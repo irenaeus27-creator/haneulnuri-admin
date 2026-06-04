@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { bookingActionLabel, bookingAuditMessage, writeLog, writeNotification } from "@/lib/supabase/audit";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -241,6 +242,47 @@ async function loadBookingsPageData(fromDate: string, toDate: string) {
   };
 }
 
+async function recordBookingAudit(action: string, booking: JsonRecord) {
+  const label = bookingActionLabel(action);
+  const bookingId = text(booking.bookingId || booking.booking_id || booking.id);
+  const userId = text(booking.userId || booking.user_id);
+  const userName = text(booking.userName || booking.user_name || booking.name);
+  const status = text(booking.status);
+
+  const message = bookingAuditMessage(booking, label);
+
+  await writeLog({
+    action: label,
+    targetSheet: "bookings",
+    targetId: bookingId,
+    status: "success",
+    message,
+    userId,
+    userName,
+  });
+
+  const shouldCreateNotification =
+    action === "addBooking" ||
+    action === "approveBooking" ||
+    action === "cancelBooking" ||
+    status === "요청" ||
+    status === "취소요청" ||
+    status === "확정" ||
+    status === "취소";
+
+  if (shouldCreateNotification) {
+    await writeNotification({
+      title: label,
+      body: message,
+      targetType: "booking",
+      targetUserId: userId,
+      targetUserName: userName,
+      status: "대기",
+      memo: bookingId,
+    });
+  }
+}
+
 async function insertBooking(data: JsonRecord) {
   const supabase = getSupabaseServerClient();
   const row = normalizeBookingPayload(data);
@@ -255,10 +297,13 @@ async function insertBooking(data: JsonRecord) {
     throw new Error(error.message);
   }
 
-  return withBookingAliases(toCamelObject(inserted as JsonRecord));
+  const booking = withBookingAliases(toCamelObject(inserted as JsonRecord));
+  await recordBookingAudit("addBooking", booking);
+
+  return booking;
 }
 
-async function updateBooking(data: JsonRecord) {
+async function updateBooking(data: JsonRecord, auditAction = "updateBooking") {
   const supabase = getSupabaseServerClient();
   const bookingId = text(data.bookingId || data.booking_id || data.id);
 
@@ -293,14 +338,20 @@ async function updateBooking(data: JsonRecord) {
     throw new Error(error.message);
   }
 
-  return withBookingAliases(toCamelObject(updated as JsonRecord));
+  const booking = withBookingAliases(toCamelObject(updated as JsonRecord));
+  await recordBookingAudit(auditAction, booking);
+
+  return booking;
 }
 
-async function updateBookingStatus(data: JsonRecord, status: string) {
-  return updateBooking({
-    ...data,
-    status,
-  });
+async function updateBookingStatus(data: JsonRecord, status: string, auditAction: string) {
+  return updateBooking(
+    {
+      ...data,
+      status,
+    },
+    auditAction
+  );
 }
 
 async function handlePost(body: JsonRecord) {
@@ -317,17 +368,17 @@ async function handlePost(body: JsonRecord) {
   }
 
   if (action === "updateBooking") {
-    const booking = await updateBooking(data);
+    const booking = await updateBooking(data, "updateBooking");
     return { message: "예약을 수정했습니다.", booking, data: booking };
   }
 
   if (action === "approveBooking") {
-    const booking = await updateBookingStatus(data, "확정");
+    const booking = await updateBookingStatus(data, "확정", "approveBooking");
     return { message: "예약을 확정했습니다.", booking, data: booking };
   }
 
   if (action === "cancelBooking") {
-    const booking = await updateBookingStatus(data, "취소");
+    const booking = await updateBookingStatus(data, "취소", "cancelBooking");
     return { message: "예약을 취소했습니다.", booking, data: booking };
   }
 
@@ -337,7 +388,7 @@ async function handlePost(body: JsonRecord) {
   }
 
   if (action === "updateRow" && text(data.sheetName) === "bookings") {
-    const booking = await updateBooking(data);
+    const booking = await updateBooking(data, "updateBooking");
     return { message: "예약을 수정했습니다.", booking, data: booking };
   }
 
