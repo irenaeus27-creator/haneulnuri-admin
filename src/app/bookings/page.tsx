@@ -1152,7 +1152,7 @@ export default function BookingsPage() {
 
   function calendarBookingCardClass(booking: BookingRow) {
     if (isPendingBooking(booking)) {
-      return "pending-request-card border-slate-300 border-dashed bg-slate-100 text-slate-650 opacity-95";
+      return "pending-request-card border-2 border-slate-400 border-dashed bg-slate-100/95 text-slate-700 opacity-100 ring-2 ring-slate-300/70";
     }
 
     return calendarTypeClass(booking.bookingType);
@@ -3179,10 +3179,10 @@ export default function BookingsPage() {
   return (
     <div className="min-h-screen w-full bg-[linear-gradient(180deg,#eef4fb_0%,#f7fbff_42%,#eef4fb_100%)]">
       <div className="flex w-full flex-col gap-4 p-5 xl:p-6">
-        <section className="rounded-[22px] border border-[#d9e6f5] bg-white/95 px-5 py-4 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
+        <section className="min-w-0 rounded-[22px] border border-[#d9e6f5] bg-white/95 px-5 py-4 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-[9px] font-medium uppercase tracking-[0.18em] text-[#7c93b2]">Booking Control</p>
+              <p className="text-[13px] font-medium uppercase tracking-[0.18em] text-[#7c93b2]">Booking Control</p>
               <h1 className="mt-0.5 text-[24px] font-bold tracking-[-0.04em] text-[#071a35]">예약관리</h1>
               <p className="mt-1.5 text-[13px] font-medium text-[#61758f]">
                 예약 신규 등록, 승인 요청, 취소 요청, 일정 변경을 한 화면에서 관리합니다.
@@ -3196,14 +3196,14 @@ export default function BookingsPage() {
               <button
                 type="button"
                 onClick={startCreate}
-                className="inline-flex h-8 items-center rounded-xl border border-[#d3ddeb] bg-white px-3 text-[11px] font-medium text-[#233a5a] shadow-sm transition hover:bg-[#f6f9fd]"
+                className="inline-flex h-9 items-center rounded-xl border border-[#d3ddeb] bg-white px-3.5 text-[13px] font-medium text-[#233a5a] shadow-sm transition hover:bg-[#f6f9fd]"
               >
                 신규 예약
               </button>
               <button
                 type="button"
                 onClick={() => void loadData(true)}
-                className="inline-flex h-8 items-center rounded-xl bg-[#071a35] px-3 text-[11px] font-medium text-white shadow-[0_10px_22px_rgba(7,26,53,0.18)] transition hover:bg-[#102544] disabled:cursor-not-allowed disabled:bg-slate-400"
+                className="inline-flex h-9 items-center rounded-xl bg-[#071a35] px-3.5 text-[13px] font-medium text-white shadow-[0_10px_22px_rgba(7,26,53,0.18)] transition hover:bg-[#102544] disabled:cursor-not-allowed disabled:bg-slate-400"
                 disabled={loading}
               >
                 {loading ? "불러오는 중" : "새로고침"}
@@ -3212,36 +3212,36 @@ export default function BookingsPage() {
           </div>
         </section>
 
-        <section ref={calendarSectionRef} className="rounded-[24px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_12px_34px_rgba(20,46,80,0.065)]">
+        <section ref={calendarSectionRef} className="min-w-0 rounded-[24px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_12px_34px_rgba(20,46,80,0.065)]">
           <div className="mb-2 flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-[#10213f]">예약 캘린더</h2>
-              <p className="mt-0.5 text-[12px] font-normal text-[#6d7f96]">
+              <p className="mt-0.5 text-[13px] font-normal text-[#6d7f96]">
                 대시보드와 같은 형태로 PFI와 예약을 함께 보면서 30분 단위로 예약을 지정합니다.
               </p>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-medium text-blue-700">
+                <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-[13px] font-medium text-blue-700">
                   {calendarViewMode === "week" ? `${koreanDateLabel(calendarDate)}부터 7일` : koreanDateLabel(calendarDate)}
                 </span>
                 {selectedBooking ? (
-                  <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-medium text-[#516982]">
+                  <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[13px] font-medium text-[#516982]">
                     선택 중: {text(selectedBooking.userName, "-")} · {formatBookingSummaryTimeRange(selectedBooking.startTime, selectedBooking.endTime)}
                   </span>
                 ) : null}
                 {calendarMoveDrag ? (
-                  <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-100">
+                  <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-[13px] font-medium text-amber-700 ring-1 ring-amber-100">
                     이동 중: {calendarMoveDrag.deltaSteps > 0 ? "+" : ""}{calendarMoveDrag.deltaSteps * 30}분
                   </span>
                 ) : null}
                 {calendarResizeDrag ? (
-                  <span className="inline-flex rounded-full bg-violet-50 px-2.5 py-0.5 text-[10px] font-medium text-violet-700 ring-1 ring-violet-100">
+                  <span className="inline-flex rounded-full bg-violet-50 px-2.5 py-0.5 text-[13px] font-medium text-violet-700 ring-1 ring-violet-100">
                     종료 조절: {calendarResizeDrag.deltaSteps > 0 ? "+" : ""}{calendarResizeDrag.deltaSteps * 30}분
                   </span>
                 ) : null}
               </div>
             </div>
 
-            <div className="rounded-[18px] border border-[#e1eaf6] bg-[#f8fbff] p-2.5">
+            <div className="min-w-0 rounded-[18px] border border-[#e1eaf6] bg-[#f8fbff] p-2.5">
               <div className="grid gap-1.5 md:grid-cols-[90px_110px_135px_70px_70px_70px]">
                 <Field label="보기">
                   <select value={calendarViewMode} onChange={(event) => setCalendarViewMode(event.target.value as "day" | "week")} className="input-base">
@@ -3276,7 +3276,7 @@ export default function BookingsPage() {
                     updateForm("bookingDate", nextDate);
                     setDateFilter(nextDate);
                   }}
-                  className="mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-[#d3ddeb] bg-white px-2 text-[10px] font-medium text-[#28486d] shadow-sm hover:bg-[#f7faff]"
+                  className="mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-[#d3ddeb] bg-white px-2 text-[13px] font-medium text-[#28486d] shadow-sm hover:bg-[#f7faff]"
                 >
                   이전
                 </button>
@@ -3287,7 +3287,7 @@ export default function BookingsPage() {
                     updateForm("bookingDate", todayText);
                     setDateFilter(todayText);
                   }}
-                  className="mt-4 inline-flex h-8 items-center justify-center rounded-lg bg-blue-50 px-2 text-[10px] font-medium text-blue-700 ring-1 ring-blue-100 hover:bg-blue-100"
+                  className="mt-4 inline-flex h-8 items-center justify-center rounded-lg bg-blue-50 px-2 text-[13px] font-medium text-blue-700 ring-1 ring-blue-100 hover:bg-blue-100"
                 >
                   오늘
                 </button>
@@ -3299,7 +3299,7 @@ export default function BookingsPage() {
                     updateForm("bookingDate", nextDate);
                     setDateFilter(nextDate);
                   }}
-                  className="mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-[#d3ddeb] bg-white px-2 text-[10px] font-medium text-[#28486d] shadow-sm hover:bg-[#f7faff]"
+                  className="mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-[#d3ddeb] bg-white px-2 text-[13px] font-medium text-[#28486d] shadow-sm hover:bg-[#f7faff]"
                 >
                   다음
                 </button>
@@ -3316,7 +3316,7 @@ export default function BookingsPage() {
               <button
                 type="button"
                 onClick={() => setShowAogAircraft((prev) => !prev)}
-                className="inline-flex h-8 items-center rounded-xl border border-[#cfd9e6] bg-white px-3 text-[10px] font-medium text-[#334e68] shadow-sm hover:bg-[#f3f7fb]"
+                className="inline-flex h-9 items-center rounded-xl border border-[#cfd9e6] bg-white px-3 text-[13px] font-medium text-[#334e68] shadow-sm hover:bg-[#f3f7fb]"
               >
                 {showAogAircraft ? "AOG 접기" : "AOG 펼치기"}
               </button>
@@ -3328,7 +3328,7 @@ export default function BookingsPage() {
               <div className="min-w-[1280px]">
                 <div className="grid grid-cols-[140px_1fr] border-b border-[#dce7f3] pb-2 text-[13px] font-semibold text-[#314965]">
                   <div className="pl-1">{calendarResourceMode === "instructor" ? "교관" : "항공기"}</div>
-                  <div className="relative h-8">
+                  <div className="relative min-w-[980px] h-8">
                     {calendarHourHeaders.map((hour, index) => (
                       <div
                         key={hour}
@@ -3352,17 +3352,17 @@ export default function BookingsPage() {
                           <div>
                             <div>{resourceName(resource)}</div>
                             {calendarResourceMode === "aircraft" && !isAircraftOperational(resource as AircraftRow) ? (
-                              <div className="mt-1 text-[11px] font-semibold text-slate-500">{aircraftStatusLabel(resource as AircraftRow)}</div>
+                              <div className="mt-1 text-[13px] font-semibold text-slate-500">{aircraftStatusLabel(resource as AircraftRow)}</div>
                             ) : null}
                             {calendarResourceMode === "instructor" ? (
-                              <div className="mt-1 text-[10px] font-medium text-[#7b8fa8]">{instructorScheduleLabel(resource as InstructorRow, calendarDate)}</div>
+                              <div className="mt-1 text-[13px] font-medium text-[#7b8fa8]">{instructorScheduleLabel(resource as InstructorRow, calendarDate)}</div>
                             ) : null}
                           </div>
                         </div>
 
                         <div
                           ref={calendarTimelineRef}
-                          className="relative min-h-[86px] border-l border-[#dce7f3]"
+                          className="relative min-w-[980px] min-h-[86px] border-l border-[#dce7f3]"
                           onMouseMove={(event) => {
                             updateCalendarMoveDrag(event);
                             updateCalendarResizeDrag(event);
@@ -3440,7 +3440,7 @@ export default function BookingsPage() {
                               <div key={`${bookingId}-${index}`}>
                                 {showPfi ? (
                                   <div
-                                    className="absolute top-3 z-10 flex h-[56px] items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-2 text-[10px] font-medium text-sky-800 shadow-sm"
+                                    className="absolute top-3 z-10 flex h-[56px] items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-2 text-[13px] font-medium text-sky-800 shadow-sm"
                                     style={calendarBlockStyleByTime(pfiStart, pfiEnd)}
                                     title={`PFI ${pfiStart}~${pfiEnd}\n${bookingTooltip(booking)}`}
                                   >
@@ -3484,15 +3484,15 @@ export default function BookingsPage() {
                                     className="block h-full w-full cursor-grab overflow-hidden text-left active:cursor-grabbing"
                                   >
                                     <div className="flex h-full flex-col justify-center gap-0.5 overflow-hidden">
-                                      <div className={`${isShortCalendarBlock(booking) ? "text-[7px]" : "text-[10px]"} truncate font-semibold leading-tight opacity-85`}>
-                                        {isPendingBooking(booking) ? <span className="mr-1 rounded bg-white/75 px-1 py-0.5 text-[8px] text-slate-600 ring-1 ring-slate-300">요청</span> : null}
+                                      <div className={`${isShortCalendarBlock(booking) ? "text-[13px]" : "text-[13px]"} truncate font-semibold leading-tight opacity-85`}>
+                                        {isPendingBooking(booking) ? <span className="mr-1 rounded bg-white/75 px-1 py-0.5 text-[13px] text-slate-600 ring-1 ring-slate-300">요청</span> : null}
                                         {compactBookingTypeLabel(booking.bookingType)}
                                       </div>
-                                      <div className={`${isShortCalendarBlock(booking) ? "text-[9px]" : "text-[12px]"} truncate font-bold leading-tight text-current`}>
+                                      <div className={`${isShortCalendarBlock(booking) ? "text-[13px]" : "text-[13px]"} truncate font-bold leading-tight text-current`}>
                                         {calendarPersonLabel(booking)}
                                       </div>
                                       {calendarInstructorLabel(booking) ? (
-                                        <div className={`${isShortCalendarBlock(booking) ? "text-[7px]" : "text-[8px]"} truncate font-medium leading-tight opacity-80`}>
+                                        <div className={`${isShortCalendarBlock(booking) ? "text-[13px]" : "text-[13px]"} truncate font-medium leading-tight opacity-80`}>
                                           {calendarInstructorLabel(booking)}
                                         </div>
                                       ) : null}
@@ -3524,7 +3524,7 @@ export default function BookingsPage() {
           ) : (
             <div className="max-h-[720px] overflow-auto">
               <div className="min-w-[980px]">
-                <div className="grid grid-cols-[140px_repeat(7,minmax(120px,1fr))] border-b border-[#dce7f3] pb-2 text-[10px] font-medium text-[#425a78]">
+                <div className="grid grid-cols-[140px_repeat(7,minmax(120px,1fr))] border-b border-[#dce7f3] pb-2 text-[13px] font-medium text-[#425a78]">
                   <div>{calendarResourceMode === "instructor" ? "교관" : "항공기"}</div>
                   {calendarDates.map((date) => (
                     <div key={date} className="text-center">
@@ -3542,7 +3542,7 @@ export default function BookingsPage() {
                         <div>
                           <div>{resourceName(resource)}</div>
                           {calendarResourceMode === "aircraft" && !isAircraftOperational(resource as AircraftRow) ? (
-                            <div className="mt-1 text-[11px] font-semibold text-slate-500">{aircraftStatusLabel(resource as AircraftRow)}</div>
+                            <div className="mt-1 text-[13px] font-semibold text-slate-500">{aircraftStatusLabel(resource as AircraftRow)}</div>
                           ) : null}
                         </div>
                       </div>
@@ -3570,12 +3570,12 @@ export default function BookingsPage() {
                                     onClick={() => startEdit(booking)}
                                     title={bookingTooltip(booking)} className={`w-full rounded-xl border px-2.5 py-2 text-left shadow-sm ${calendarTypeClass(booking.bookingType)}`}
                                   >
-                                    <div className="truncate text-[11px] font-semibold opacity-80">{compactBookingTypeLabel(booking.bookingType)}</div>
+                                    <div className="truncate text-[13px] font-semibold opacity-80">{compactBookingTypeLabel(booking.bookingType)}</div>
                                     <div className="mt-1 truncate text-[14px] font-semibold">{calendarPersonLabel(booking)}</div>
                                     {calendarInstructorLabel(booking) ? (
-                                      <div className="mt-0.5 truncate text-[10px] font-semibold opacity-75">{calendarInstructorLabel(booking)}</div>
+                                      <div className="mt-0.5 truncate text-[13px] font-semibold opacity-75">{calendarInstructorLabel(booking)}</div>
                                     ) : null}
-                                    <div className="mt-0.5 text-[10px] font-semibold opacity-70">
+                                    <div className="mt-0.5 text-[13px] font-semibold opacity-70">
                                       {normalizeTime(booking.startTime)}~{normalizeTime(booking.endTime)}
                                     </div>
                                   </button>
@@ -3592,7 +3592,7 @@ export default function BookingsPage() {
             </div>
           )}
 
-          <div className="mt-3 flex flex-wrap gap-2 text-[12px] font-bold text-[#61758f]">
+          <div className="mt-3 flex flex-wrap gap-2 text-[13px] font-bold text-[#61758f]">
             <span className="rounded-full bg-[#f3f7fb] px-2 py-0.5">빈 칸 드래그: 시간 선택</span>
             <span className="rounded-full bg-[#f3f7fb] px-2 py-0.5">블록 클릭: 선택</span>
             <span className="rounded-full bg-[#f3f7fb] px-2 py-0.5">블록 더블클릭: 상세수정</span>
@@ -3601,7 +3601,7 @@ export default function BookingsPage() {
             <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700">PFI: 교육/렌탈 시작 30분 전</span>
           </div>
 
-          <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] font-medium">
+          <div className="mt-1.5 flex flex-wrap gap-1.5 text-[13px] font-medium">
             <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700 ring-1 ring-blue-100">교육비행</span>
             <span className="rounded-full bg-orange-50 px-2 py-0.5 text-orange-700 ring-1 ring-orange-100">렌탈비행</span>
             <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 ring-1 ring-emerald-100">체험비행</span>
@@ -3611,42 +3611,42 @@ export default function BookingsPage() {
         </section>
 
         <section className="grid gap-2 xl:grid-cols-[minmax(330px,0.75fr)_minmax(0,1.25fr)]">
-          <div className="overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 shadow-[0_18px_50px_rgba(20,46,80,0.07)]">
+          <div className="min-w-0 overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 shadow-[0_18px_50px_rgba(20,46,80,0.07)]">
             <div className="flex items-center justify-between border-b border-[#edf2f7] px-3 py-2">
               <div>
                 <h2 className="text-[15px] font-semibold text-[#10213f]">처리 대기 요청</h2>
-                <p className="mt-0.5 text-[11px] font-normal text-[#61758f]">승인 대기와 취소 요청을 확인하고, 선택한 예약 패널에서도 상태 처리할 수 있습니다.</p>
+                <p className="mt-0.5 text-[13px] font-normal text-[#61758f]">승인 대기와 취소 요청을 확인하고, 선택한 예약 패널에서도 상태 처리할 수 있습니다.</p>
               </div>
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-medium text-blue-700">{pendingRequestBookings.length}건</span>
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-[13px] font-medium text-blue-700">{pendingRequestBookings.length}건</span>
             </div>
 
             {pendingRequestBookings.length === 0 ? (
-              <div className="mx-5 my-3 rounded-xl border border-dashed border-[#dbe5f1] bg-[#f8fbff] px-3 py-3 text-center"><p className="text-[11px] font-medium text-[#60738d]">처리 대기 요청이 없습니다.</p><p className="mt-1 text-[10px] font-normal text-[#8ba0b8]">앱 예약 요청과 취소 요청이 들어오면 이 영역에 표시됩니다.</p></div>
+              <div className="mx-5 my-3 rounded-xl border border-dashed border-[#dbe5f1] bg-[#f8fbff] px-3 py-3 text-center"><p className="text-[13px] font-medium text-[#60738d]">처리 대기 요청이 없습니다.</p><p className="mt-1 text-[13px] font-normal text-[#8ba0b8]">앱 예약 요청과 취소 요청이 들어오면 이 영역에 표시됩니다.</p></div>
             ) : (
               <div className="divide-y divide-[#edf2f8]">
                 {pendingRequestBookings.slice(0, 6).map((item, index) => {
                   const actions = statusActionButtons(normalizedStatusOf(item));
                   return (
-                    <div key={`${text(item.bookingId, "request")}-${index}`} title={bookingTooltip(item)} onClick={() => focusBookingInCalendar(item)} className={`flex cursor-pointer flex-col gap-2 border-l-4 px-3 py-2 transition hover:bg-blue-50/60 md:flex-row md:items-center md:justify-between ${pendingRequestToneClass(item.status)}`}>
+                    <div key={`${text(item.bookingId, "request")}-${index}`} title={bookingTooltip(item)} onClick={() => focusBookingInCalendar(item)} className={`pending-request-list-card flex cursor-pointer flex-col gap-2 border-l-4 px-3 py-2 transition hover:bg-blue-50/60 md:flex-row md:items-center md:justify-between ${pendingRequestToneClass(item.status)}`}>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span title={statusBadgeTitle(normalizedStatusOf(item))} className={`inline-flex rounded-full px-1.5 py-0.5 text-[9px] font-semibold ring-1 ${statusBadgeClass(normalizedStatusOf(item))}`}>
+                          <span title={statusBadgeTitle(normalizedStatusOf(item))} className={`inline-flex rounded-full px-1.5 py-0.5 text-[13px] font-semibold ring-1 ${statusBadgeClass(normalizedStatusOf(item))}`}>
                             {normalizedStatusOf(item)}
                           </span>
                           {isFutureCompletedBooking(item) ? (
-                            <span title={futureCompletedTitle(item)} className="rounded-full bg-rose-50 px-2 py-0.5 text-[9px] font-semibold text-rose-700 ring-1 ring-rose-200">미래완료</span>
+                            <span title={futureCompletedTitle(item)} className="rounded-full bg-rose-50 px-2 py-0.5 text-[13px] font-semibold text-rose-700 ring-1 ring-rose-200">미래완료</span>
                           ) : null}
-                          <span className="text-[11px] font-medium text-[#163255]">{normalizeDate(item.bookingDate)} {normalizeTime(item.startTime)}~{normalizeTime(item.endTime)}</span>
+                          <span className="text-[13px] font-medium text-[#163255]">{normalizeDate(item.bookingDate)} {normalizeTime(item.startTime)}~{normalizeTime(item.endTime)}</span>
                         </div>
-                        <p className="mt-1 truncate text-[11px] font-medium text-[#102544]">{pendingRequestSummary(item)}</p>
-                        <p className="mt-0.5 truncate text-[10px] font-normal text-[#6d7f96]">{text(item.phone, "-")} · 담당 {text(item.instructorName, "-")}</p>
+                        <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{pendingRequestSummary(item)}</p>
+                        <p className="mt-0.5 truncate text-[13px] font-normal text-[#6d7f96]">{text(item.phone, "-")} · 담당 {text(item.instructorName, "-")}</p>
                       </div>
 
                       <div className="flex shrink-0 flex-wrap gap-1.5">
                         <button
                           type="button"
                           onClick={(event) => { event.stopPropagation(); focusBookingInCalendar(item); }}
-                          className="inline-flex h-6 items-center rounded-md bg-blue-50 px-1.5 text-[8px] font-medium text-blue-700 hover:bg-blue-100"
+                          className="inline-flex h-7 items-center rounded-md bg-blue-50 px-1.5 text-[13px] font-medium text-blue-700 hover:bg-blue-100"
                         >
                           선택
                         </button>
@@ -3657,7 +3657,7 @@ export default function BookingsPage() {
                             onClick={(event) => { event.stopPropagation(); void changeBookingStatus(item, action.nextStatus, action.actionLabel); }}
                             disabled={saving}
                             title={actionButtonTitle(action.nextStatus)}
-                            className={`inline-flex h-6 items-center rounded-lg px-1.5 text-[9px] font-medium leading-none transition disabled:cursor-not-allowed disabled:opacity-50 ${action.tone === "primary" ? "bg-blue-600 text-white hover:bg-blue-700" : action.tone === "danger" ? "bg-rose-50 text-rose-600 hover:bg-rose-100" : "bg-slate-100 text-[#405875] hover:bg-slate-200"}`}
+                            className={`inline-flex h-7 items-center rounded-lg px-1.5 text-[13px] font-medium leading-none transition disabled:cursor-not-allowed disabled:opacity-50 ${action.tone === "primary" ? "bg-blue-600 text-white hover:bg-blue-700" : action.tone === "danger" ? "bg-rose-50 text-rose-600 hover:bg-rose-100" : "bg-slate-100 text-[#405875] hover:bg-slate-200"}`}
                           >
                             {action.label}
                           </button>
@@ -3666,7 +3666,7 @@ export default function BookingsPage() {
                           type="button"
                           onClick={() => startEdit(item)}
                           title="수정: 예약 수정 폼으로 이동합니다."
-                          className="inline-flex h-6 items-center rounded-lg border border-[#d3ddeb] bg-white px-1.5 text-[9px] font-medium leading-none text-[#28486d] transition hover:bg-[#f7faff]">
+                          className="inline-flex h-7 items-center rounded-lg border border-[#d3ddeb] bg-white px-1.5 text-[13px] font-medium leading-none text-[#28486d] transition hover:bg-[#f7faff]">
                           상세
                         </button>
                       </div>
@@ -3677,21 +3677,21 @@ export default function BookingsPage() {
             )}
           </div>
 
-          <div className="rounded-[24px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_10px_28px_rgba(20,46,80,0.07)]">
+          <div className="min-w-0 rounded-[24px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_10px_28px_rgba(20,46,80,0.07)]">
             <div className="mb-3 flex items-start justify-between gap-2">
               <div>
                 <h2 className="text-[15px] font-semibold text-[#10213f]">선택한 예약</h2>
-                <p className="mt-0.5 text-[10px] font-normal text-[#61758f]">캘린더나 목록에서 선택한 예약을 확인하고 상태를 처리합니다. 선택된 예약은 캘린더와 목록에서 함께 강조됩니다.</p>
+                <p className="mt-0.5 text-[13px] font-normal text-[#61758f]">캘린더나 목록에서 선택한 예약을 확인하고 상태를 처리합니다. 선택된 예약은 캘린더와 목록에서 함께 강조됩니다.</p>
               </div>
               {selectedBooking ? (
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <span title={statusBadgeTitle(normalizedStatusOf(selectedBooking))} className={`rounded-full px-2.5 py-0.5 text-[10px] font-medium ring-1 ${statusBadgeClass(normalizedStatusOf(selectedBooking))}`}>
+                  <span title={statusBadgeTitle(normalizedStatusOf(selectedBooking))} className={`rounded-full px-2.5 py-0.5 text-[13px] font-medium ring-1 ${statusBadgeClass(normalizedStatusOf(selectedBooking))}`}>
                     {normalizedStatusOf(selectedBooking)}
                   </span>
                   <button
                     type="button"
                     onClick={clearSelectedBooking}
-                    className="inline-flex h-6 items-center rounded-md border border-[#d3ddeb] bg-white px-1.5 text-[8px] font-medium text-[#405875] hover:bg-[#f7faff]"
+                    className="inline-flex h-7 items-center rounded-md border border-[#d3ddeb] bg-white px-1.5 text-[13px] font-medium text-[#405875] hover:bg-[#f7faff]"
                   >
                     선택 해제
                   </button>
@@ -3700,25 +3700,25 @@ export default function BookingsPage() {
             </div>
 
             {!selectedBooking ? (
-              <div className="rounded-xl border border-dashed border-[#d7e1ed] bg-[#f8fbff] px-3 py-2.5 text-center text-[12px] font-medium text-[#7c8da4]">
+              <div className="rounded-xl border border-dashed border-[#d7e1ed] bg-[#f8fbff] px-3 py-2.5 text-center text-[13px] font-medium text-[#7c8da4]">
                 예약을 선택하면 상세 정보가 표시됩니다.
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="rounded-[16px] border border-blue-100 bg-[linear-gradient(135deg,#f8fbff_0%,#ffffff_100%)] p-3 shadow-[0_8px_20px_rgba(37,99,235,0.06)]">
+                <div className="min-w-0 rounded-[16px] border border-blue-100 bg-[linear-gradient(135deg,#f8fbff_0%,#ffffff_100%)] p-3 shadow-[0_8px_20px_rgba(37,99,235,0.06)]">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-medium ring-1 ${bookingTypeBadgeClass(selectedBooking.bookingType)}`}>
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[13px] font-medium ring-1 ${bookingTypeBadgeClass(selectedBooking.bookingType)}`}>
                       {text(selectedBooking.bookingType)}
                     </span>
-                    <span title={statusBadgeTitle(normalizedStatusOf(selectedBooking))} className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-medium ring-1 ${statusBadgeClass(normalizedStatusOf(selectedBooking))}`}>
+                    <span title={statusBadgeTitle(normalizedStatusOf(selectedBooking))} className={`inline-flex rounded-full px-2.5 py-0.5 text-[13px] font-medium ring-1 ${statusBadgeClass(normalizedStatusOf(selectedBooking))}`}>
                       {normalizedStatusOf(selectedBooking)}
                     </span>
                     {isFutureCompletedBooking(selectedBooking) ? (
-                      <span title={futureCompletedTitle(selectedBooking)} className="rounded-full bg-rose-50 px-1.5 py-0.5 text-[9px] font-semibold text-rose-700 ring-1 ring-rose-200">
+                      <span title={futureCompletedTitle(selectedBooking)} className="rounded-full bg-rose-50 px-1.5 py-0.5 text-[13px] font-semibold text-rose-700 ring-1 ring-rose-200">
                         미래완료
                       </span>
                     ) : null}
-                    <span className="text-[12px] font-medium text-[#7b8da5]">예약ID {text(selectedBooking.bookingId, "-")}</span>
+                    <span className="text-[13px] font-medium text-[#7b8da5]">예약ID {text(selectedBooking.bookingId, "-")}</span>
                   </div>
 
                   <p className="mt-3 text-[14px] font-semibold tracking-[-0.02em] text-[#10213f]">
@@ -3726,26 +3726,26 @@ export default function BookingsPage() {
                   </p>
 
                   {latestActionMemo(selectedBooking.memo) ? (
-                    <div className="mt-2 rounded-xl border border-[#e1eaf6] bg-[#f8fbff] px-3 py-2 text-[11px] font-medium text-[#536b87]">
+                    <div className="mt-2 rounded-xl border border-[#e1eaf6] bg-[#f8fbff] px-3 py-2 text-[13px] font-medium text-[#536b87]">
                       최근 처리 이력: {latestActionMemo(selectedBooking.memo)}
                     </div>
                   ) : null}
 
-                  <div className="mt-3 grid grid-cols-4 gap-1.5 text-[11px] font-medium text-[#405875]">
+                  <div className="mt-3 grid grid-cols-4 gap-1.5 text-[13px] font-medium text-[#405875]">
                     <div className="rounded-lg bg-white px-2 py-1.5">
-                      <p className="text-[10px] font-semibold text-[#7b8da5]">일정</p>
+                      <p className="text-[13px] font-semibold text-[#7b8da5]">일정</p>
                       <p className="mt-0.5 truncate font-medium text-[#102544]">{formatBookingSummaryDate(selectedBooking.bookingDate)} {formatBookingSummaryTimeRange(selectedBooking.startTime, selectedBooking.endTime)}</p>
                     </div>
                     <div className="rounded-lg bg-white px-2 py-1.5">
-                      <p className="text-[10px] font-semibold text-[#7b8da5]">항공기</p>
+                      <p className="text-[13px] font-semibold text-[#7b8da5]">항공기</p>
                       <p className="mt-0.5 truncate font-medium text-[#102544]">{aircraftDisplay(selectedBooking)}</p>
                     </div>
                     <div className="rounded-lg bg-white px-2 py-1.5">
-                      <p className="text-[10px] font-semibold text-[#7b8da5]">담당</p>
+                      <p className="text-[13px] font-semibold text-[#7b8da5]">담당</p>
                       <p className="mt-0.5 truncate font-medium text-[#102544]">{text(selectedBooking.instructorName, "-")}</p>
                     </div>
                     <div className="rounded-lg bg-white px-2 py-1.5">
-                      <p className="text-[10px] font-semibold text-[#7b8da5]">전화번호</p>
+                      <p className="text-[13px] font-semibold text-[#7b8da5]">전화번호</p>
                       <p className="mt-0.5 truncate font-medium text-[#102544]">{text(selectedBooking.phone, "-")}</p>
                     </div>
                   </div>
@@ -3753,12 +3753,12 @@ export default function BookingsPage() {
 
                 <div className="flex items-end gap-1.5 rounded-[16px] border border-[#e1eaf6] bg-[#f8fbff] p-2.5">
                   <div className="min-w-0 flex-1">
-                    <label className="text-[10px] font-medium text-[#60738d]">처리 메모</label>
+                    <label className="text-[13px] font-medium text-[#60738d]">처리 메모</label>
                     <input
                       value={requestActionMemo}
                       onChange={(event) => setRequestActionMemo(event.target.value)}
                       placeholder="예: 교관 확인 후 승인 / 고객 요청에 따라 취소 승인 / 기상 악화로 취소"
-                      className="mt-1.5 h-9 w-full rounded-xl border border-[#d4deeb] bg-white px-3 text-[12px] text-[#203756] outline-none transition focus:border-[#1f6fff] focus:ring-4 focus:ring-[#dbeafe]"
+                      className="mt-1.5 h-10 w-full rounded-xl border border-[#d4deeb] bg-white px-3 text-[13px] text-[#203756] outline-none transition focus:border-[#1f6fff] focus:ring-4 focus:ring-[#dbeafe]"
                     />
                   </div>
 
@@ -3767,7 +3767,7 @@ export default function BookingsPage() {
                       type="button"
                       onClick={() => startEdit(selectedBooking)}
                       title="수정: 예약 수정 폼으로 이동합니다."
-                      className="inline-flex h-8 items-center justify-center rounded-lg border border-[#d3ddeb] bg-white px-2.5 text-[9px] font-medium text-[#28486d] transition hover:bg-[#f7faff]"
+                      className="inline-flex h-9 items-center justify-center rounded-lg border border-[#d3ddeb] bg-white px-2.5 text-[13px] font-medium text-[#28486d] transition hover:bg-[#f7faff]"
                     >
                       상세
                     </button>
@@ -3778,7 +3778,7 @@ export default function BookingsPage() {
                         disabled={saving}
                         onClick={() => void changeBookingStatus(selectedBooking, action.nextStatus, action.actionLabel, requestActionMemo)}
                         title={actionButtonTitle(action.nextStatus)}
-                        className={`inline-flex h-6 items-center rounded-md px-1.5 text-[8px] font-medium leading-none transition disabled:cursor-not-allowed disabled:opacity-50 ${action.tone === "primary" ? "bg-blue-600 text-white hover:bg-blue-700" : action.tone === "danger" ? "bg-rose-50 text-rose-600 hover:bg-rose-100" : "bg-slate-100 text-[#405875] hover:bg-slate-200"}`}
+                        className={`inline-flex h-7 items-center rounded-md px-1.5 text-[13px] font-medium leading-none transition disabled:cursor-not-allowed disabled:opacity-50 ${action.tone === "primary" ? "bg-blue-600 text-white hover:bg-blue-700" : action.tone === "danger" ? "bg-rose-50 text-rose-600 hover:bg-rose-100" : "bg-slate-100 text-[#405875] hover:bg-slate-200"}`}
                       >
                         {action.label}
                       </button>
@@ -3791,23 +3791,23 @@ export default function BookingsPage() {
         </section>
 
 
-        <section ref={formRef} className="rounded-[24px] border border-[#d9e6f5] bg-white/95 p-2.5 shadow-[0_12px_34px_rgba(20,46,80,0.065)]">
+        <section ref={formRef} className="min-w-0 rounded-[24px] border border-[#d9e6f5] bg-white/95 p-2.5 shadow-[0_12px_34px_rgba(20,46,80,0.065)]">
           <div className="mb-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-[#10213f]">{editing ? "예약 상세 수정" : "예약 신규 등록"}</h2>
-              <p className="mt-0.5 text-[11px] font-normal text-[#61758f]">필수 항목을 선택하면 대상자 정보와 점유 시간이 자동으로 정리됩니다.</p>
-              <div className="mt-1.5 rounded-xl border border-[#e1eaf6] bg-[#f8fbff] px-3 py-1.5 text-[10px] font-medium text-[#536b87]">
+              <p className="mt-0.5 text-[13px] font-normal text-[#61758f]">필수 항목을 선택하면 대상자 정보와 점유 시간이 자동으로 정리됩니다.</p>
+              <div className="mt-1.5 rounded-xl border border-[#e1eaf6] bg-[#f8fbff] px-3 py-1.5 text-[13px] font-medium text-[#536b87]">
                 입력 요약: {compactFormSummary(form)}
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${editing ? "bg-amber-50 text-amber-700 ring-1 ring-amber-100" : "bg-blue-50 text-blue-700 ring-1 ring-blue-100"}`}>
+              <span className={`rounded-full px-1.5 py-0.5 text-[13px] font-medium ${editing ? "bg-amber-50 text-amber-700 ring-1 ring-amber-100" : "bg-blue-50 text-blue-700 ring-1 ring-blue-100"}`}>
                 {editing ? "수정 모드 · 기존 예약 변경" : "신규 등록"}
               </span>
               <button
                 type="button"
                 onClick={startCreate}
-                className="inline-flex h-8 items-center rounded-xl border border-[#d3ddeb] bg-white px-2 text-[9px] font-medium text-[#28486d] hover:bg-[#f7faff]"
+                className="inline-flex h-9 items-center rounded-xl border border-[#d3ddeb] bg-white px-2 text-[13px] font-medium text-[#28486d] hover:bg-[#f7faff]"
               >
                 입력 초기화
               </button>
@@ -3941,14 +3941,14 @@ export default function BookingsPage() {
             </FormGroup>
 
             {(requiredFieldWarnings.length > 0 && (isEducationForm || isRentalForm)) ? (
-              <div className="rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800">
+              <div className="min-w-0 rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
                 <span className="font-semibold">{isEducationForm ? "교육생 확인" : "렌탈 기장 확인"}</span>
                 <span className="ml-2">{requiredFieldWarnings.slice(0, 2).join(" · ")}{requiredFieldWarnings.length > 2 ? ` 외 ${requiredFieldWarnings.length - 2}건` : ""}</span>
               </div>
             ) : null}
 
             {(isEducationForm && form.userId) ? (
-              <div className="grid gap-2 rounded-[14px] border border-blue-100 bg-blue-50/70 px-3 py-2 text-[11px] text-[#28486d] md:grid-cols-3">
+              <div className="grid gap-2 rounded-[14px] border border-blue-100 bg-blue-50/70 px-3 py-2 text-[13px] text-[#28486d] md:grid-cols-3">
                 <div>
                   <span className="text-[#6b7f99]">연락처</span>
                   <p className="mt-0.5 font-medium text-[#0f315f]">{form.phone || "-"}</p>
@@ -3965,25 +3965,25 @@ export default function BookingsPage() {
             ) : null}
 
             {isRentalForm ? (
-              <div className={`rounded-[14px] border px-3 py-2 text-[11px] font-medium ${selectedRentalPilot && selectableAircraftForForm.length === 0 ? "border-rose-200 bg-rose-50 text-rose-800" : "border-orange-100 bg-orange-50 text-orange-800"}`}>
+              <div className={`rounded-[14px] border px-3 py-2 text-[13px] font-medium ${selectedRentalPilot && selectableAircraftForForm.length === 0 ? "border-rose-200 bg-rose-50 text-rose-800" : "border-orange-100 bg-orange-50 text-orange-800"}`}>
                 렌탈기장 배정 항공기: {selectedRentalPilot ? `${selectableAircraftForForm.length}대 선택 가능` : "렌탈 기장을 먼저 선택하세요."}
                 {selectedRentalPilot && selectableAircraftForForm.length === 0 ? " · 배정 항공기가 없습니다." : ""}
               </div>
             ) : null}
 
             {isExperienceForm ? (
-              <div className="rounded-[14px] border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] font-medium text-emerald-800">
+              <div className="min-w-0 rounded-[14px] border border-emerald-100 bg-emerald-50 px-3 py-2 text-[13px] font-medium text-emerald-800">
                 체험비행은 코스 선택 시 예약 점유시간 30분으로 자동 정리됩니다.
               </div>
             ) : null}
 
             {requiredFieldWarnings.length > 0 ? (
-              <div className="rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800">
+              <div className="min-w-0 rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
                 <span className="font-semibold">저장 전 확인</span>
                 <span className="ml-2">{requiredFieldWarnings.slice(0, 3).join(" · ")}{requiredFieldWarnings.length > 3 ? ` 외 ${requiredFieldWarnings.length - 3}건` : ""}</span>
               </div>
             ) : conflictWarnings.length > 0 ? (
-              <div className={`rounded-[14px] border px-3 py-2 text-[11px] font-medium ${hasAircraftConflict ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+              <div className={`rounded-[14px] border px-3 py-2 text-[13px] font-medium ${hasAircraftConflict ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
                 <div className="font-semibold">
                   {hasAircraftConflict ? "항공기 충돌 경고" : "교관/감독 충돌 경고"}
                   <span className="ml-1 font-normal">저장 시 한 번 더 확인합니다.</span>
@@ -3996,50 +3996,50 @@ export default function BookingsPage() {
                 </div>
               </div>
             ) : canShowReadyMessage ? (
-              <div className="rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-medium text-emerald-800">
+              <div className="min-w-0 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] font-medium text-emerald-800">
                 예약 가능 · PFI 포함 점유 시간 기준으로 확인된 항공기/교관 중복 예약이 없습니다.
               </div>
             ) : null}
 
-            <div className="rounded-[14px] border border-[#e1eaf6] bg-[#fbfdff] p-2">
-              <div className="grid gap-1.5 text-[12px] font-medium text-[#36506d] md:grid-cols-4 xl:grid-cols-8">
+            <div className="min-w-0 rounded-[14px] border border-[#e1eaf6] bg-[#fbfdff] p-2">
+              <div className="grid gap-1.5 text-[13px] font-medium text-[#36506d] md:grid-cols-4 xl:grid-cols-8">
                 <div className="rounded-lg bg-white px-2.5 py-1.5">
-                  <p className="text-[10px] font-semibold text-[#8292a8]">{isRentalForm ? "기장명" : isEducationForm ? "교육생명" : "예약자명"}</p>
+                  <p className="text-[13px] font-semibold text-[#8292a8]">{isRentalForm ? "기장명" : isEducationForm ? "교육생명" : "예약자명"}</p>
                   {isExperienceForm ? (
-                    <input value={form.userName} onChange={(event) => updateForm("userName", event.target.value)} placeholder="체험 고객명" className="mt-1 h-8 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[12px] outline-none focus:border-[#1f6fff]" />
+                    <input value={form.userName} onChange={(event) => updateForm("userName", event.target.value)} placeholder="체험 고객명" className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]" />
                   ) : (
-                    <p className="mt-1 truncate text-[11px] font-medium text-[#102544]">{form.userName || "자동 입력"}</p>
+                    <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{form.userName || "자동 입력"}</p>
                   )}
                 </div>
 
                 <div className="rounded-lg bg-white px-2.5 py-1.5">
-                  <p className="text-[10px] font-semibold text-[#8292a8]">연락처</p>
+                  <p className="text-[13px] font-semibold text-[#8292a8]">연락처</p>
                   {isExperienceForm ? (
-                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="010-0000-0000" className="mt-1 h-8 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[12px] outline-none focus:border-[#1f6fff]" />
+                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="010-0000-0000" className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]" />
                   ) : (
-                    <p className="mt-1 truncate text-[11px] font-medium text-[#102544]">{form.phone || "자동 입력"}</p>
+                    <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{form.phone || "자동 입력"}</p>
                   )}
                 </div>
 
                 <div className="rounded-lg bg-white px-2.5 py-1.5">
-                  <p className="text-[10px] font-semibold text-[#8292a8]">예약 상태</p>
+                  <p className="text-[13px] font-semibold text-[#8292a8]">예약 상태</p>
                   {editing ? (
-                    <select value={form.status} onChange={(event) => updateForm("status", event.target.value)} className="mt-1 h-8 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[12px] outline-none focus:border-[#1f6fff]">
+                    <select value={form.status} onChange={(event) => updateForm("status", event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]">
                       {bookingStatuses.map((item) => <option key={item} value={item}>{item}</option>)}
                     </select>
                   ) : (
-                    <p className="mt-1 truncate text-[11px] font-medium text-[#102544]">확정</p>
+                    <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">확정</p>
                   )}
                 </div>
 
                 <div className="rounded-lg bg-white px-2.5 py-1.5">
-                  <p className="text-[10px] font-semibold text-[#8292a8]">예약 ID</p>
-                  <p className="mt-1 truncate text-[11px] font-medium text-[#102544]">{form.bookingId || "자동 생성"}</p>
+                  <p className="text-[13px] font-semibold text-[#8292a8]">예약 ID</p>
+                  <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{form.bookingId || "자동 생성"}</p>
                 </div>
 
                 <div className="rounded-lg bg-white px-2.5 py-1.5">
-                  <p className="text-[10px] font-semibold text-[#8292a8]">코스/과정</p>
-                  <p className="mt-1 truncate text-[11px] font-medium text-[#102544]">{form.courseName || "-"}</p>
+                  <p className="text-[13px] font-semibold text-[#8292a8]">코스/과정</p>
+                  <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{form.courseName || "-"}</p>
                 </div>
               </div>
             </div>
@@ -4050,7 +4050,7 @@ export default function BookingsPage() {
                   value={form.memo}
                   onChange={(event) => updateForm("memo", event.target.value)}
                   placeholder="예약 관련 메모"
-                  className="h-8 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[10px] text-[#203756] outline-none transition focus:border-[#1f6fff] focus:ring-4 focus:ring-[#dbeafe]"
+                  className="h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] text-[#203756] outline-none transition focus:border-[#1f6fff] focus:ring-4 focus:ring-[#dbeafe]"
                 />
               </div>
 
@@ -4060,17 +4060,17 @@ export default function BookingsPage() {
                     type="button"
                     onClick={() => void cancelSelectedBooking()}
                     disabled={saving}
-                    className="inline-flex h-8 items-center rounded-lg border border-rose-200 bg-rose-50 px-2 text-[9px] font-medium text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex h-9 items-center rounded-lg border border-rose-200 bg-rose-50 px-2 text-[13px] font-medium text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     예약취소
                   </button>
                 ) : null}
-                <button type="button" onClick={startCreate} className="inline-flex h-8 items-center rounded-lg border border-[#d3ddeb] bg-white px-2 text-[9px] font-medium text-[#28486d] hover:bg-[#f7faff]">초기화</button>
+                <button type="button" onClick={startCreate} className="inline-flex h-9 items-center rounded-lg border border-[#d3ddeb] bg-white px-2 text-[13px] font-medium text-[#28486d] hover:bg-[#f7faff]">초기화</button>
                 <button
                   type="button"
                   onClick={() => void saveBooking()}
                   disabled={saving}
-                  className={`inline-flex h-8 items-center rounded-lg px-2 text-[9px] font-medium text-white shadow-[0_10px_22px_rgba(7,26,53,0.16)] disabled:cursor-not-allowed disabled:bg-slate-400 ${conflictWarnings.length > 0 ? "bg-rose-600 hover:bg-rose-700" : "bg-[#102544] hover:bg-[#17355e]"}`}
+                  className={`inline-flex h-9 items-center rounded-lg px-2 text-[13px] font-medium text-white shadow-[0_10px_22px_rgba(7,26,53,0.16)] disabled:cursor-not-allowed disabled:bg-slate-400 ${conflictWarnings.length > 0 ? "bg-rose-600 hover:bg-rose-700" : "bg-[#102544] hover:bg-[#17355e]"}`}
                 >
                   {saving ? "저장 중" : editing ? "수정 저장" : "예약 등록"}
                 </button>
@@ -4079,7 +4079,7 @@ export default function BookingsPage() {
 </div>
         </section>
 
-        <section className="rounded-[24px] border border-[#d9e6f5] bg-white/95 p-2.5 shadow-[0_10px_28px_rgba(20,46,80,0.06)]">
+        <section className="min-w-0 rounded-[24px] border border-[#d9e6f5] bg-white/95 p-2.5 shadow-[0_10px_28px_rgba(20,46,80,0.06)]">
           <div className="mb-2 flex flex-col gap-1.5 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-[14px] font-semibold text-[#10213f]">예약 목록 필터</h2>
@@ -4090,13 +4090,13 @@ export default function BookingsPage() {
             <button
               type="button"
               onClick={resetBookingFilters}
-              className="inline-flex h-8 items-center rounded-lg border border-[#d3ddeb] bg-white px-2 text-[9px] font-medium text-[#405875] shadow-sm hover:bg-[#f7faff]"
+              className="inline-flex h-9 items-center rounded-lg border border-[#d3ddeb] bg-white px-2 text-[13px] font-medium text-[#405875] shadow-sm hover:bg-[#f7faff]"
             >
               필터 초기화
             </button>
           </div>
 
-          <div className="mb-2 rounded-xl border border-[#e1eaf6] bg-[#f8fbff] px-3 py-2 text-[11px] font-medium text-[#536b87]">
+          <div className="mb-2 rounded-xl border border-[#e1eaf6] bg-[#f8fbff] px-3 py-2 text-[13px] font-medium text-[#536b87]">
             현재 표시: {displayFilterSummary(showCancelledBookings, statusFilter, typeFilter, dateFilter, keyword)}
           </div>
 
@@ -4116,7 +4116,7 @@ export default function BookingsPage() {
                 <button
                   type="button"
                   onClick={() => setKeyword("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-[#60738d] hover:bg-slate-200"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-slate-100 px-1.5 py-0.5 text-[13px] font-medium text-[#60738d] hover:bg-slate-200"
                 >
                   지움
                 </button>
@@ -4125,7 +4125,7 @@ export default function BookingsPage() {
             <button
               type="button"
               onClick={() => setShowCancelledBookings((prev) => !prev)}
-              className={`h-8 rounded-lg border px-2 text-[9px] font-medium transition ${
+              className={`h-8 rounded-lg border px-2 text-[13px] font-medium transition ${
                 showCancelledBookings
                   ? "border-blue-200 bg-blue-50 text-blue-700"
                   : "border-[#d3ddeb] bg-white text-[#6b7f99] hover:bg-[#f7faff]"
@@ -4144,7 +4144,7 @@ export default function BookingsPage() {
                   key={item}
                   type="button"
                   onClick={() => applyQuickFilter(item)}
-                  className={`rounded-full border px-2 py-0.5 text-[11px] font-medium shadow-sm transition ${
+                  className={`rounded-full border px-2 py-0.5 text-[13px] font-medium shadow-sm transition ${
                     active
                       ? "border-blue-200 bg-blue-50 text-blue-700"
                       : "border-[#d7e1ed] bg-white text-[#516982] hover:bg-[#f4f8fc]"
@@ -4156,7 +4156,7 @@ export default function BookingsPage() {
             })}
           </div>
 
-          <div className="mt-1.5 flex flex-wrap gap-1.5 text-[10px] font-medium text-[#61758f]">
+          <div className="mt-1.5 flex flex-wrap gap-1.5 text-[13px] font-medium text-[#61758f]">
             <span className="rounded-full bg-[#f3f7fb] px-2 py-0.5">유형 {typeFilter}</span>
             <span className="rounded-full bg-[#f3f7fb] px-2 py-0.5">상태 {statusFilter}</span>
             <span className="rounded-full bg-[#f3f7fb] px-2 py-0.5">날짜 {dateFilter || "전체"}</span>
@@ -4164,15 +4164,15 @@ export default function BookingsPage() {
           </div>
         </section>
 
-        {error && <section className="rounded-[20px] border border-rose-200 bg-rose-50 p-5 text-sm font-semibold text-rose-700">{error}</section>}
+        {error && <section className="min-w-0 rounded-[20px] border border-rose-200 bg-rose-50 p-5 text-sm font-semibold text-rose-700">{error}</section>}
 
-        <section className="overflow-hidden rounded-[26px] border border-[#d9e6f5] bg-white/95 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
+        <section className="min-w-0 overflow-hidden rounded-[26px] border border-[#d9e6f5] bg-white/95 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
           <div className="flex flex-col gap-3 border-b border-[#edf2f7] px-3 py-2.5 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-[16px] font-semibold tracking-[-0.02em] text-[#10213f]">예약 목록</h2>
-              <p className="mt-0.5 text-[11px] font-normal text-[#61758f]">오늘 이후 예약을 상태 우선순위와 시간순으로 표시합니다. 목록을 클릭하면 선택 예약 패널에 표시됩니다.</p>
+              <p className="mt-0.5 text-[13px] font-normal text-[#61758f]">오늘 이후 예약을 상태 우선순위와 시간순으로 표시합니다. 목록을 클릭하면 선택 예약 패널에 표시됩니다.</p>
             </div>
-            <p className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-medium text-blue-700">표시 {filteredBookings.length}건</p>
+            <p className="rounded-full bg-blue-50 px-3 py-1 text-[13px] font-medium text-blue-700">표시 {filteredBookings.length}건</p>
           </div>
 
           {loading ? (
@@ -4181,8 +4181,8 @@ export default function BookingsPage() {
             <div className="p-12 text-center text-sm font-medium text-[#6d7f96]">표시할 예약이 없습니다.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1160px] border-separate border-spacing-0 text-left text-[11px]">
-                <thead className="sticky top-0 z-10 bg-[#f6f9fd] text-[11px] font-semibold text-[#6f8097] shadow-[0_1px_0_#edf2f7]">
+              <table className="min-w-[1180px] min-w-[1160px] border-separate border-spacing-0 text-left text-[13px]">
+                <thead className="sticky top-0 z-10 bg-[#f6f9fd] text-[13px] font-semibold text-[#6f8097] shadow-[0_1px_0_#edf2f7]">
                   <tr>
                     <th className="px-2.5 py-2">일정</th>
                     <th className="px-2.5 py-2">예약정보</th>
@@ -4214,35 +4214,35 @@ export default function BookingsPage() {
                         }}
                       >
                         <td className="px-2 py-1.5 align-top">
-                          <div className="inline-flex rounded-lg bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                          <div className="inline-flex rounded-lg bg-blue-50 px-2 py-0.5 text-[13px] font-medium text-blue-700">
                             {formatCompactBookingDate(item.bookingDate)}
                           </div>
-                          <div className="mt-1.5 text-[11px] font-medium text-[#102544]">{normalizeTime(item.startTime) || "-"}~{normalizeTime(item.endTime) || "-"}</div>
-                          <div className="mt-0.5 max-w-[95px] truncate text-[9px] font-medium text-[#8ca0b7]">{bookingId || "-"}</div>
+                          <div className="mt-1.5 text-[13px] font-medium text-[#102544]">{normalizeTime(item.startTime) || "-"}~{normalizeTime(item.endTime) || "-"}</div>
+                          <div className="mt-0.5 max-w-[95px] truncate text-[13px] font-medium text-[#8ca0b7]">{bookingId || "-"}</div>
                         </td>
                         <td className="px-2 py-1.5 align-top">
                           <div className="flex items-center gap-1.5">
                             <span className="truncate font-semibold text-[#102544]">{bookingDisplayTitle(item)}</span>
                             {selectedBooking && text(selectedBooking.bookingId, "") === bookingId ? (
-                              <span className="shrink-0 rounded-full bg-blue-600 px-1.5 py-0.5 text-[8px] font-semibold text-white">선택됨</span>
+                              <span className="shrink-0 rounded-full bg-blue-600 px-1.5 py-0.5 text-[13px] font-semibold text-white">선택됨</span>
                             ) : null}
                           </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-[#8ca0b7]">
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold ring-1 ${bookingTypeBadgeClass(item.bookingType)}`}>{text(item.bookingType)}</span>
-                            {isUnpaidExperience(item) ? <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700 ring-1 ring-amber-200">미결제</span> : null}
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] font-semibold text-[#8ca0b7]">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[13px] font-semibold ring-1 ${bookingTypeBadgeClass(item.bookingType)}`}>{text(item.bookingType)}</span>
+                            {isUnpaidExperience(item) ? <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[13px] font-semibold text-amber-700 ring-1 ring-amber-200">미결제</span> : null}
                           </div>
                         </td>
                         <td className="px-2 py-1.5 align-top">
                           <div className="font-semibold text-[#102544]">{text(item.userName)}</div>
-                          <div className="mt-1 text-[11px] font-semibold text-[#8ca0b7]">{text(item.phone)}</div>
+                          <div className="mt-1 text-[13px] font-semibold text-[#8ca0b7]">{text(item.phone)}</div>
                         </td>
                         <td className="px-2 py-1.5 align-top">
                           <div className="font-semibold text-[#23415f]">{text(item.instructorName, "-")}</div>
-                          <div className="mt-1 text-[11px] font-semibold text-[#8ca0b7]">{text(item.instructorId, "-")}</div>
+                          <div className="mt-1 text-[13px] font-semibold text-[#8ca0b7]">{text(item.instructorId, "-")}</div>
                         </td>
                         <td className="px-2 py-1.5 align-top">
                           <div className="font-semibold text-[#23415f]">{aircraftDisplay(item)}</div>
-                          <div className="mt-1 text-[11px] font-semibold text-[#8ca0b7]">{text(item.aircraftId, "-")}</div>
+                          <div className="mt-1 text-[13px] font-semibold text-[#8ca0b7]">{text(item.aircraftId, "-")}</div>
                         </td>
                         <td className="px-2 py-1.5 align-top">
                           <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ${statusBadgeClass(status)}`}>{status || "-"}</span>
@@ -4256,7 +4256,7 @@ export default function BookingsPage() {
                               selectBookingForPanel(item);
                             }}
                             title="선택: 오른쪽 선택한 예약 패널에서 상태를 처리합니다."
-                            className={`inline-flex h-6 items-center rounded-lg px-2 text-[9px] font-medium leading-none transition ${
+                            className={`inline-flex h-7 items-center rounded-lg px-2 text-[13px] font-medium leading-none transition ${
                               selectedBooking && text(selectedBooking.bookingId, "") === bookingId
                                 ? "bg-blue-600 text-white"
                                 : "bg-blue-50 text-blue-700 hover:bg-blue-100"
@@ -4274,12 +4274,12 @@ export default function BookingsPage() {
                                   event.stopPropagation();
                                   window.location.href = trainingLogHref(item);
                                 }}
-                                className="inline-flex h-6 items-center rounded-lg bg-[#102544] px-1.5 text-[9px] font-medium leading-none text-white hover:bg-[#17355e]"
+                                className="inline-flex h-7 items-center rounded-lg bg-[#102544] px-1.5 text-[13px] font-medium leading-none text-white hover:bg-[#17355e]"
                               >
                                 교육일지
                               </button>
                             ) : null}
-                            <button type="button" onClick={(event) => { event.stopPropagation(); startEdit(item); }} title="상세: 예약 수정 폼으로 이동합니다." className="inline-flex h-6 items-center rounded-lg border border-[#d3ddeb] bg-white px-1.5 text-[9px] font-medium leading-none text-[#28486d] transition hover:bg-[#f7faff]">
+                            <button type="button" onClick={(event) => { event.stopPropagation(); startEdit(item); }} title="상세: 예약 수정 폼으로 이동합니다." className="inline-flex h-7 items-center rounded-lg border border-[#d3ddeb] bg-white px-1.5 text-[13px] font-medium leading-none text-[#28486d] transition hover:bg-[#f7faff]">
                             상세
                           </button>
                           </div>
@@ -4350,39 +4350,73 @@ export default function BookingsPage() {
         }
 
         @keyframes pending-request-soft-shake {
-          0%, 76%, 100% {
-            transform: translateX(0);
+          0%, 74%, 100% {
+            translate: 0 0;
           }
-          80% {
-            transform: translateX(-1.5px);
+          79% {
+            translate: -2px 0;
           }
           84% {
-            transform: translateX(1.5px);
+            translate: 2px 0;
           }
-          88% {
-            transform: translateX(-1px);
+          89% {
+            translate: -1px 0;
           }
-          92% {
-            transform: translateX(1px);
+          94% {
+            translate: 1px 0;
           }
         }
 
         @keyframes pending-request-soft-ring {
           0%, 100% {
-            box-shadow: 0 8px 18px rgba(20, 46, 80, 0.08);
+            opacity: 0.36;
+            box-shadow: 0 0 0 0 rgba(100, 116, 139, 0.18);
           }
           50% {
-            box-shadow: 0 0 0 4px rgba(100, 116, 139, 0.16), 0 10px 20px rgba(20, 46, 80, 0.10);
+            opacity: 0.8;
+            box-shadow: 0 0 0 5px rgba(100, 116, 139, 0.18);
+          }
+        }
+
+        @keyframes pending-request-soft-blink {
+          0%, 100% {
+            opacity: 0.9;
+          }
+          50% {
+            opacity: 1;
           }
         }
 
         .pending-request-card {
+          position: absolute;
+          border-style: dashed !important;
+          border-color: rgb(100 116 139) !important;
+          box-shadow: 0 8px 18px rgba(20, 46, 80, 0.12), 0 0 0 2px rgba(148, 163, 184, 0.34) !important;
           animation:
-            pending-request-soft-shake 2.4s ease-in-out infinite,
-            pending-request-soft-ring 2.4s ease-in-out infinite;
+            pending-request-soft-shake 2.8s ease-in-out infinite,
+            pending-request-soft-blink 2.8s ease-in-out infinite;
         }
 
-        .pending-request-card:hover {
+        .pending-request-card::after {
+          content: "";
+          pointer-events: none;
+          position: absolute;
+          inset: -4px;
+          border-radius: 1rem;
+          border: 1px dashed rgba(100, 116, 139, 0.7);
+          animation: pending-request-soft-ring 2.8s ease-in-out infinite;
+        }
+
+        .pending-request-card:hover,
+        .pending-request-card:hover::after {
+          animation-play-state: paused;
+        }
+
+        .pending-request-list-card {
+          animation: pending-request-soft-blink 2.8s ease-in-out infinite;
+        }
+
+        .pending-request-list-card:hover {
           animation-play-state: paused;
         }
 
@@ -4394,10 +4428,10 @@ export default function BookingsPage() {
 function Field({ label, children, required = false, auto = false }: { label: string; children: ReactNode; required?: boolean; auto?: boolean }) {
   return (
     <div>
-      <label className="flex items-center gap-1 text-[11px] font-semibold text-[#60738d]">
+      <label className="flex items-center gap-1 text-[13px] font-semibold text-[#60738d]">
         <span>{label}</span>
         {required ? <span className="h-1.5 w-1.5 rounded-full bg-blue-500" title="필수 입력" /> : null}
-        {auto ? <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-500">자동</span> : null}
+        {auto ? <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[13px] font-medium text-slate-500">자동</span> : null}
       </label>
       {children}
     </div>
@@ -4406,10 +4440,10 @@ function Field({ label, children, required = false, auto = false }: { label: str
 
 function FormGroup({ title, description, children, columns = "xl:grid-cols-4" }: { title: string; description?: string; children: ReactNode; columns?: string }) {
   return (
-    <div className="rounded-[16px] border border-[#e1eaf6] bg-[#fbfdff] p-2.5">
+    <div className="min-w-0 rounded-[16px] border border-[#e1eaf6] bg-[#fbfdff] p-2.5">
       <div className="mb-1.5 flex items-center justify-between gap-2">
-        <h3 className="text-[11px] font-medium text-[#10213f]">{title}</h3>
-        {description ? <p className="text-[11px] font-medium text-[#7b8da5]">{description}</p> : null}
+        <h3 className="text-[13px] font-medium text-[#10213f]">{title}</h3>
+        {description ? <p className="text-[13px] font-medium text-[#7b8da5]">{description}</p> : null}
       </div>
       <div className={`grid gap-2 md:grid-cols-2 ${columns}`}>
         {children}

@@ -250,19 +250,19 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="flex min-h-screen w-72 shrink-0 flex-col border-r border-blue-100/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_45%,#ffffff_100%)] shadow-[8px_0_30px_rgba(15,23,42,0.04)]">
-      <div className="px-5 pb-3 pt-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#dbeafe_0%,#eff6ff_100%)] text-blue-600 shadow-[0_12px_24px_rgba(37,99,235,0.12)]">
-            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <aside className="flex min-h-screen w-[270px] shrink-0 flex-col border-r border-blue-100/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_45%,#ffffff_100%)] shadow-[8px_0_30px_rgba(15,23,42,0.04)]">
+      <div className="px-4 pb-3 pt-4">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#dbeafe_0%,#eff6ff_100%)] text-blue-600 shadow-[0_12px_24px_rgba(37,99,235,0.12)]">
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M3 12 21 4l-6.5 16-3.2-6.7z" />
               <path d="m11.3 13.3 4.2-4.2" />
             </svg>
           </div>
           <div>
-            <p className="text-[14px] font-black tracking-[0.26em] text-blue-400">SKYNURI</p>
-            <h1 className="mt-0.5 text-[22px] font-extrabold tracking-[-0.04em] text-slate-950">하늘누리 비행교육원</h1>
-            <p className="mt-0.5 text-[14px] font-semibold text-slate-400">운영 관리 시스템</p>
+            <p className="text-[12px] font-bold tracking-[0.28em] text-blue-400">SKYNURI</p>
+            <h1 className="mt-0.5 whitespace-nowrap text-[19px] font-bold tracking-[-0.04em] text-slate-950">하늘누리 비행교육원</h1>
+            <p className="mt-0.5 text-[12px] font-medium text-slate-400">운영 관리 시스템</p>
           </div>
         </div>
       </div>
@@ -283,7 +283,7 @@ export default function Sidebar() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`group flex items-center justify-between rounded-2xl px-3 py-1.5 text-[15px] font-bold transition ${
+                    className={`group flex items-center justify-between rounded-2xl px-3 py-1.5 text-[14px] font-semibold transition ${
                       active
                         ? "bg-[linear-gradient(135deg,#eaf3ff_0%,#dbeafe_100%)] text-blue-700 shadow-[0_12px_28px_rgba(37,99,235,0.12)] ring-1 ring-blue-100"
                         : "text-slate-800 hover:bg-blue-50/80 hover:text-blue-700"

@@ -1863,14 +1863,11 @@ function ScheduleGraph({
     { length: SCHEDULE_END_HOUR - SCHEDULE_START_HOUR },
     (_, index) => SCHEDULE_START_HOUR + index,
   );
-  const showCurrentTimeLine =
-    selectedDate === today &&
-    currentTimeMinutes >= SCHEDULE_START_MIN &&
-    currentTimeMinutes <= SCHEDULE_END_MIN;
+  const showCurrentTimeLine = false;
   const currentTimeLeft = ((currentTimeMinutes - SCHEDULE_START_MIN) / SCHEDULE_TOTAL_MIN) * 100;
 
   return (
-    <ContentCard className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
+    <ContentCard className="flex h-full min-h-[520px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="flex flex-col gap-4 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-[-0.02em] text-[#10213f]">운항 일정</h2>
@@ -1897,8 +1894,8 @@ function ScheduleGraph({
         </form>
       </div>
 
-      <div className="px-6 pb-4">
-        <div className="w-full min-w-0">
+      <div className="overflow-x-auto px-6 pb-4">
+        <div className="min-w-[1220px]">
           <div className="grid grid-cols-[110px_1fr] border-b border-[#dbe5f1] pb-2">
             <div className="text-[15px] font-bold text-[#314965]">항공기</div>
             <div className="relative h-8">
@@ -1978,17 +1975,17 @@ function ScheduleGraph({
                           item.bookingType === "PFI"
                             ? "z-10 overflow-hidden px-0 py-0"
                             : isShortBlock
-                              ? "z-20 overflow-hidden px-1 py-1"
-                              : "z-20 overflow-hidden px-3.5 py-2"
+                              ? "z-20 overflow-hidden px-0.5 py-1"
+                              : "z-20 overflow-hidden px-2.5 py-2"
                         } ${scheduleColorClass(item.bookingType)}`}
                         style={{
                           left: `${displayLeft}%`,
                           width: `${Math.min(width, 100 - displayLeft)}%`,
-                          minWidth: item.bookingType === "PFI" ? "56px" : "0px",
+                          minWidth: "0px",
                         }}
                       >
                         {item.bookingType === "PFI" ? (
-                          <div className="flex h-full w-full items-center justify-center text-[15px] font-semibold leading-none text-sky-900" aria-label="PFI">PFI</div>
+                          <div className="flex h-full w-full items-center justify-center text-[13px] font-semibold leading-none text-sky-900" aria-label="PFI">PFI</div>
                         ) : isShortBlock ? (
                           <div className="flex h-full min-h-0 flex-col items-center justify-center text-center text-[#16365f]">
                             <div className="max-w-full truncate text-[11px] font-semibold leading-[14px] text-[#102a52]">{item.userName}</div>
@@ -1997,9 +1994,9 @@ function ScheduleGraph({
                           </div>
                         ) : (
                           <div className="flex h-full min-h-0 flex-col justify-center gap-0.5 text-[#16365f]">
-                            <div className="truncate text-[12px] font-medium leading-[16px]">{item.bookingType}</div>
-                            <div className="truncate text-[14px] font-semibold leading-[18px] text-[#102a52]">{item.userName}</div>
-                            {item.instructorName ? <div className="truncate text-[13px] font-normal leading-[17px] text-[#405a78]">{item.instructorName}</div> : null}
+                            <div className="truncate text-[11px] font-medium leading-[15px]">{item.bookingType}</div>
+                            <div className="truncate text-[13px] font-semibold leading-[17px] text-[#102a52]">{item.userName}</div>
+                            {item.instructorName ? <div className="truncate text-[12px] font-normal leading-[16px] text-[#405a78]">{item.instructorName}</div> : null}
                           </div>
                         )}
                       </div>
@@ -2260,8 +2257,8 @@ function WeatherLineChart({
   series: { key: string; label: string; className: string; stroke: string }[];
 }) {
   const width = 760;
-  const height = 340;
-  const padding = { top: 20, right: 20, bottom: 54, left: 70 };
+  const height = 470;
+  const padding = { top: 26, right: 24, bottom: 70, left: 82 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
   const values = rows.flatMap((row) => series.map((item) => Number(row[item.key] || 0)));
@@ -2337,11 +2334,11 @@ function WeatherLineChart({
   const chartIdBase = title.replace(/\s+/g, "-").toLowerCase();
 
   return (
-    <div className="rounded-[22px] border border-[#dfe8f5] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] px-4 py-3.5 shadow-[0_10px_30px_rgba(20,46,80,0.05)]">
+    <div className="rounded-[22px] border border-[#dfe8f5] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] px-4 py-4 shadow-[0_10px_30px_rgba(20,46,80,0.05)]">
       <div className="mb-2.5 flex items-start justify-between gap-2">
         <div>
-          <p className="text-[16px] font-bold tracking-[-0.02em] text-[#10213f]">{title}</p>
-          <p className="mt-0.5 text-[12px] font-medium text-[#61758f]">{subtitle}</p>
+          <p className="text-[18px] font-bold tracking-[-0.02em] text-[#10213f]">{title}</p>
+          <p className="mt-0.5 text-[13px] font-medium text-[#61758f]">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {series.map((item) => {
@@ -2351,14 +2348,14 @@ function WeatherLineChart({
             return (
               <span
                 key={item.key}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 px-3 py-1 text-xs font-extrabold text-[#31455f] shadow-sm"
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 px-3.5 py-1.5 text-[14px] font-bold text-[#31455f] shadow-sm"
               >
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.solid }} />
                 {item.label} {latest}
               </span>
             );
           })}
-          <span className="ml-1 shrink-0 text-[13px] font-extrabold text-[#263b55]">{unit}</span>
+          <span className="ml-1 shrink-0 text-[16px] font-bold text-[#263b55]">{unit}</span>
         </div>
       </div>
 
@@ -2400,7 +2397,7 @@ function WeatherLineChart({
                 y={yAt(tick) + 5}
                 textAnchor="end"
                 fill="#263b55"
-                fontSize="17"
+                fontSize="22"
                 fontWeight="850"
               >
                 {tick}
@@ -2424,7 +2421,7 @@ function WeatherLineChart({
                   y={height - 14}
                   textAnchor="middle"
                   fill="#263b55"
-                  fontSize="17"
+                  fontSize="22"
                   fontWeight="850"
                 >
                   {row.label}
@@ -2504,22 +2501,22 @@ function WeatherDetailPanel({ weather }: { weather: WeatherData }) {
   const hasWeatherRows = sourceRows.some((item) => !item.missing);
 
   return (
-    <ContentCard className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
+    <ContentCard className="flex h-full min-h-[520px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="flex shrink-0 items-center justify-between px-5 py-3.5">
         <div>
-          <h3 className="text-[17px] font-bold tracking-[-0.02em] text-[#10213f]">시간별 기상 그래프</h3>
-          <p className="mt-0.5 text-[12px] font-medium text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
+          <h3 className="text-[18px] font-bold tracking-[-0.02em] text-[#10213f]">시간별 기상 그래프</h3>
+          <p className="mt-0.5 text-[13px] font-medium text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
         </div>
         <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">Open-Meteo</span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden px-4 pb-3">
+      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden px-4 pb-4">
         {!hasWeatherRows ? (
           <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-[#dbe5f1] bg-[#f8fbff] p-5 text-sm font-medium text-[#6f8199]">
             07:00~20:00 기상 정보를 불러오지 못했습니다.
           </div>
         ) : (
-          <div className="grid gap-2.5">
+          <div className="grid gap-3">
             <WeatherLineChart
               title="풍속·돌풍 변화"
               subtitle="시간에 따른 바람 세기 변화"
@@ -2643,7 +2640,7 @@ function InstructorAssignmentSummaryPanel({
             배정된 교관 일정이 없습니다.
           </div>
         ) : (
-          items.slice(0, 8).map((item) => {
+          items.slice(0, 7).map((item) => {
             const preview = item.items[0];
             const compactStatus =
               item.workLabel === "휴무"
@@ -2661,33 +2658,33 @@ function InstructorAssignmentSummaryPanel({
                 key={item.id}
                 className="rounded-2xl border border-[#e7eef7] bg-white px-3 py-2"
               >
-                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-2">
+                <div className="grid grid-cols-[minmax(54px,auto)_1fr_auto] items-center gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <p className="truncate text-[14px] font-extrabold text-[#10213f]">{item.name}</p>
-                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-extrabold ${instructorStatusBadgeClass(item.workTone)}`}>
+                      <p className="truncate text-[13px] font-bold text-[#10213f]">{item.name}</p>
+                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${instructorStatusBadgeClass(item.workTone)}`}>
                         {item.workLabel}
                       </span>
                     </div>
                   </div>
 
-                  <p className={`min-w-0 truncate text-center text-[11px] font-extrabold ${instructorStatusBadgeClass(item.statusTone).split(" ").slice(-1)[0]}`}>
+                  <p className={`min-w-0 truncate text-center text-[11px] font-semibold ${instructorStatusBadgeClass(item.statusTone).split(" ").slice(-1)[0]}`}>
                     {compactStatus}
                   </p>
 
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-extrabold ${item.count ? "bg-blue-50 text-blue-700" : "bg-slate-50 text-slate-500"}`}>
+                  <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.count ? "bg-blue-50 text-blue-700" : "bg-slate-50 text-slate-500"}`}>
                     {item.count}건
                   </span>
                 </div>
 
                 <div className="mt-1.5 rounded-xl bg-[#f8fbff] px-3 py-1.5">
                   {preview ? (
-                    <div className="grid grid-cols-[44px_1fr_auto] items-center gap-2 text-[10.5px]">
+                    <div className="grid grid-cols-[44px_1fr_64px] items-center gap-2 text-[10.5px]">
                       <span className="font-extrabold text-[#10213f]">{preview.startTime}</span>
-                      <span className="min-w-0 truncate font-bold text-[#405875]">
+                      <span className="min-w-0 truncate font-semibold text-[#405875]">
                         {preview.userName} · {preview.bookingType.replace("비행", "")}
                       </span>
-                      <span className="truncate font-bold text-[#7b8da5]">{preview.aircraftName}</span>
+                      <span className="truncate text-right font-semibold text-[#7b8da5]">{preview.aircraftName}</span>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between text-[10.5px]">
@@ -2842,7 +2839,8 @@ export default async function DashboardPage({
   return (
     <PageContainer title="관리자 대시보드" description="하늘누리 비행교육원의 운영 현황을 한눈에 확인하세요.">
       <DashboardTimeSunSummary today={today} />
-      <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_350px]">
+      <div className="w-full overflow-x-auto pb-3">
+      <div className="grid w-[1690px] shrink-0 items-stretch gap-4 grid-cols-[1310px_360px]">
         <div className="grid h-full min-h-0 grid-rows-[auto_1fr] gap-4">
           <ScheduleGraph
             aircraftRows={aircraftRows}
@@ -2855,8 +2853,8 @@ export default async function DashboardPage({
             currentTimeMinutes={currentKstMinutes()}
           />
 
-          <div className="grid min-h-0 items-stretch gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(0,1.08fr)_minmax(0,0.68fr)]">
-            <MiniTable title="다가오는 예약" href="/bookings" headers={["예약자", "예약시간", "유형", "항공기", "담당교관", "상태/처리"]} className="h-full min-h-[430px]">
+          <div className="grid min-h-0 items-stretch gap-4 grid-cols-[560px_430px_288px]">
+            <MiniTable title="다가오는 예약" href="/bookings" headers={["예약자", "시간", "유형", "항공기", "교관", "상태"]} className="h-full min-h-[520px]">
             {upcomingBookings.length === 0 ? (
             <tr><td colSpan={6} className="text-center text-[#6f8199]">다가오는 예약이 없습니다.</td></tr>
             ) : (
@@ -2865,7 +2863,7 @@ export default async function DashboardPage({
             const bookingType = getBookingType(booking);
             return (
             <tr key={text(booking.bookingId) || index}>
-            <td className="font-bold text-[#10213f]">{text(booking.userName || booking.name || booking.customerName || booking.memberName, "-")}</td>
+            <td className="truncate font-semibold text-[#10213f]">{text(booking.userName || booking.name || booking.customerName || booking.memberName, "-")}</td>
             <td>
             <div className="font-bold text-[#10213f]">{normalizeDate(getBookingDateValue(booking)).slice(5)}</div>
             <div className="text-xs font-bold text-[#6f8199]">{normalizeTime(getBookingStartValue(booking))}~{normalizeTime(getBookingEndValue(booking))}</div>
@@ -2875,11 +2873,11 @@ export default async function DashboardPage({
             {bookingType}
             </span>
             </td>
-            <td>{getBookingAircraftName(booking, aircraftLookup)}</td>
-            <td>{isRentalBookingType(bookingType) ? "-" : text(getBookingInstructorName(booking), "-")}</td>
+            <td className="whitespace-nowrap text-[12px] font-semibold text-[#10213f]">{getBookingAircraftName(booking, aircraftLookup)}</td>
+            <td className="truncate text-[12px] font-semibold text-[#10213f]">{isRentalBookingType(bookingType) ? "-" : text(getBookingInstructorName(booking), "-")}</td>
             <td>
             <div className="flex flex-col gap-1.5">
-            <span className={`ui-badge w-fit px-2.5 py-1 text-[11px] ${badgeClass(getDisplayBookingStatus(booking))}`}>{getDisplayBookingStatus(booking) || "-"}</span>
+            <span className={`ui-badge w-fit px-2 py-0.5 text-[10px] ${badgeClass(getDisplayBookingStatus(booking))}`}>{getDisplayBookingStatus(booking) || "-"}</span>
             {actions.length > 0 ? (
             <div className="flex gap-1.5">
             {actions.map((action) => (
@@ -2907,7 +2905,7 @@ export default async function DashboardPage({
 
             <WeatherDetailPanel weather={weather} />
 
-            <InstructorAssignmentSummaryPanel items={instructorAssignmentSummary} className="h-full min-h-[430px]" />
+            <InstructorAssignmentSummaryPanel items={instructorAssignmentSummary} className="h-full min-h-[520px]" />
           </div>
         </div>
 
@@ -2919,8 +2917,9 @@ export default async function DashboardPage({
             todayBookings={todayBookings.filter((booking) => getDisplayBookingStatus(booking) === "확정").length}
             weather={weather}
           />
-          <RecentActivityPanel activities={recentActivities} className="h-full min-h-[430px]" />
+          <RecentActivityPanel activities={recentActivities} className="h-full min-h-[520px]" />
         </div>
+      </div>
       </div>
     </PageContainer>
   );
