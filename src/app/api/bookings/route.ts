@@ -9,7 +9,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 type ApiObject = Record<string, unknown>;
 
 type CachedBookingsGet = { expiresAt: number; data: ApiObject };
-let bookingsGetCache: CachedBookingsGet | undefined;
+const bookingsGetCache = new Map<string, CachedBookingsGet>();
 const BOOKINGS_GET_CACHE_TTL_MS = 8_000;
 
 function shouldBypassRouteCache(request: NextRequest) {
@@ -18,7 +18,35 @@ function shouldBypassRouteCache(request: NextRequest) {
 }
 
 function clearBookingsRouteCache() {
-  bookingsGetCache = undefined;
+  bookingsGetCache.clear();
+}
+
+function kstDateText(date: Date) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return formatter.format(date);
+}
+
+function addDaysText(dateText: string, offset: number) {
+  const [year, month, day] = dateText.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + offset);
+
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+function getBookingRangeParams(request: NextRequest) {
+  const today = kstDateText(new Date());
+  const params = request.nextUrl.searchParams;
+  const fromDate = params.get("fromDate") || params.get("startDate") || addDaysText(today, -7);
+  const toDate = params.get("toDate") || params.get("endDate") || addDaysText(today, 90);
+
+  return { fromDate, toDate };
 }
 
 
@@ -320,26 +348,79 @@ function extractRowsFromAllData(allData: unknown, sheetName: string) {
   return [];
 }
 
-async function fetchAllSheets() {
+async function fetchBookingsRange(fromDate: string, toDate: string) {
+  if (!API_URL) {
+    throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
+  }
+
+  const url = new URL(API_URL);
+  url.searchParams.set("action", "getBookingsRange");
+  url.searchParams.set("fromDate", fromDate);
+  url.searchParams.set("toDate", toDate);
+  url.searchParams.set("_ts", String(Date.now()));
+
+  const parsedData = await fetchAppsScriptJson(url.toString(), "예약 범위", 2);
+  return normalizeRows(parsedData);
+}
+
+async function fetchMasterSheets() {
   if (!API_URL) {
     throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
   }
 
   const url = new URL(API_URL);
   url.searchParams.set("action", "getAllData");
-  url.searchParams.set("sheets", "bookings,students,instructors,aircraft,settings,courseCatalog,rentalPilots");
+  url.searchParams.set("sheets", "students,instructors,aircraft,settings,courseCatalog,rentalPilots");
   url.searchParams.set("_ts", String(Date.now()));
 
-  const allData = await fetchAppsScriptJson(url.toString(), "전체 시트", 2);
+  const allData = await fetchAppsScriptJson(url.toString(), "예약관리 기준 시트", 2);
 
   return {
-    bookings: extractRowsFromAllData(allData, "bookings"),
     students: extractRowsFromAllData(allData, "students"),
     instructors: extractRowsFromAllData(allData, "instructors"),
     aircraft: extractRowsFromAllData(allData, "aircraft"),
     settings: normalizeSettingsRows(extractRowsFromAllData(allData, "settings")),
     courseCatalog: extractRowsFromAllData(allData, "courseCatalog"),
     rentalPilots: extractRowsFromAllData(allData, "rentalPilots"),
+  };
+}
+
+async function fetchAllSheets(request: NextRequest) {
+  const { fromDate, toDate } = getBookingRangeParams(request);
+
+  const [bookingsResult, masterResult] = await Promise.allSettled([
+    fetchBookingsRange(fromDate, toDate),
+    fetchMasterSheets(),
+  ]);
+
+  const fallbackMaster = async () => {
+    const students = await fetchSheet("students", { optional: true });
+    const instructors = await fetchSheet("instructors", { optional: true });
+    const aircraft = await fetchSheet("aircraft", { optional: true });
+    const rawSettings = await fetchSheet("settings", { optional: true });
+    const settings = normalizeSettingsRows(rawSettings);
+    const courseCatalog = await fetchSheet("courseCatalog", { optional: true });
+    const rentalPilots = await fetchSheet("rentalPilots", { optional: true });
+    return { students, instructors, aircraft, settings, courseCatalog, rentalPilots };
+  };
+
+  const bookings = bookingsResult.status === "fulfilled"
+    ? bookingsResult.value
+    : await fetchSheet("bookings");
+
+  const masters = masterResult.status === "fulfilled"
+    ? masterResult.value
+    : await fallbackMaster();
+
+  return {
+    bookings,
+    students: masters.students,
+    instructors: masters.instructors,
+    aircraft: masters.aircraft,
+    settings: masters.settings,
+    courseCatalog: masters.courseCatalog,
+    rentalPilots: masters.rentalPilots,
+    range: { fromDate, toDate },
   };
 }
 
@@ -428,20 +509,25 @@ async function postToAppsScript(action: string, data: ApiObject) {
 
 export async function GET(request: NextRequest) {
   try {
-    if (!shouldBypassRouteCache(request) && bookingsGetCache && bookingsGetCache.expiresAt > Date.now()) {
+    const { fromDate, toDate } = getBookingRangeParams(request);
+    const cacheKey = `${fromDate}:${toDate}`;
+    const cached = bookingsGetCache.get(cacheKey);
+
+    if (!shouldBypassRouteCache(request) && cached && cached.expiresAt > Date.now()) {
       return NextResponse.json({
-        ...bookingsGetCache.data,
+        ...cached.data,
         cached: true,
-        cacheTtlSeconds: Math.ceil((bookingsGetCache.expiresAt - Date.now()) / 1000),
+        cacheTtlSeconds: Math.ceil((cached.expiresAt - Date.now()) / 1000),
       });
     }
+
     let sheets;
 
     try {
-      sheets = await fetchAllSheets();
+      sheets = await fetchAllSheets(request);
     } catch (bulkError) {
       console.warn(
-        "[bookings GET bulk fallback]",
+        "[bookings GET range fallback]",
         bulkError instanceof Error ? bulkError.message : String(bulkError)
       );
       sheets = await fetchSheetsSequentialFallback();
@@ -460,12 +546,14 @@ export async function GET(request: NextRequest) {
       settings: sheets.settings,
       courseCatalog: sheets.courseCatalog,
       rentalPilots: sheets.rentalPilots,
+      range: "range" in sheets ? sheets.range : { fromDate, toDate },
+      rangeLimited: "range" in sheets,
     };
 
-    bookingsGetCache = {
+    bookingsGetCache.set(cacheKey, {
       expiresAt: Date.now() + BOOKINGS_GET_CACHE_TTL_MS,
       data: responseData,
-    };
+    });
 
     return NextResponse.json(responseData);
   } catch (error) {
