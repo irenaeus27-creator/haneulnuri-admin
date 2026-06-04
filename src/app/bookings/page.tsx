@@ -215,6 +215,48 @@ function formValue(value: unknown) {
   return String(value);
 }
 
+function getRentalPilotLabelValue(item: RentalPilotRow | UserRow | StudentRow | Record<string, unknown>) {
+  return formValue(
+    (item as RentalPilotRow).pilotId ||
+      (item as RentalPilotRow).rentalPilotId ||
+      (item as UserRow).userId ||
+      (item as StudentRow).studentId ||
+      (item as RentalPilotRow).phone ||
+      (item as RentalPilotRow).name,
+  );
+}
+
+function getRentalPilotDisplayName(item: RentalPilotRow | UserRow | StudentRow | Record<string, unknown>) {
+  return formValue(
+    (item as RentalPilotRow).name ||
+      (item as RentalPilotRow).pilotName ||
+      (item as UserRow).userName ||
+      (item as StudentRow).name ||
+      (item as RentalPilotRow).phone,
+  );
+}
+
+function findRentalPilotByAnyValue(items: (RentalPilotRow | UserRow | StudentRow | Record<string, unknown>)[], value: string) {
+  const target = formValue(value);
+  if (!target) return null;
+
+  return (
+    items.find((item) => {
+      const values = [
+        getRentalPilotLabelValue(item),
+        getRentalPilotDisplayName(item),
+        formValue((item as RentalPilotRow).phone),
+        formValue((item as UserRow).userId),
+        formValue((item as StudentRow).studentId),
+      ];
+
+      return values.some((candidate) => candidate && candidate === target);
+    }) || null
+  );
+}
+
+
+
 function parseSheetDateTime(value: unknown) {
   const raw = formValue(value).trim();
 
@@ -1964,6 +2006,21 @@ export default function BookingsPage() {
     setForm((prev) => ({
       ...prev,
       [key]: value,
+    }));
+  }
+
+
+  function applyRentalPilotSelection(value: string) {
+    const selected = findRentalPilotByAnyValue(rentalPilots, value);
+    const nextUserId = formValue(value);
+    const nextUserName = selected ? getRentalPilotDisplayName(selected) : form.userName;
+    const nextPhone = selected ? formValue((selected as RentalPilotRow).phone) : form.phone;
+
+    setForm((prev) => ({
+      ...prev,
+      userId: nextUserId,
+      userName: nextUserName,
+      phone: nextPhone || prev.phone,
     }));
   }
 
@@ -3908,7 +3965,7 @@ export default function BookingsPage() {
 
               {isRentalForm ? (
                 <Field label="렌탈 기장" required>
-                  <select value={form.userId} onChange={(event) => selectRentalPilot(event.target.value)} className="input-base compact-input">
+                  <select value={form.userId || form.userName} onChange={(event) => selectRentalPilot(event.target.value)} className="input-base compact-input">
                     <option value="">렌탈 기장 선택</option>
                     {allActiveRentalPilots.map((item, index) => {
                       const pilotId = text(item.pilotId || item.userId, "");
