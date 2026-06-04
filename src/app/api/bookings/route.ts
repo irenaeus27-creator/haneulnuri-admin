@@ -31,12 +31,32 @@ function timeText(value: unknown) {
   return `${String(Number(match[1])).padStart(2, "0")}:${String(Number(match[2])).padStart(2, "0")}`;
 }
 
-function toCamelKey(key: string) {
-  return key.replace(/_([a-z0-9])/g, (_, char: string) => char.toUpperCase());
+function nullIfEmpty(value: unknown) {
+  const raw = text(value);
+  return raw ? raw : null;
 }
 
-function toSnakeKey(key: string) {
-  return key.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
+function timeOrNull(value: unknown) {
+  const valueText = timeText(value);
+  return valueText ? valueText : null;
+}
+
+function dateOrNull(value: unknown) {
+  const raw = text(value);
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  return raw;
+}
+
+function numberOrNull(value: unknown) {
+  const raw = text(value);
+  if (!raw) return null;
+  const numberValue = Number(raw);
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function toCamelKey(key: string) {
+  return key.replace(/_([a-z0-9])/g, (_, char: string) => char.toUpperCase());
 }
 
 function toCamelObject(row: JsonRecord) {
@@ -49,17 +69,7 @@ function toCamelObject(row: JsonRecord) {
   return result;
 }
 
-function toSnakeObject(row: JsonRecord) {
-  const result: JsonRecord = {};
-
-  Object.entries(row || {}).forEach(([key, value]) => {
-    result[toSnakeKey(key)] = value;
-  });
-
-  return result;
-}
-
-function removeEmptyUndefined(row: JsonRecord) {
+function removeUndefined(row: JsonRecord) {
   const result: JsonRecord = {};
 
   Object.entries(row).forEach(([key, value]) => {
@@ -115,27 +125,38 @@ function normalizeBookingPayload(input: JsonRecord, existing?: JsonRecord) {
   const now = new Date().toISOString();
   const bookingId = text(input.bookingId || input.id || existing?.booking_id || existing?.bookingId) || buildId("BKG");
 
+  const bookingDate = dateOrNull(input.bookingDate || input.booking_date || existing?.booking_date);
+  const startTime = timeOrNull(input.startTime || input.start_time || existing?.start_time);
+  const endTime = timeOrNull(input.endTime || input.end_time || existing?.end_time);
+
+  if (!bookingDate) throw new Error("예약일을 선택하세요.");
+  if (!startTime) throw new Error("시작시간을 선택하세요.");
+  if (!endTime) throw new Error("종료시간을 선택하세요.");
+
+  const bookingType = text(input.bookingType || input.booking_type || input.type || existing?.booking_type || "기타");
+  const reservationType = text(input.reservationType || input.reservation_type || existing?.reservation_type || bookingType);
+
   const raw: JsonRecord = {
     booking_id: bookingId,
-    booking_date: text(input.bookingDate || input.booking_date || existing?.booking_date),
-    start_time: timeText(input.startTime || input.start_time || existing?.start_time),
-    end_time: timeText(input.endTime || input.end_time || existing?.end_time),
-    booking_type: text(input.bookingType || input.booking_type || input.type || existing?.booking_type || "기타"),
-    reservation_type: text(input.reservationType || input.reservation_type || existing?.reservation_type),
-    course_name: text(input.courseName || input.course_name || existing?.course_name),
-    user_id: text(input.userId || input.user_id || existing?.user_id),
-    user_name: text(input.userName || input.user_name || input.name || existing?.user_name),
-    phone: text(input.phone || existing?.phone),
-    instructor_id: text(input.instructorId || input.instructor_id || existing?.instructor_id),
-    instructor_name: text(input.instructorName || input.instructor_name || existing?.instructor_name),
-    aircraft_id: text(input.aircraftId || input.aircraft_id || existing?.aircraft_id),
-    aircraft_name: text(input.aircraftName || input.aircraft_name || input.aircraft || existing?.aircraft_name),
+    booking_date: bookingDate,
+    start_time: startTime,
+    end_time: endTime,
+    booking_type: bookingType,
+    reservation_type: reservationType || bookingType,
+    course_name: nullIfEmpty(input.courseName || input.course_name || existing?.course_name),
+    user_id: nullIfEmpty(input.userId || input.user_id || existing?.user_id),
+    user_name: nullIfEmpty(input.userName || input.user_name || input.name || existing?.user_name),
+    phone: nullIfEmpty(input.phone || existing?.phone),
+    instructor_id: nullIfEmpty(input.instructorId || input.instructor_id || existing?.instructor_id),
+    instructor_name: nullIfEmpty(input.instructorName || input.instructor_name || existing?.instructor_name),
+    aircraft_id: nullIfEmpty(input.aircraftId || input.aircraft_id || existing?.aircraft_id),
+    aircraft_name: nullIfEmpty(input.aircraftName || input.aircraft_name || input.aircraft || existing?.aircraft_name),
     status: text(input.status || existing?.status || "확정"),
-    payment_status: text(input.paymentStatus || input.payment_status || existing?.payment_status),
-    memo: text(input.memo || existing?.memo),
-    request_date: text(input.requestDate || input.request_date || existing?.request_date),
-    duration_minutes: Number(input.durationMinutes || input.duration_minutes || existing?.duration_minutes || 0) || null,
-    buffer_end_time: timeText(input.bufferEndTime || input.buffer_end_time || existing?.buffer_end_time),
+    payment_status: nullIfEmpty(input.paymentStatus || input.payment_status || existing?.payment_status),
+    memo: nullIfEmpty(input.memo || existing?.memo),
+    request_date: dateOrNull(input.requestDate || input.request_date || existing?.request_date || bookingDate),
+    duration_minutes: numberOrNull(input.durationMinutes || input.duration_minutes || existing?.duration_minutes),
+    buffer_end_time: timeOrNull(input.bufferEndTime || input.buffer_end_time || existing?.buffer_end_time),
     updated_at: now,
   };
 
@@ -143,10 +164,7 @@ function normalizeBookingPayload(input: JsonRecord, existing?: JsonRecord) {
     raw.created_at = text(input.createdAt || input.created_at) || now;
   }
 
-  if (!raw.reservation_type) raw.reservation_type = raw.booking_type;
-  if (!raw.request_date) raw.request_date = raw.booking_date;
-
-  return removeEmptyUndefined(raw);
+  return removeUndefined(raw);
 }
 
 async function selectTable(table: string, options?: {
@@ -313,7 +331,6 @@ async function handlePost(body: JsonRecord) {
     return { message: "예약을 취소했습니다.", booking, data: booking };
   }
 
-  // 기존 화면에서 generic addRow/updateRow를 예약에 쓰는 경우 방어
   if (action === "addRow" && text(data.sheetName) === "bookings") {
     const booking = await insertBooking(data);
     return { message: "예약을 등록했습니다.", booking, data: booking };
