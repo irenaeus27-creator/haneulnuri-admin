@@ -93,6 +93,140 @@ type WeatherData = {
   message?: string;
 };
 
+type OpenMeteoResponse = {
+  current?: Record<string, number | string>;
+  hourly?: Record<string, (number | string)[]>;
+};
+
+function weatherCodeText(code: unknown) {
+  const value = Number(code);
+  if ([0].includes(value)) return "맑음";
+  if ([1, 2, 3].includes(value)) return "구름";
+  if ([45, 48].includes(value)) return "안개";
+  if ([51, 53, 55, 56, 57].includes(value)) return "이슬비";
+  if ([61, 63, 65, 66, 67, 80, 81, 82].includes(value)) return "비";
+  if ([71, 73, 75, 77, 85, 86].includes(value)) return "눈";
+  if ([95, 96, 99].includes(value)) return "뇌우";
+  return "확인 필요";
+}
+
+function selectActiveRunway(windDirection: number) {
+  const direction = Number.isFinite(windDirection) ? windDirection : 0;
+  if (direction >= 51 && direction < 230) return { label: "14", heading: 140 };
+  return { label: "32", heading: 320 };
+}
+
+function calculateWindComponents(windSpeed: number, windDirection: number, runwayHeading: number) {
+  const diff = Math.abs((((windDirection - runwayHeading + 540) % 360) - 180));
+  const radians = (diff * Math.PI) / 180;
+  const headwind = Math.round(windSpeed * Math.cos(radians));
+  const crosswind = Math.round(Math.abs(windSpeed * Math.sin(radians)));
+  const tailwind = headwind < 0 ? Math.abs(headwind) : 0;
+
+  return {
+    headwind: headwind > 0 ? headwind : 0,
+    crosswind,
+    tailwind,
+  };
+}
+
+function buildWeatherDecision(components: { headwind: number; crosswind: number; tailwind: number }, gust: number, precipitation: number) {
+  if (components.crosswind >= 15 || gust >= 25 || precipitation >= 5) {
+    return { label: "주의", tone: "amber", message: "측풍, 돌풍 또는 강수 조건 확인이 필요합니다." };
+  }
+
+  if (components.tailwind >= 5) {
+    return { label: "확인 필요", tone: "amber", message: "배풍 성분이 있어 활주로 판단이 필요합니다." };
+  }
+
+  return { label: "양호", tone: "emerald", message: "현재 기상 조건은 대체로 양호합니다." };
+}
+
+async function fetchOpenMeteoDirect(): Promise<WeatherData> {
+  const latitude = 37.106759;
+  const longitude = 126.765010;
+  const url = new URL("https://api.open-meteo.com/v1/forecast");
+
+  url.searchParams.set("latitude", String(latitude));
+  url.searchParams.set("longitude", String(longitude));
+  url.searchParams.set("timezone", "Asia/Seoul");
+  url.searchParams.set("forecast_days", "1");
+  url.searchParams.set("wind_speed_unit", "kn");
+  url.searchParams.set("current", [
+    "temperature_2m",
+    "apparent_temperature",
+    "relative_humidity_2m",
+    "precipitation",
+    "rain",
+    "weather_code",
+    "cloud_cover",
+    "pressure_msl",
+    "surface_pressure",
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "wind_gusts_10m",
+  ].join(","));
+  url.searchParams.set("hourly", [
+    "temperature_2m",
+    "precipitation",
+    "cloud_cover",
+    "wind_speed_10m",
+    "wind_direction_10m",
+    "wind_gusts_10m",
+  ].join(","));
+
+  const response = await fetch(url.toString(), { cache: "no-store" });
+  if (!response.ok) throw new Error(`Open-Meteo 직접 호출 오류: ${response.status}`);
+
+  const data = (await response.json()) as OpenMeteoResponse;
+  const current = data.current || {};
+  const hourly = data.hourly || {};
+  const windSpeed = Number(current.wind_speed_10m || 0);
+  const windDirection = Number(current.wind_direction_10m || 0);
+  const windGust = Number(current.wind_gusts_10m || 0);
+  const precipitation = Number(current.precipitation || 0);
+  const runway = selectActiveRunway(windDirection);
+  const components = calculateWindComponents(windSpeed, windDirection, runway.heading);
+
+  const hourlyRows = Array.isArray(hourly.time)
+    ? hourly.time.map((time, index) => ({
+        time: String(time),
+        hour: Number(String(time).slice(11, 13)),
+        temperature: Number((hourly.temperature_2m || [])[index] || 0),
+        windSpeed: Number((hourly.wind_speed_10m || [])[index] || 0),
+        windDirection: Number((hourly.wind_direction_10m || [])[index] || 0),
+        windGust: Number((hourly.wind_gusts_10m || [])[index] || 0),
+        precipitation: Number((hourly.precipitation || [])[index] || 0),
+        cloudCover: Number((hourly.cloud_cover || [])[index] || 0),
+      }))
+    : [];
+
+  return {
+    ok: true,
+    source: "Open-Meteo",
+    current: {
+      time: String(current.time || ""),
+      temperature: Number(current.temperature_2m || 0),
+      apparentTemperature: Number(current.apparent_temperature || 0),
+      humidity: Number(current.relative_humidity_2m || 0),
+      precipitation,
+      rain: Number(current.rain || 0),
+      weatherCode: Number(current.weather_code || 0),
+      weatherText: weatherCodeText(current.weather_code),
+      cloudCover: Number(current.cloud_cover || 0),
+      pressureMsl: Number(current.pressure_msl || 0),
+      surfacePressure: Number(current.surface_pressure || 0),
+      windSpeed,
+      windDirection,
+      windGust,
+    },
+    runway,
+    windComponents: components,
+    decision: buildWeatherDecision(components, windGust, precipitation),
+    hourly: hourlyRows,
+  };
+}
+
 const SCHEDULE_START_HOUR = 7;
 const SCHEDULE_END_HOUR = 20;
 const SCHEDULE_START_MIN = SCHEDULE_START_HOUR * 60;
@@ -271,30 +405,37 @@ async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
 async function safeGetWeatherData(): Promise<WeatherData> {
   try {
     const baseUrl = getAppBaseUrl();
-    const response = await fetch(`${baseUrl}/api/weather/open-meteo`, {
+    const response = await fetch(`${baseUrl}/api/weather/open-meteo?_ts=${Date.now()}`, {
       cache: "no-store",
     });
 
-    if (!response.ok) {
-      throw new Error(`날씨 API 오류: ${response.status}`);
+    if (response.ok) {
+      const data = (await response.json()) as WeatherData;
+      if (data.ok && data.current) return data;
     }
 
-    return (await response.json()) as WeatherData;
+    return await fetchOpenMeteoDirect();
   } catch (error) {
-    console.error("날씨 정보를 불러오지 못했습니다.", error);
-    return {
-      ok: false,
-      source: "Open-Meteo",
-      current: null,
-      runway: null,
-      windComponents: null,
-      decision: {
-        label: "확인 필요",
-        tone: "slate",
-        message: "날씨 정보를 불러오지 못했습니다.",
-      },
-      hourly: [],
-    };
+    console.error("날씨 정보를 내부 API에서 불러오지 못해 직접 호출을 시도합니다.", error);
+
+    try {
+      return await fetchOpenMeteoDirect();
+    } catch (directError) {
+      console.error("날씨 정보를 불러오지 못했습니다.", directError);
+      return {
+        ok: false,
+        source: "Open-Meteo",
+        current: null,
+        runway: null,
+        windComponents: null,
+        decision: {
+          label: "확인 필요",
+          tone: "slate",
+          message: "날씨 정보를 불러오지 못했습니다.",
+        },
+        hourly: [],
+      };
+    }
   }
 }
 
