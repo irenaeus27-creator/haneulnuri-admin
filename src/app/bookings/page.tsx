@@ -1194,6 +1194,9 @@ export default function BookingsPage() {
   const [isCalendarDragging, setIsCalendarDragging] = useState(false);
   const [calendarMoveDrag, setCalendarMoveDrag] = useState<CalendarMoveDrag>(null);
   const [calendarResizeDrag, setCalendarResizeDrag] = useState<CalendarResizeDrag>(null);
+  const calendarMoveDragRef = useRef<CalendarMoveDrag>(null);
+  const calendarResizeDragRef = useRef<CalendarResizeDrag>(null);
+  const calendarDragFinalizeLockRef = useRef(false);
   const [error, setError] = useState("");
   const [operationMessage, setOperationMessage] = useState("");
   const [lastSavedConflictKey, setLastSavedConflictKey] = useState("");
@@ -1884,11 +1887,13 @@ export default function BookingsPage() {
     if (!calendarMoveDrag && !calendarResizeDrag) return;
 
     function handleWindowMouseMove(event: MouseEvent) {
+      if (!calendarMoveDragRef.current && !calendarResizeDragRef.current) return;
       updateCalendarMoveDrag(event);
       updateCalendarResizeDrag(event);
     }
 
     function handleWindowMouseUp() {
+      if (!calendarMoveDragRef.current && !calendarResizeDragRef.current) return;
       void finishActiveCalendarBlockDrag();
     }
 
@@ -1896,22 +1901,33 @@ export default function BookingsPage() {
       cancelActiveCalendarBlockDrag();
     }
 
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        cancelActiveCalendarBlockDrag();
+      }
+    }
+
     const previousUserSelect = document.body.style.userSelect;
+    const previousCursor = document.body.style.cursor;
 
     document.body.style.userSelect = "none";
+    document.body.style.cursor = calendarResizeDragRef.current ? "ew-resize" : "grabbing";
     window.addEventListener("mousemove", handleWindowMouseMove);
     window.addEventListener("mouseup", handleWindowMouseUp);
     window.addEventListener("blur", handleWindowCancel);
+    window.addEventListener("keydown", handleKeyDown);
     document.addEventListener("mouseleave", handleWindowCancel);
 
     return () => {
       document.body.style.userSelect = previousUserSelect;
+      document.body.style.cursor = previousCursor;
       window.removeEventListener("mousemove", handleWindowMouseMove);
       window.removeEventListener("mouseup", handleWindowMouseUp);
       window.removeEventListener("blur", handleWindowCancel);
+      window.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("mouseleave", handleWindowCancel);
     };
-  }, [calendarMoveDrag, calendarResizeDrag, bookings]);
+  }, [calendarMoveDrag, calendarResizeDrag]);
 
   const filteredBookings = useMemo(() => {
     const q = keyword.trim().toLowerCase();
@@ -2747,31 +2763,46 @@ export default function BookingsPage() {
 
 
   async function finishActiveCalendarBlockDrag() {
-    const activeDrag = calendarResizeDrag || calendarMoveDrag;
+    if (calendarDragFinalizeLockRef.current) return;
+
+    const activeResizeDrag = calendarResizeDragRef.current;
+    const activeMoveDrag = calendarMoveDragRef.current;
+    const activeDrag = activeResizeDrag || activeMoveDrag;
 
     if (!activeDrag) return;
+
+    calendarDragFinalizeLockRef.current = true;
 
     const activeBooking = bookings.find((item) => formValue(item.bookingId) === activeDrag.bookingId);
 
     if (!activeBooking) {
+      calendarMoveDragRef.current = null;
+      calendarResizeDragRef.current = null;
       setCalendarMoveDrag(null);
       setCalendarResizeDrag(null);
+      calendarDragFinalizeLockRef.current = false;
       return;
     }
 
-    if (calendarResizeDrag?.bookingId === activeDrag.bookingId) {
-      await finishCalendarResizeDrag(activeBooking);
-      return;
-    }
+    try {
+      if (activeResizeDrag?.bookingId === activeDrag.bookingId) {
+        await finishCalendarResizeDrag(activeBooking, activeResizeDrag);
+        return;
+      }
 
-    if (calendarMoveDrag?.bookingId === activeDrag.bookingId) {
-      await finishCalendarMoveDrag(activeBooking);
+      if (activeMoveDrag?.bookingId === activeDrag.bookingId) {
+        await finishCalendarMoveDrag(activeBooking, activeMoveDrag);
+      }
+    } finally {
+      calendarDragFinalizeLockRef.current = false;
     }
   }
 
   function cancelActiveCalendarBlockDrag() {
-    if (!calendarMoveDrag && !calendarResizeDrag) return;
+    if (!calendarMoveDragRef.current && !calendarResizeDragRef.current && !calendarMoveDrag && !calendarResizeDrag) return;
 
+    calendarMoveDragRef.current = null;
+    calendarResizeDragRef.current = null;
     setCalendarMoveDrag(null);
     setCalendarResizeDrag(null);
   }
@@ -2786,42 +2817,52 @@ export default function BookingsPage() {
 
     if (!bookingId) return;
 
-    setCalendarMoveDrag({
+    const nextDrag = {
       bookingId,
       startX: event.clientX,
       timelineWidth: calendarTimelineWidthFromEvent(event),
       deltaSteps: 0,
       originalStartTime: normalizeTime(booking.startTime),
       originalEndTime: normalizeTime(booking.endTime),
-    });
+    };
+
+    calendarResizeDragRef.current = null;
+    calendarMoveDragRef.current = nextDrag;
+    setCalendarResizeDrag(null);
+    setCalendarMoveDrag(nextDrag);
   }
 
   function updateCalendarMoveDrag(event: React.MouseEvent | MouseEvent) {
-    if (!calendarMoveDrag) return;
+    const currentDrag = calendarMoveDragRef.current;
+    if (!currentDrag) return;
 
-    const rawDeltaSteps = calendarStepFromDelta(event.clientX - calendarMoveDrag.startX, calendarMoveDrag.timelineWidth);
-    const deltaSteps = clampCalendarMoveSteps(calendarMoveDrag.originalStartTime, calendarMoveDrag.originalEndTime, rawDeltaSteps);
+    const rawDeltaSteps = calendarStepFromDelta(event.clientX - currentDrag.startX, currentDrag.timelineWidth);
+    const deltaSteps = clampCalendarMoveSteps(currentDrag.originalStartTime, currentDrag.originalEndTime, rawDeltaSteps);
 
-    if (deltaSteps === calendarMoveDrag.deltaSteps) return;
+    if (deltaSteps === currentDrag.deltaSteps) return;
 
-    setCalendarMoveDrag({
-      ...calendarMoveDrag,
+    const nextDrag = {
+      ...currentDrag,
       deltaSteps,
-    });
+    };
+
+    calendarMoveDragRef.current = nextDrag;
+    setCalendarMoveDrag(nextDrag);
   }
 
-  async function finishCalendarMoveDrag(booking: BookingRow) {
-    if (!calendarMoveDrag || calendarMoveDrag.bookingId !== formValue(booking.bookingId)) return;
+  async function finishCalendarMoveDrag(booking: BookingRow, dragSnapshot = calendarMoveDragRef.current) {
+    if (!dragSnapshot || dragSnapshot.bookingId !== formValue(booking.bookingId)) return;
 
-    const { deltaSteps, originalStartTime, originalEndTime } = calendarMoveDrag;
+    const { deltaSteps, originalStartTime, originalEndTime } = dragSnapshot;
 
     if (deltaSteps) {
       calendarBlockDragClickBlockRef.current = true;
       window.setTimeout(() => {
         calendarBlockDragClickBlockRef.current = false;
-      }, 0);
+      }, 120);
     }
 
+    calendarMoveDragRef.current = null;
     setCalendarMoveDrag(null);
 
     if (!deltaSteps) return;
@@ -2909,42 +2950,52 @@ export default function BookingsPage() {
 
     if (!bookingId) return;
 
-    setCalendarResizeDrag({
+    const nextDrag = {
       bookingId,
       startX: event.clientX,
       timelineWidth: calendarTimelineWidthFromEvent(event),
       deltaSteps: 0,
       originalStartTime: normalizeTime(booking.startTime),
       originalEndTime: normalizeTime(booking.endTime),
-    });
+    };
+
+    calendarMoveDragRef.current = null;
+    calendarResizeDragRef.current = nextDrag;
+    setCalendarMoveDrag(null);
+    setCalendarResizeDrag(nextDrag);
   }
 
   function updateCalendarResizeDrag(event: React.MouseEvent | MouseEvent) {
-    if (!calendarResizeDrag) return;
+    const currentDrag = calendarResizeDragRef.current;
+    if (!currentDrag) return;
 
-    const rawDeltaSteps = calendarStepFromDelta(event.clientX - calendarResizeDrag.startX, calendarResizeDrag.timelineWidth);
-    const deltaSteps = clampCalendarResizeSteps(calendarResizeDrag.originalStartTime, calendarResizeDrag.originalEndTime, rawDeltaSteps);
+    const rawDeltaSteps = calendarStepFromDelta(event.clientX - currentDrag.startX, currentDrag.timelineWidth);
+    const deltaSteps = clampCalendarResizeSteps(currentDrag.originalStartTime, currentDrag.originalEndTime, rawDeltaSteps);
 
-    if (deltaSteps === calendarResizeDrag.deltaSteps) return;
+    if (deltaSteps === currentDrag.deltaSteps) return;
 
-    setCalendarResizeDrag({
-      ...calendarResizeDrag,
+    const nextDrag = {
+      ...currentDrag,
       deltaSteps,
-    });
+    };
+
+    calendarResizeDragRef.current = nextDrag;
+    setCalendarResizeDrag(nextDrag);
   }
 
-  async function finishCalendarResizeDrag(booking: BookingRow) {
-    if (!calendarResizeDrag || calendarResizeDrag.bookingId !== formValue(booking.bookingId)) return;
+  async function finishCalendarResizeDrag(booking: BookingRow, dragSnapshot = calendarResizeDragRef.current) {
+    if (!dragSnapshot || dragSnapshot.bookingId !== formValue(booking.bookingId)) return;
 
-    const { deltaSteps, originalStartTime, originalEndTime } = calendarResizeDrag;
+    const { deltaSteps, originalStartTime, originalEndTime } = dragSnapshot;
 
     if (deltaSteps) {
       calendarBlockDragClickBlockRef.current = true;
       window.setTimeout(() => {
         calendarBlockDragClickBlockRef.current = false;
-      }, 0);
+      }, 120);
     }
 
+    calendarResizeDragRef.current = null;
     setCalendarResizeDrag(null);
 
     if (!deltaSteps) return;
