@@ -131,6 +131,8 @@ type BookingForm = {
   status: string;
   paymentStatus: string;
   memo: string;
+  rentalPilotId?: string;
+  rentalPilotName?: string;
 };
 
 type CalendarDragSelection = {
@@ -214,6 +216,50 @@ function formValue(value: unknown) {
 
   return String(value);
 }
+
+function rentalPilotValue(item: RentalPilotRow | UserRow | StudentRow | Record<string, unknown>) {
+  return formValue(
+    (item as Record<string, unknown>).rentalPilotId ||
+      (item as Record<string, unknown>).pilotId ||
+      (item as Record<string, unknown>).userId ||
+      (item as Record<string, unknown>).studentId ||
+      (item as Record<string, unknown>).phone ||
+      (item as Record<string, unknown>).name,
+  );
+}
+
+function rentalPilotName(item: RentalPilotRow | UserRow | StudentRow | Record<string, unknown>) {
+  return formValue(
+    (item as Record<string, unknown>).name ||
+      (item as Record<string, unknown>).pilotName ||
+      (item as Record<string, unknown>).userName ||
+      (item as Record<string, unknown>).rentalPilotName ||
+      (item as Record<string, unknown>).phone,
+  );
+}
+
+function findRentalPilot(items: (RentalPilotRow | UserRow | StudentRow | Record<string, unknown>)[], value: string) {
+  const target = formValue(value);
+  if (!target) return null;
+
+  return (
+    items.find((item) => {
+      const candidates = [
+        rentalPilotValue(item),
+        rentalPilotName(item),
+        formValue((item as Record<string, unknown>).rentalPilotId),
+        formValue((item as Record<string, unknown>).pilotId),
+        formValue((item as Record<string, unknown>).userId),
+        formValue((item as Record<string, unknown>).studentId),
+        formValue((item as Record<string, unknown>).phone),
+      ];
+
+      return candidates.some((candidate) => candidate && candidate === target);
+    }) || null
+  );
+}
+
+
 
 function getRentalPilotLabelValue(item: RentalPilotRow | UserRow | StudentRow | Record<string, unknown>) {
   return formValue(
@@ -2010,19 +2056,23 @@ export default function BookingsPage() {
   }
 
 
-  function applyRentalPilotSelection(value: string) {
-    const selected = findRentalPilotByAnyValue(rentalPilots, value);
-    const nextUserId = formValue(value);
-    const nextUserName = selected ? getRentalPilotDisplayName(selected) : form.userName;
-    const nextPhone = selected ? formValue((selected as RentalPilotRow).phone) : form.phone;
+
+  function handleRentalPilotChange(value: string) {
+    const selectedPilot = findRentalPilot(rentalPilots, value);
+    const selectedId = formValue(value);
+    const selectedName = selectedPilot ? rentalPilotName(selectedPilot) : "";
+    const selectedPhone = selectedPilot ? formValue((selectedPilot as Record<string, unknown>).phone) : "";
 
     setForm((prev) => ({
       ...prev,
-      userId: nextUserId,
-      userName: nextUserName,
-      phone: nextPhone || prev.phone,
+      rentalPilotId: selectedId,
+      rentalPilotName: selectedName || prev.rentalPilotName,
+      userId: selectedId || prev.userId,
+      userName: selectedName || prev.userName,
+      phone: selectedPhone || prev.phone,
     }));
   }
+
 
   function startCreate() {
     setLastSavedConflictKey("");
@@ -3965,7 +4015,7 @@ export default function BookingsPage() {
 
               {isRentalForm ? (
                 <Field label="렌탈 기장" required>
-                  <select value={form.userId || form.userName} onChange={(event) => selectRentalPilot(event.target.value)} className="input-base compact-input">
+                  <select value={form.rentalPilotId || form.userId || ""} onChange={(event) => handleRentalPilotChange(event.target.value)} className="input-base compact-input">
                     <option value="">렌탈 기장 선택</option>
                     {allActiveRentalPilots.map((item, index) => {
                       const pilotId = text(item.pilotId || item.userId, "");
