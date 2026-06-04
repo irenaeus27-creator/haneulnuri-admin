@@ -1,247 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
-import { normalizeSettingsRows } from "@/lib/settingsOptions";
+import { JsonRecord, buildId, insertRow, nowIso, pickAllowed, selectRows, text, updateRow } from "@/lib/supabase/route-helpers";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BASE_URL || "";
+const TABLE = "aircraft";
+const ID_COLUMN = "aircraft_id";
+const PREFIX = "A";
+const RESPONSE_KEY = "aircraft";
+const SERVICE = "skynuri-supabase-aircraft";
+const ORDER_COLUMN = "aircraft_id";
+const ALLOWED_COLUMNS = ["aircraft_id", "aircraft_name", "model", "registration_no", "status", "next_inspection_date", "active", "photo_url", "memo", "created_at", "updated_at"];
 
-type ApiObject = Record<string, unknown>;
+function normalize(input: JsonRecord, isCreate = false) {
+  const now = nowIso();
+  const id = text(input.aircraftId || input.aircraft_id) || buildId(PREFIX);
+  const row: JsonRecord = { [ID_COLUMN]: id };
 
-function normalizeRows(data: unknown): ApiObject[] {
-  if (Array.isArray(data)) return data as ApiObject[];
-
-  if (data && typeof data === "object") {
-    const obj = data as ApiObject;
-    if (Array.isArray(obj.data)) return obj.data as ApiObject[];
-    if (Array.isArray(obj.rows)) return obj.rows as ApiObject[];
-    if (Array.isArray(obj.values)) return obj.values as ApiObject[];
-  }
-
-  return [];
-}
-
-async function readJsonResponse(response: Response, context: string) {
-  const rawText = await response.text();
-
-  if (!rawText.trim()) {
-    throw new Error(`${context} 응답이 비어 있습니다.`);
-  }
-
-  try {
-    return JSON.parse(rawText) as unknown;
-  } catch {
-    throw new Error(`${context} 응답을 JSON으로 변환하지 못했습니다.`);
-  }
-}
-
-async function fetchSheet(sheetName: string, options?: { optional?: boolean }) {
-  if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
-  }
-
-  try {
-    const url = new URL(API_URL);
-    url.searchParams.set("action", "getSheet");
-    url.searchParams.set("sheet", sheetName);
-
-    const response = await fetch(url.toString(), {
-      method: "GET",
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new Error(`${sheetName} 시트 Apps Script API 오류: ${response.status}`);
-    }
-
-    const parsedData = await readJsonResponse(response, `${sheetName} 시트`);
-
-    if (
-      parsedData &&
-      typeof parsedData === "object" &&
-      "success" in parsedData &&
-      (parsedData as ApiObject).success === false
-    ) {
-      throw new Error(
-        String((parsedData as ApiObject).message || "") ||
-          `${sheetName} 시트를 불러오지 못했습니다.`
-      );
-    }
-
-    return normalizeRows(parsedData);
-  } catch (error) {
-    if (options?.optional) {
-      console.warn(`[aircraft GET optional sheet skipped: ${sheetName}]`, error instanceof Error ? error.message : error);
-      return [];
-    }
-
-    throw error;
-  }
-}
-
-async function postToAppsScript(action: string, data: ApiObject) {
-  if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
-  }
-
-  const response = await fetch(API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/plain;charset=utf-8",
-    },
-    body: JSON.stringify({ action, data }),
-    cache: "no-store",
+  ALLOWED_COLUMNS.forEach((column) => {
+    const camel = column.replace(/_([a-z0-9])/g, (_: string, char: string) => char.toUpperCase());
+    const value = input[camel] ?? input[column];
+    if (value !== undefined) row[column] = value;
   });
 
-  if (!response.ok) {
-    throw new Error(`Apps Script API 오류: ${response.status}`);
+  if (ALLOWED_COLUMNS.includes("created_at") && isCreate && !row.created_at) row.created_at = now;
+  if (ALLOWED_COLUMNS.includes("updated_at")) row.updated_at = now;
+
+  return pickAllowed(row, ALLOWED_COLUMNS);
+}
+
+async function handlePost(body: JsonRecord) {
+  const action = text(body.action);
+  const data = (body.data || body) as JsonRecord;
+
+  if (action.startsWith("add") || action === "addRow") {
+    const saved = await insertRow(TABLE, normalize(data, true));
+    return { message: "등록했습니다.", [RESPONSE_KEY]: saved, data: saved };
   }
 
-  const parsedData = await readJsonResponse(response, "Apps Script");
-
-  if (
-    parsedData &&
-    typeof parsedData === "object" &&
-    "success" in parsedData &&
-    (parsedData as ApiObject).success === false
-  ) {
-    throw new Error(
-      String((parsedData as ApiObject).message || "") ||
-        `Apps Script 처리에 실패했습니다. action=${action}`
-    );
+  if (action.startsWith("update") || action === "updateRow") {
+    const row = normalize(data, false);
+    const id = text(data.aircraftId || data.aircraft_id || row[ID_COLUMN]);
+    const saved = await updateRow(TABLE, ID_COLUMN, id, row);
+    return { message: "수정했습니다.", [RESPONSE_KEY]: saved, data: saved };
   }
 
-  return parsedData;
+  throw new Error(`지원하지 않는 action입니다: ${action}`);
 }
 
 export async function GET() {
+  const startedAt = Date.now();
   try {
-    const [aircraft, rawSettings] = await Promise.all([
-      fetchSheet("aircraft"),
-      fetchSheet("settings", { optional: true }),
-    ]);
-
-    const settings = normalizeSettingsRows(rawSettings);
-
-    return NextResponse.json({
-      ok: true,
-      aircraft,
-      settings,
-    });
+    const rows = await selectRows(TABLE, { orderColumn: ORDER_COLUMN, ascending: true });
+    return NextResponse.json({ ok: true, success: true, source: "supabase", service: SERVICE, [RESPONSE_KEY]: rows, data: { [RESPONSE_KEY]: rows }, counts: { [RESPONSE_KEY]: rows.length }, elapsedMs: Date.now() - startedAt });
   } catch (error) {
-    console.error("[aircraft GET error]", error);
-
-    return NextResponse.json(
-      {
-        ok: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "항공기 데이터를 불러오지 못했습니다.",
-        aircraft: [],
-        settings: [],
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, success: false, source: "supabase", message: error instanceof Error ? error.message : "조회에 실패했습니다.", elapsedMs: Date.now() - startedAt }, { status: 500 });
   }
-}
-
-
-function text(value: unknown) {
-  return String(value ?? "").trim();
-}
-
-function normalizeAircraftPayload(data: ApiObject) {
-  const aircraftId = text(data.aircraftId || data.id);
-  const registrationNo = text(data.registrationNo || data.registration || data.aircraftName);
-  const aircraftName = text(data.aircraftName || data.name || registrationNo);
-
-  return {
-    ...data,
-    sheetName: "aircraft",
-    idHeader: "aircraftId",
-    aircraftId,
-    id: text(data.id || aircraftId),
-    aircraftName,
-    name: text(data.name || aircraftName),
-    registrationNo,
-    registration: text(data.registration || registrationNo),
-    status: text(data.status || "운항 가능"),
-    active: data.active ?? true,
-  };
-}
-
-function fallbackActions(action: string) {
-  if (action === "addAircraft") return ["addAircraft", "addRow"];
-  if (action === "updateAircraft") return ["updateAircraft", "updateRow"];
-  if (action === "deactivateAircraft") return ["deactivateAircraft", "updateAircraft", "updateRow"];
-  return [action];
-}
-
-async function postAircraftWithFallback(action: string, data: ApiObject) {
-  const payload = normalizeAircraftPayload(data);
-  const errors: string[] = [];
-
-  for (const candidateAction of fallbackActions(action)) {
-    try {
-      return await postToAppsScript(candidateAction, payload);
-    } catch (error) {
-      errors.push(`${candidateAction}: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  throw new Error(errors.join(" / "));
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
   try {
-    const body = await request.json();
-    const action = String(body.action || "").trim();
-    const data = (body.data || {}) as ApiObject;
-
-    if (!action) {
-      return NextResponse.json(
-        { ok: false, success: false, message: "action 값이 필요합니다." },
-        { status: 400 }
-      );
-    }
-
-    const allowedActions = new Set([
-      "addAircraft",
-      "updateAircraft",
-      "deactivateAircraft",
-    ]);
-
-    if (!allowedActions.has(action)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          success: false,
-          message: `지원하지 않는 action입니다: ${action}`,
-        },
-        { status: 400 }
-      );
-    }
-
-    const result = await postAircraftWithFallback(action, data);
-
-    return NextResponse.json({
-      ok: true,
-      success: true,
-      result,
-    });
+    const body = (await request.json()) as JsonRecord;
+    const result = await handlePost(body);
+    return NextResponse.json({ ok: true, success: true, source: "supabase", service: SERVICE, elapsedMs: Date.now() - startedAt, ...result });
   } catch (error) {
-    console.error("[aircraft POST error]", error);
-
-    return NextResponse.json(
-      {
-        ok: false,
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "항공기 정보를 저장하지 못했습니다.",
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, success: false, source: "supabase", message: error instanceof Error ? error.message : "처리에 실패했습니다.", elapsedMs: Date.now() - startedAt }, { status: 500 });
   }
 }
