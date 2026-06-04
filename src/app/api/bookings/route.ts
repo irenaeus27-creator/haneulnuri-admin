@@ -4,6 +4,67 @@ import { normalizeSettingsRows } from "@/lib/settingsOptions";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+
+
+const APPS_SCRIPT_TIMEOUT_MS = 12000;
+
+function createTimeoutSignal(timeoutMs = APPS_SCRIPT_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  return {
+    signal: controller.signal,
+    clear: () => clearTimeout(timer),
+  };
+}
+
+function timeoutErrorMessage(context: string) {
+  return `${context} 요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.`;
+}
+
+function sleepRetry(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(input: RequestInfo | URL, init: RequestInit, context: string, retryCount = 1) {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
+    const timeout = createTimeoutSignal();
+
+    try {
+      const response = await fetch(input, {
+        ...init,
+        signal: timeout.signal,
+      });
+
+      timeout.clear();
+
+      if (response.ok || attempt >= retryCount) {
+        return response;
+      }
+
+      lastError = new Error(`${context} 응답 오류: ${response.status}`);
+    } catch (error) {
+      timeout.clear();
+
+      if (error instanceof Error && error.name === "AbortError") {
+        lastError = new Error(timeoutErrorMessage(context));
+      } else {
+        lastError = error;
+      }
+
+      if (attempt >= retryCount) {
+        throw lastError instanceof Error ? lastError : new Error(`${context} 요청에 실패했습니다.`);
+      }
+    }
+
+    await sleepRetry(450 * (attempt + 1));
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(`${context} 요청에 실패했습니다.`);
+}
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 type ApiObject = Record<string, unknown>;
@@ -474,7 +535,7 @@ async function postToAppsScript(action: string, data: ApiObject) {
     throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
   }
 
-  const response = await fetch(API_URL, {
+  const response = await fetchWithRetry(API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "text/plain;charset=utf-8",
@@ -484,7 +545,7 @@ async function postToAppsScript(action: string, data: ApiObject) {
       data,
     }),
     cache: "no-store",
-  });
+  }, "Apps Script", 1);
 
   if (!response.ok) {
     throw new Error(`Apps Script API 오류: ${response.status}`);
