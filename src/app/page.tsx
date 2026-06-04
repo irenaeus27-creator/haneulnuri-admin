@@ -2565,6 +2565,55 @@ function InstructorAssignmentSummaryPanel({
 }
 
 
+
+function DashboardDebugPanel({
+  bookings,
+  aircraft,
+  selectedDate,
+  today,
+  scheduleItems,
+  aircraftRows,
+}: {
+  bookings: Row[];
+  aircraft: Row[];
+  selectedDate: string;
+  today: string;
+  scheduleItems: ScheduleItem[];
+  aircraftRows: string[];
+}) {
+  const selectedDateBookings = bookings.filter((booking) => normalizeDate(getBookingDateValue(booking)) === selectedDate);
+  const activeSelectedDateBookings = selectedDateBookings.filter(isActiveBooking);
+  const sampleBookings = bookings.slice(0, 5).map((booking) => ({
+    id: text(booking.bookingId, "-"),
+    date: normalizeDate(getBookingDateValue(booking)),
+    aircraftId: text(booking.aircraftId, "-"),
+    aircraftName: text(booking.aircraftName || booking.aircraft || booking.registrationNo, "-"),
+    start: normalizeTime(getBookingStartValue(booking)),
+    end: normalizeTime(getBookingEndValue(booking)),
+    status: text(getBookingStatus(booking), "-"),
+  }));
+
+  return (
+    <ContentCard className="rounded-[18px] border border-amber-200 bg-amber-50/80 p-4 text-[12px] text-[#5f4517]">
+      <div className="mb-2 text-[14px] font-bold text-amber-800">대시보드 디버그</div>
+      <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+        <div><b>today</b><br />{today}</div>
+        <div><b>selectedDate</b><br />{selectedDate}</div>
+        <div><b>bookings</b><br />{bookings.length}건</div>
+        <div><b>selected bookings</b><br />{selectedDateBookings.length}건</div>
+        <div><b>active selected</b><br />{activeSelectedDateBookings.length}건</div>
+        <div><b>scheduleItems</b><br />{scheduleItems.length}건</div>
+        <div><b>aircraft</b><br />{aircraft.length}대</div>
+        <div><b>aircraftRows</b><br />{aircraftRows.length}대</div>
+      </div>
+      <pre className="mt-3 max-h-[220px] overflow-auto rounded-xl border border-amber-200 bg-white/80 p-3 text-[11px] leading-5 text-[#263b55]">
+        {JSON.stringify({ aircraftRows, sampleBookings }, null, 2)}
+      </pre>
+    </ContentCard>
+  );
+}
+
+
 function DashboardSidePanel({
   pendingRequests,
   cancelRequests,
@@ -2652,6 +2701,14 @@ export default async function DashboardPage({
   return (
     <PageContainer title="관리자 대시보드" description="하늘누리 비행교육원의 운영 현황을 한눈에 확인하세요.">
       <DashboardTimeSunSummary today={today} />
+      <DashboardDebugPanel
+        bookings={bookings}
+        aircraft={visibleDashboardAircraft}
+        selectedDate={selectedDate}
+        today={today}
+        scheduleItems={filteredScheduleItems}
+        aircraftRows={aircraftRows}
+      />
       <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_350px]">
         <div className="grid h-full min-h-0 grid-rows-[auto_1fr] gap-4">
           <ScheduleGraph
