@@ -1078,6 +1078,7 @@ export default function BookingsPage() {
   const [calendarMoveDrag, setCalendarMoveDrag] = useState<CalendarMoveDrag>(null);
   const [calendarResizeDrag, setCalendarResizeDrag] = useState<CalendarResizeDrag>(null);
   const [error, setError] = useState("");
+  const [operationMessage, setOperationMessage] = useState("");
 
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("전체");
@@ -1669,12 +1670,12 @@ export default function BookingsPage() {
     });
   }
 
-  const loadData = useCallback(async (showLoading = true) => {
+  const loadData = useCallback(async (showLoading = true, forceFresh = false) => {
     try {
       if (showLoading) setLoading(true);
       setError("");
 
-      const response = await fetch(`/api/bookings?_ts=${Date.now()}`, {
+      const response = await fetch(`/api/bookings?${forceFresh ? "noCache=1&" : ""}_ts=${Date.now()}`, {
         method: "GET",
         cache: "no-store",
       });
@@ -2477,7 +2478,7 @@ export default function BookingsPage() {
 
     await Promise.all(
       targets.map(async (booking) => {
-        const response = await fetch(`/api/bookings?_ts=${Date.now()}`, {
+        const response = await fetch(`/api/bookings?noCache=1&_ts=${Date.now()}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2598,9 +2599,10 @@ export default function BookingsPage() {
 
     try {
       setMovingBookingId(bookingId);
+      setOperationMessage("예약 시간 이동을 저장하는 중입니다...");
       applyMergedBookingState(bookingId, updatedBooking, []);
 
-      const response = await fetch(`/api/bookings?_ts=${Date.now()}`, {
+      const response = await fetch(`/api/bookings?noCache=1&_ts=${Date.now()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2635,10 +2637,11 @@ export default function BookingsPage() {
       }
 
     } catch (err) {
-      await loadData(false);
+      await loadData(false, true);
       alert(err instanceof Error ? err.message : "예약 시간 이동에 실패했습니다.");
     } finally {
       setMovingBookingId(null);
+      setOperationMessage("");
     }
   }
 
@@ -2719,9 +2722,10 @@ export default function BookingsPage() {
 
     try {
       setMovingBookingId(bookingId);
+      setOperationMessage("예약 시간 이동을 저장하는 중입니다...");
       applyMergedBookingState(bookingId, updatedBooking, []);
 
-      const response = await fetch(`/api/bookings?_ts=${Date.now()}`, {
+      const response = await fetch(`/api/bookings?noCache=1&_ts=${Date.now()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2756,7 +2760,7 @@ export default function BookingsPage() {
       }
 
     } catch (err) {
-      await loadData(false);
+      await loadData(false, true);
       alert(err instanceof Error ? err.message : "예약 시간 변경에 실패했습니다.");
     } finally {
       setMovingBookingId(null);
@@ -2944,6 +2948,7 @@ export default function BookingsPage() {
       }
 
       setSaving(true);
+      setOperationMessage(editing ? "예약 수정 내용을 저장하는 중입니다..." : "신규 예약을 저장하는 중입니다...");
 
       const normalizedStartTime = normalizeTime(form.startTime);
       const normalizedBookingType = normalizeBookingTypeForSave(form.bookingType);
@@ -2962,7 +2967,7 @@ export default function BookingsPage() {
         ...(conflictWarningMessages.length > 0 ? { allowConflict: true } : {}),
       };
 
-      const response = await fetch(`/api/bookings?_ts=${Date.now()}`, {
+      const response = await fetch(`/api/bookings?noCache=1&_ts=${Date.now()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2991,7 +2996,7 @@ export default function BookingsPage() {
 
       const savedDate = payload.bookingDate;
       const savedType = payload.bookingType;
-      await loadData(true);
+      await loadData(true, true);
       setDateFilter(savedDate);
       setDurationMinutes(savedType.includes("체험") ? 30 : savedType.includes("렌탈") ? durationMinutes : 60);
       setForm({
@@ -3010,6 +3015,7 @@ export default function BookingsPage() {
       alert(err instanceof Error ? err.message : "예약 저장에 실패했습니다.");
     } finally {
       setSaving(false);
+      setOperationMessage("");
     }
   }
 
@@ -3034,8 +3040,9 @@ export default function BookingsPage() {
 
     try {
       setSaving(true);
+      setOperationMessage("예약 상태 변경을 저장하는 중입니다...");
 
-      const response = await fetch(`/api/bookings?_ts=${Date.now()}`, {
+      const response = await fetch(`/api/bookings?noCache=1&_ts=${Date.now()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3078,7 +3085,7 @@ export default function BookingsPage() {
         throw new Error(result.message || "예약 상태 변경에 실패했습니다.");
       }
 
-      await loadData(true);
+      await loadData(true, true);
       if (selectedBooking && text(selectedBooking.bookingId, "") === bookingId) {
         setSelectedBooking((prev) =>
           prev
@@ -3094,6 +3101,7 @@ export default function BookingsPage() {
       alert(err instanceof Error ? err.message : "예약 상태 변경에 실패했습니다.");
     } finally {
       setSaving(false);
+      setOperationMessage("");
     }
   }
 
@@ -3124,7 +3132,7 @@ export default function BookingsPage() {
         memo: buildActionMemo(text(form.memo, ""), "관리자 예약취소"),
       };
 
-      const response = await fetch(`/api/bookings?_ts=${Date.now()}`, {
+      const response = await fetch(`/api/bookings?noCache=1&_ts=${Date.now()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -3172,6 +3180,7 @@ export default function BookingsPage() {
       alert(err instanceof Error ? err.message : "예약 취소에 실패했습니다.");
     } finally {
       setSaving(false);
+      setOperationMessage("");
     }
   }
 
@@ -3190,19 +3199,20 @@ export default function BookingsPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-              <div onClickCapture={() => void loadData(false)}>
+              <div onClickCapture={() => void loadData(false, true)}>
                 <TopAlertBell />
               </div>
               <button
                 type="button"
                 onClick={startCreate}
-                className="inline-flex h-9 items-center rounded-xl border border-[#d3ddeb] bg-white px-3.5 text-[13px] font-medium text-[#233a5a] shadow-sm transition hover:bg-[#f6f9fd]"
+                disabled={saving || Boolean(movingBookingId)}
+                className="inline-flex h-9 items-center rounded-xl border border-[#d3ddeb] bg-white px-3.5 text-[13px] font-medium text-[#233a5a] shadow-sm transition hover:bg-[#f6f9fd] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 신규 예약
               </button>
               <button
                 type="button"
-                onClick={() => void loadData(true)}
+                onClick={() => void loadData(true, true)}
                 className="inline-flex h-9 items-center rounded-xl bg-[#071a35] px-3.5 text-[13px] font-medium text-white shadow-[0_10px_22px_rgba(7,26,53,0.18)] transition hover:bg-[#102544] disabled:cursor-not-allowed disabled:bg-slate-400"
                 disabled={loading}
               >
@@ -3211,6 +3221,12 @@ export default function BookingsPage() {
             </div>
           </div>
         </section>
+
+        {(saving || movingBookingId || operationMessage) ? (
+          <section className="min-w-0 rounded-[18px] border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 shadow-sm">
+            {operationMessage || (movingBookingId ? "예약 시간 변경을 저장하는 중입니다..." : "변경사항을 저장하는 중입니다...")}
+          </section>
+        ) : null}
 
         <section ref={calendarSectionRef} className="min-w-0 rounded-[24px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_12px_34px_rgba(20,46,80,0.065)]">
           <div className="mb-2 flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
@@ -3807,6 +3823,7 @@ export default function BookingsPage() {
               <button
                 type="button"
                 onClick={startCreate}
+                disabled={saving || Boolean(movingBookingId)}
                 className="inline-flex h-9 items-center rounded-xl border border-[#d3ddeb] bg-white px-2 text-[13px] font-medium text-[#28486d] hover:bg-[#f7faff]"
               >
                 입력 초기화
@@ -4164,7 +4181,14 @@ export default function BookingsPage() {
           </div>
         </section>
 
-        {error && <section className="min-w-0 rounded-[20px] border border-rose-200 bg-rose-50 p-5 text-sm font-semibold text-rose-700">{error}</section>}
+        {error && (
+          <section className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-[20px] border border-rose-200 bg-rose-50 p-5 text-sm font-semibold text-rose-700">
+            <span>{error}</span>
+            <button type="button" onClick={() => void loadData(true, true)} className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100">
+              다시 시도
+            </button>
+          </section>
+        )}
 
         <section className="min-w-0 overflow-hidden rounded-[26px] border border-[#d9e6f5] bg-white/95 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
           <div className="flex flex-col gap-3 border-b border-[#edf2f7] px-3 py-2.5 lg:flex-row lg:items-center lg:justify-between">

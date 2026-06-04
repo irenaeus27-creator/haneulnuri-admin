@@ -112,13 +112,14 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState("전체");
   const [roleFilter, setRoleFilter] = useState("전체");
   const [error, setError] = useState("");
+  const [operationMessage, setOperationMessage] = useState("");
 
-  const loadUsers = useCallback(async (showLoading = true) => {
+  const loadUsers = useCallback(async (showLoading = true, forceFresh = false) => {
     try {
       if (showLoading) setLoading(true);
       setError("");
 
-      const response = await fetch("/api/users", {
+      const response = await fetch(`/api/users?${forceFresh ? "noCache=1&" : ""}_ts=${Date.now()}`, {
         method: "GET",
         cache: "no-store",
       });
@@ -154,7 +155,7 @@ export default function UsersPage() {
   }, []);
 
   useEffect(() => {
-    void loadUsers(true);
+    void loadUsers(true, false);
   }, [loadUsers]);
 
   const roleOptions = useMemo(() => {
@@ -214,8 +215,9 @@ export default function UsersPage() {
 
     try {
       setSavingId(userId);
+      setOperationMessage(action === "approveUser" ? "회원 승인 처리 중입니다..." : "회원 반려 처리 중입니다...");
 
-      const response = await fetch("/api/users", {
+      const response = await fetch("/api/users?noCache=1", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -272,6 +274,7 @@ export default function UsersPage() {
         )
       );
 
+      await loadUsers(false, true);
       alert(action === "approveUser" ? "회원이 승인되었습니다. 이제 앱에서 예약할 수 있습니다." : "회원이 반려되었습니다.");
     } catch (err) {
       alert(
@@ -283,11 +286,17 @@ export default function UsersPage() {
       );
     } finally {
       setSavingId(null);
+      setOperationMessage("");
     }
   }
 
   return (
     <PageContainer title="회원관리" description="앱 가입 회원의 승인 상태와 예약 권한을 관리합니다.">
+      {savingId || operationMessage ? (
+        <ContentCard className="border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-700">
+          {operationMessage || "회원 상태를 저장하는 중입니다..."}
+        </ContentCard>
+      ) : null}
       <ContentCard className="p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -326,15 +335,18 @@ export default function UsersPage() {
             className="ui-input"
           />
 
-          <button type="button" onClick={() => void loadUsers(true)} className="ui-btn ui-btn-primary h-[46px]" disabled={loading}>
+          <button type="button" onClick={() => void loadUsers(true, true)} className="ui-btn ui-btn-primary h-[46px]" disabled={loading}>
             {loading ? "로딩 중" : "새로고침"}
           </button>
         </div>
       </ContentCard>
 
       {error ? (
-        <ContentCard className="border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
-          {error}
+        <ContentCard className="flex flex-wrap items-center justify-between gap-3 border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
+          <span>{error}</span>
+          <button type="button" onClick={() => void loadUsers(true, true)} className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100">
+            다시 시도
+          </button>
         </ContentCard>
       ) : null}
 

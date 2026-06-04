@@ -467,16 +467,17 @@ export default function StudentsPage() {
   const [courseFilter, setCourseFilter] = useState("전체");
   const [quickFilter, setQuickFilter] = useState("전체");
   const [error, setError] = useState("");
+  const [operationMessage, setOperationMessage] = useState("");
   const [form, setForm] = useState<StudentForm>(emptyForm);
   const [editing, setEditing] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [sortMode, setSortMode] = useState("recent");
 
-  const loadData = useCallback(async (showLoading = true) => {
+  const loadData = useCallback(async (showLoading = true, forceFresh = false) => {
     try {
       if (showLoading) setLoading(true);
       setError("");
-      const response = await fetch("/api/students", { method: "GET", cache: "no-store" });
+      const response = await fetch(`/api/students?${forceFresh ? "noCache=1&" : ""}_ts=${Date.now()}`, { method: "GET", cache: "no-store" });
       const rawText = await response.text();
       if (!rawText.trim()) throw new Error("서버 응답이 비어 있습니다.");
       const data = JSON.parse(rawText) as { ok?: boolean; message?: string; students?: StudentRow[]; instructors?: InstructorRow[]; aircraft?: AircraftRow[]; trainingLogs?: TrainingLogRow[] };
@@ -497,7 +498,7 @@ export default function StudentsPage() {
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void loadData(false), 0);
+    const timer = window.setTimeout(() => void loadData(false, false), 0);
     return () => window.clearTimeout(timer);
   }, [loadData]);
 
@@ -604,6 +605,7 @@ export default function StudentsPage() {
         return;
       }
       setSaving(true);
+      setOperationMessage(editing ? "교육생 수정 내용을 저장하는 중입니다..." : "교육생을 등록하는 중입니다...");
       const manualMinutes = editing ? manualTimeTextToMinutes(form.manualTrainingTime) : 0;
       const manualCount = editing ? Number(form.manualTrainingCount || 0) : 0;
       const addChargeMinutes = chargeMinutesFromHours(form.chargeHours);
@@ -624,7 +626,7 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
         manualAdjustmentMemo: editing ? form.manualAdjustmentMemo : "",
       };
 
-      const response = await fetch("/api/students", {
+      const response = await fetch("/api/students?noCache=1", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: editing ? "update" : "add", data: payload }),
@@ -633,7 +635,7 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
       if (!rawText.trim()) throw new Error("서버 응답이 비어 있습니다.");
       const data = JSON.parse(rawText) as { ok?: boolean; message?: string };
       if (!response.ok || !data.ok) throw new Error(data.message || "교육생 저장에 실패했습니다.");
-      await loadData(true);
+      await loadData(true, true);
       setKeyword("");
       setStatusFilter("전체");
       setCourseFilter("전체");
@@ -646,6 +648,7 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
       alert(err instanceof Error ? err.message : "교육생 저장에 실패했습니다.");
     } finally {
       setSaving(false);
+      setOperationMessage("");
     }
   }
 
@@ -653,6 +656,11 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
 
   return (
     <PageContainer title="교육생 관리" description="교육생 등록, 비행시간 관리 및 현황을 확인할 수 있습니다.">
+      {saving || operationMessage ? (
+        <ContentCard className="border border-blue-200 bg-blue-50 p-4 text-sm font-semibold text-blue-700">
+          {operationMessage || "교육생 정보를 저장하는 중입니다..."}
+        </ContentCard>
+      ) : null}
       <div className="grid gap-4 xl:grid-cols-[minmax(430px,0.9fr)_minmax(560px,1.1fr)]">
         <ContentCard className="rounded-[18px] p-5 shadow-sm">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -660,7 +668,7 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
               <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-[#07172f]">{editing ? "교육생 수정" : "교육생 등록 / 수정"}</h2>
               <p className="mt-1 text-[13px] font-medium text-[#6f8199]">새로운 교육생을 등록하거나 기존 정보를 수정할 수 있습니다.</p>
             </div>
-            <button type="button" onClick={startCreate} className="ui-btn ui-btn-primary px-5">+ 신규 교육생 등록</button>
+            <button type="button" onClick={startCreate} disabled={saving} className="ui-btn ui-btn-primary px-5 disabled:cursor-not-allowed disabled:opacity-50">+ 신규 교육생 등록</button>
           </div>
 
           <div className="space-y-3">
@@ -943,7 +951,14 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
         </ContentCard>
       </div>
 
-      {error ? <ContentCard className="border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">{error}</ContentCard> : null}
+      {error ? (
+        <ContentCard className="flex flex-wrap items-center justify-between gap-3 border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
+          <span>{error}</span>
+          <button type="button" onClick={() => void loadData(true, true)} className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100">
+            다시 시도
+          </button>
+        </ContentCard>
+      ) : null}
 
       <ContentCard className="overflow-hidden rounded-[18px] p-0 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
@@ -959,6 +974,7 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
               <option value="name">이름순</option>
               <option value="remaining">잔여시간 적은순</option>
             </select>
+            <button type="button" onClick={() => void loadData(true, true)} disabled={loading} className="ui-btn ui-btn-outline h-10 disabled:cursor-not-allowed disabled:opacity-50">{loading ? "불러오는 중" : "새로고침"}</button>
             <button type="button" onClick={() => alert("엑셀 내보내기는 추후 연결 예정입니다.")} className="ui-btn ui-btn-outline h-10">엑셀 내보내기</button>
           </div>
         </div>
