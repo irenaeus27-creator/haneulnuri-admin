@@ -444,6 +444,51 @@ function text(value: unknown, fallback = "") {
   return raw || fallback;
 }
 
+function dashboardLogTitle(log: Record<string, unknown>) {
+  const action = text(log.action);
+  const targetSheet = text(log.targetSheet);
+
+  if (targetSheet === "bookings") {
+    if (action === "append" || action === "add" || action === "create") return "예약 생성";
+    if (action === "update" || action === "edit") return "예약 수정";
+    if (action === "approveBooking") return "예약 확정";
+    if (action === "cancelBooking") return "예약 취소";
+    return "예약 변경";
+  }
+
+  if (targetSheet === "users") {
+    if (action.includes("approve")) return "회원 승인";
+    if (action.includes("reject")) return "회원 반려";
+    if (action === "append" || action === "add" || action === "create") return "회원 등록";
+    if (action === "update" || action === "edit") return "회원 수정";
+    return "회원 변경";
+  }
+
+  if (targetSheet === "students") {
+    if (action === "append" || action === "add" || action === "create") return "교육생 등록";
+    if (action === "update" || action === "edit") return "교육생 수정";
+    return "교육생 변경";
+  }
+
+  return action || "변경 내역";
+}
+
+function dashboardLogDetail(log: Record<string, unknown>) {
+  const message = text(log.message);
+  const targetSheet = text(log.targetSheet);
+  const targetId = text(log.targetId);
+
+  if (message && message !== targetSheet && message !== targetId) return message;
+
+  if (targetSheet === "bookings") return targetId ? `예약 ID ${targetId}` : "예약 정보 변경";
+  if (targetSheet === "users") return targetId ? `회원 ID ${targetId}` : "회원 정보 변경";
+  if (targetSheet === "students") return targetId ? `교육생 ID ${targetId}` : "교육생 정보 변경";
+
+  return targetSheet || "시스템 변경";
+}
+
+
+
 function normalizeDate(value: unknown) {
   const valueText = sharedFormatBookingDate(value);
   return valueText === "-" ? "" : valueText;
@@ -2563,7 +2608,7 @@ function RecentActivityPanel({
       <div className="mb-3 flex shrink-0 items-center justify-between">
         <div>
           <h3 className="text-lg font-bold text-[#10213f]">최근 변경 내역</h3>
-          <p className="mt-1 text-xs font-medium text-[#61758f]">예약·알림·로그 기준 최근 활동</p>
+          <p className="mt-1 text-xs font-medium text-[#61758f]">예약·회원·교육생 기준 최근 작업</p>
         </div>
         <Link href="/logs" className="text-xs font-semibold text-[#1264f4]">로그 보기 ›</Link>
       </div>
