@@ -198,8 +198,6 @@ function normalizeValue(column: string, value: unknown) {
   if (NUMBER_COLUMNS.has(column)) return normalizeNumber(value);
 
   const raw = text(value);
-
-  // 일반 텍스트 컬럼은 빈 문자열도 "지우기" 의도로 인정합니다.
   return raw;
 }
 
@@ -243,13 +241,22 @@ function normalizeStudent(input: JsonRecord, options: { isCreate: boolean }) {
   return row;
 }
 
+function asRecord(value: unknown): JsonRecord {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as JsonRecord;
+  }
+  return {};
+}
+
 function getStudentId(input: JsonRecord) {
+  const nestedStudent = asRecord(input.student);
+
   return text(
     input.studentId ||
       input.student_id ||
       input.id ||
-      input.student?.studentId ||
-      input.student?.student_id
+      nestedStudent.studentId ||
+      nestedStudent.student_id
   );
 }
 
@@ -278,7 +285,6 @@ async function updateStudent(data: JsonRecord) {
 
   const row = normalizeStudent(data, { isCreate: false });
 
-  // student_id 자체는 primary key라 수정 payload에서 제외합니다.
   delete row.student_id;
   delete row.created_at;
 
@@ -300,7 +306,7 @@ async function updateStudent(data: JsonRecord) {
 
 async function handlePost(body: JsonRecord) {
   const action = text(body.action);
-  const data = (body.data || body.student || body) as JsonRecord;
+  const data = asRecord(body.data || body.student || body);
 
   if (
     action === "addStudent" ||
