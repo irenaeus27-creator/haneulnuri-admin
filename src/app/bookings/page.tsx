@@ -1879,6 +1879,40 @@ export default function BookingsPage() {
     };
   }, [loadData]);
 
+
+  useEffect(() => {
+    if (!calendarMoveDrag && !calendarResizeDrag) return;
+
+    function handleWindowMouseMove(event: MouseEvent) {
+      updateCalendarMoveDrag(event);
+      updateCalendarResizeDrag(event);
+    }
+
+    function handleWindowMouseUp() {
+      void finishActiveCalendarBlockDrag();
+    }
+
+    function handleWindowCancel() {
+      cancelActiveCalendarBlockDrag();
+    }
+
+    const previousUserSelect = document.body.style.userSelect;
+
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+    window.addEventListener("blur", handleWindowCancel);
+    document.addEventListener("mouseleave", handleWindowCancel);
+
+    return () => {
+      document.body.style.userSelect = previousUserSelect;
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+      window.removeEventListener("blur", handleWindowCancel);
+      document.removeEventListener("mouseleave", handleWindowCancel);
+    };
+  }, [calendarMoveDrag, calendarResizeDrag, bookings]);
+
   const filteredBookings = useMemo(() => {
     const q = keyword.trim().toLowerCase();
     const today = todayIsoText();
@@ -2711,6 +2745,37 @@ export default function BookingsPage() {
     }
   }
 
+
+  async function finishActiveCalendarBlockDrag() {
+    const activeDrag = calendarResizeDrag || calendarMoveDrag;
+
+    if (!activeDrag) return;
+
+    const activeBooking = bookings.find((item) => formValue(item.bookingId) === activeDrag.bookingId);
+
+    if (!activeBooking) {
+      setCalendarMoveDrag(null);
+      setCalendarResizeDrag(null);
+      return;
+    }
+
+    if (calendarResizeDrag?.bookingId === activeDrag.bookingId) {
+      await finishCalendarResizeDrag(activeBooking);
+      return;
+    }
+
+    if (calendarMoveDrag?.bookingId === activeDrag.bookingId) {
+      await finishCalendarMoveDrag(activeBooking);
+    }
+  }
+
+  function cancelActiveCalendarBlockDrag() {
+    if (!calendarMoveDrag && !calendarResizeDrag) return;
+
+    setCalendarMoveDrag(null);
+    setCalendarResizeDrag(null);
+  }
+
   function beginCalendarMoveDrag(event: React.MouseEvent, booking: BookingRow) {
     event.preventDefault();
     event.stopPropagation();
@@ -2731,7 +2796,7 @@ export default function BookingsPage() {
     });
   }
 
-  function updateCalendarMoveDrag(event: React.MouseEvent) {
+  function updateCalendarMoveDrag(event: React.MouseEvent | MouseEvent) {
     if (!calendarMoveDrag) return;
 
     const rawDeltaSteps = calendarStepFromDelta(event.clientX - calendarMoveDrag.startX, calendarMoveDrag.timelineWidth);
@@ -2854,7 +2919,7 @@ export default function BookingsPage() {
     });
   }
 
-  function updateCalendarResizeDrag(event: React.MouseEvent) {
+  function updateCalendarResizeDrag(event: React.MouseEvent | MouseEvent) {
     if (!calendarResizeDrag) return;
 
     const rawDeltaSteps = calendarStepFromDelta(event.clientX - calendarResizeDrag.startX, calendarResizeDrag.timelineWidth);
@@ -3662,9 +3727,8 @@ export default function BookingsPage() {
                                   style={calendarBlockStyleByTime(previewTimes.startTime, previewTimes.endTime)}
                                   title={bookingTooltip(booking)}
                                   onMouseDown={(event) => beginCalendarMoveDrag(event, booking)}
-                                  onMouseUp={() => {
-                                    void finishCalendarMoveDrag(booking);
-                                    void finishCalendarResizeDrag(booking);
+                                  onMouseUp={(event) => {
+                                    event.stopPropagation();
                                   }}
                                 >
                                   <button
@@ -3711,7 +3775,6 @@ export default function BookingsPage() {
                                     onMouseDown={(event) => beginCalendarResizeDrag(event, booking)}
                                     onMouseUp={(event) => {
                                       event.stopPropagation();
-                                      void finishCalendarResizeDrag(booking);
                                     }}
                                     className="absolute right-0 bottom-1 top-1 hidden w-3 cursor-ew-resize rounded-full bg-white/85 shadow-sm ring-1 ring-[#9fb4cf] transition hover:bg-[#eaf3ff] group-hover:block"
                                     title="종료시간 30분 단위 조절"
