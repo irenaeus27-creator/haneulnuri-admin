@@ -263,7 +263,7 @@ async function fetchSheet(sheetName: SheetName) {
 
   try {
     const url = new URL(API_URL);
-    url.searchParams.set("action", "getSheet");
+    url.searchParams.set("action", "getDashboardData");
   url.searchParams.set("_ts", String(Date.now()));
     url.searchParams.set("sheet", sheetName);
 
@@ -326,6 +326,7 @@ export async function GET() {
 
     if (cachedDashboard && cachedDashboard.expiresAt > Date.now()) {
       return NextResponse.json({
+      ultraLightDashboard: true,
       lightweightDashboard: true,
         ok: true,
         source: cachedDashboard.source,
