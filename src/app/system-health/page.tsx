@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ContentCard from "@/components/ContentCard";
 import PageContainer from "@/components/PageContainer";
 
@@ -77,17 +77,39 @@ export default function SystemHealthPage() {
   const [actionResult, setActionResult] = useState<ActionResult | null>(null);
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
+  const [toolToken, setToolToken] = useState("");
+  const [saveToken, setSaveToken] = useState(true);
 
   const sheets = useMemo(() => {
     const sheetMap = health?.sheetMeta?.sheets || {};
     return Object.entries(sheetMap).sort(([a], [b]) => a.localeCompare(b, "ko"));
   }, [health]);
 
+  useEffect(() => {
+    const savedToken = localStorage.getItem("haneulnuri-system-tool-token") || "";
+    setToolToken(savedToken);
+  }, []);
+
+  function buildToolHeaders() {
+    const headers: Record<string, string> = {};
+    if (toolToken.trim()) headers["x-system-tool-token"] = toolToken.trim();
+    return headers;
+  }
+
+  function persistToken() {
+    if (saveToken && toolToken.trim()) {
+      localStorage.setItem("haneulnuri-system-tool-token", toolToken.trim());
+    } else {
+      localStorage.removeItem("haneulnuri-system-tool-token");
+    }
+  }
+
   async function runHealthCheck() {
     try {
       setLoading("health");
       setError("");
-      const response = await fetch(`/api/health?_ts=${Date.now()}`, { cache: "no-store" });
+      persistToken();
+      const response = await fetch(`/api/health?_ts=${Date.now()}`, { cache: "no-store", headers: buildToolHeaders() });
       const data = (await response.json()) as HealthResponse;
 
       if (!response.ok || data.ok === false) {
@@ -109,9 +131,11 @@ export default function SystemHealthPage() {
       setActionResult(null);
 
       const endpoint = type === "clear" ? "/api/cache/clear" : "/api/cache/warmup";
+      persistToken();
       const response = await fetch(`${endpoint}?_ts=${Date.now()}`, {
         method: "POST",
         cache: "no-store",
+        headers: buildToolHeaders(),
       });
       const data = (await response.json()) as ActionResult;
 
@@ -142,6 +166,29 @@ export default function SystemHealthPage() {
             <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusBadge(Boolean(health?.ok))}`}>
               {health?.ok ? "정상" : "미확인"}
             </span>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-[#dbe5f1] bg-[#f8fbff] p-4">
+            <label className="text-xs font-bold text-[#405875]">시스템 점검 토큰</label>
+            <input
+              type="password"
+              value={toolToken}
+              onChange={(event) => setToolToken(event.target.value)}
+              placeholder="Vercel SYSTEM_TOOL_TOKEN 값"
+              className="mt-2 h-11 w-full rounded-xl border border-[#cfdceb] bg-white px-3 text-sm font-semibold text-[#10213f] outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+            />
+            <label className="mt-3 flex items-center gap-2 text-xs font-semibold text-[#61758f]">
+              <input
+                type="checkbox"
+                checked={saveToken}
+                onChange={(event) => setSaveToken(event.target.checked)}
+                className="h-4 w-4 rounded border-[#cbd7e6]"
+              />
+              이 브라우저에 토큰 저장
+            </label>
+            <p className="mt-2 text-[11px] font-medium text-[#7b8da5]">
+              운영 배포에서는 Vercel 환경변수 SYSTEM_TOOL_TOKEN과 일치해야 실행됩니다.
+            </p>
           </div>
 
           <div className="mt-5 grid gap-3">
