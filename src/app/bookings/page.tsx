@@ -217,7 +217,7 @@ function formValue(value: unknown) {
   return String(value);
 }
 
-function rentalPilotValue(item: RentalPilotRow | UserRow | StudentRow | Record<string, unknown>) {
+function rentalPilotValue(item: Record<string, unknown>) {
   return formValue(
     (item as Record<string, unknown>).rentalPilotId ||
       (item as Record<string, unknown>).pilotId ||
@@ -228,7 +228,7 @@ function rentalPilotValue(item: RentalPilotRow | UserRow | StudentRow | Record<s
   );
 }
 
-function rentalPilotName(item: RentalPilotRow | UserRow | StudentRow | Record<string, unknown>) {
+function rentalPilotName(item: Record<string, unknown>) {
   return formValue(
     (item as Record<string, unknown>).name ||
       (item as Record<string, unknown>).pilotName ||
@@ -238,7 +238,7 @@ function rentalPilotName(item: RentalPilotRow | UserRow | StudentRow | Record<st
   );
 }
 
-function findRentalPilot(items: (RentalPilotRow | UserRow | StudentRow | Record<string, unknown>)[], value: string) {
+function findRentalPilot(items: Record<string, unknown>[], value: string) {
   const target = formValue(value);
   if (!target) return null;
 
@@ -261,28 +261,28 @@ function findRentalPilot(items: (RentalPilotRow | UserRow | StudentRow | Record<
 
 
 
-function getRentalPilotLabelValue(item: RentalPilotRow | UserRow | StudentRow | Record<string, unknown>) {
+function getRentalPilotLabelValue(item: Record<string, unknown>) {
   return formValue(
-    (item as RentalPilotRow).pilotId ||
-      (item as RentalPilotRow).rentalPilotId ||
-      (item as UserRow).userId ||
-      (item as StudentRow).studentId ||
-      (item as RentalPilotRow).phone ||
-      (item as RentalPilotRow).name,
+    (item as Record<string, unknown>).pilotId ||
+      (item as Record<string, unknown>).rentalPilotId ||
+      (item as Record<string, unknown>).userId ||
+      (item as Record<string, unknown>).studentId ||
+      (item as Record<string, unknown>).phone ||
+      (item as Record<string, unknown>).name,
   );
 }
 
-function getRentalPilotDisplayName(item: RentalPilotRow | UserRow | StudentRow | Record<string, unknown>) {
+function getRentalPilotDisplayName(item: Record<string, unknown>) {
   return formValue(
-    (item as RentalPilotRow).name ||
-      (item as RentalPilotRow).pilotName ||
-      (item as UserRow).userName ||
-      (item as StudentRow).name ||
-      (item as RentalPilotRow).phone,
+    (item as Record<string, unknown>).name ||
+      (item as Record<string, unknown>).pilotName ||
+      (item as Record<string, unknown>).userName ||
+      (item as Record<string, unknown>).name ||
+      (item as Record<string, unknown>).phone,
   );
 }
 
-function findRentalPilotByAnyValue(items: (RentalPilotRow | UserRow | StudentRow | Record<string, unknown>)[], value: string) {
+function findRentalPilotByAnyValue(items: Record<string, unknown>[], value: string) {
   const target = formValue(value);
   if (!target) return null;
 
@@ -291,9 +291,9 @@ function findRentalPilotByAnyValue(items: (RentalPilotRow | UserRow | StudentRow
       const values = [
         getRentalPilotLabelValue(item),
         getRentalPilotDisplayName(item),
-        formValue((item as RentalPilotRow).phone),
-        formValue((item as UserRow).userId),
-        formValue((item as StudentRow).studentId),
+        formValue((item as Record<string, unknown>).phone),
+        formValue((item as Record<string, unknown>).userId),
+        formValue((item as Record<string, unknown>).studentId),
       ];
 
       return values.some((candidate) => candidate && candidate === target);
@@ -2058,7 +2058,7 @@ export default function BookingsPage() {
 
 
   function handleRentalPilotChange(value: string) {
-    const selectedPilot = findRentalPilot(rentalPilots, value);
+    const selectedPilot = findRentalPilot(rentalPilots as Record<string, unknown>[], value);
     const selectedId = formValue(value);
     const selectedName = selectedPilot ? rentalPilotName(selectedPilot) : "";
     const selectedPhone = selectedPilot ? formValue((selectedPilot as Record<string, unknown>).phone) : "";
