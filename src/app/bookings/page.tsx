@@ -1523,7 +1523,7 @@ export default function BookingsPage() {
         warnings.push({
           type: "aircraft",
           bookingId: text(booking.bookingId, ""),
-          message: `항공기 충돌: ${aircraftDisplay(booking)} / ${commonDetail}`,
+          message: `항공기 일정 중복: ${aircraftDisplay(booking)} / ${commonDetail}`,
         });
       }
 
@@ -1531,7 +1531,7 @@ export default function BookingsPage() {
         warnings.push({
           type: "instructor",
           bookingId: text(booking.bookingId, ""),
-          message: `교관/감독 충돌: ${text(booking.instructorName, "미지정")} / ${commonDetail}`,
+          message: `교관 일정 중복: ${text(booking.instructorName, "미지정")} / ${commonDetail}`,
         });
       }
     });
@@ -2897,7 +2897,7 @@ export default function BookingsPage() {
       }
 
       if (conflictWarningMessages.length > 0) {
-        const ok = window.confirm(`예약 충돌 가능성이 있습니다.\n- ${conflictWarningMessages.join("\n- ")}\n\n그래도 저장할까요?`);
+        const ok = window.confirm(`예약 중복 가능성이 있습니다.\n- ${conflictWarningMessages.join("\n- ")}\n\n그래도 저장할까요?`);
         if (!ok) return;
       }
 
@@ -4018,8 +4018,8 @@ export default function BookingsPage() {
             ) : conflictWarnings.length > 0 ? (
               <div className={`rounded-[14px] border px-3 py-2 text-[13px] font-medium ${hasAircraftConflict ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
                 <div className="font-semibold">
-                  {hasAircraftConflict ? "항공기 충돌 경고" : "교관/감독 충돌 경고"}
-                  <span className="ml-1 font-normal">저장 시 한 번 더 확인합니다.</span>
+                  {hasAircraftConflict ? "일정 중복 확인" : "교관 일정 중복 경고"}
+                  <span className="ml-1 font-normal">선택한 시간에 이미 등록된 일정이 있는지 저장 전 한 번 더 확인합니다.</span>
                 </div>
                 <div className="mt-1 space-y-0.5">
                   {conflictWarnings.slice(0, 3).map((warning) => (
