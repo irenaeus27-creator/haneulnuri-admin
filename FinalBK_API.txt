@@ -1,0 +1,946 @@
+/*******************************************************
+ * 하늘누리 관리자 프로그램 Apps Script 전체 코드
+ * Google Spreadsheet backend
+ *******************************************************/
+
+const SHEET_CONFIG = {
+  bookings: { idHeader: "bookingId", prefix: "BKG" },
+  users: { idHeader: "userId", prefix: "U" },
+  students: { idHeader: "studentId", prefix: "STU" },
+  instructors: { idHeader: "instructorId", prefix: "INS" },
+  aircraft: { idHeader: "aircraftId", prefix: "A" },
+  rentalPilots: { idHeader: "pilotId", prefix: "RP" },
+  courseCatalog: { idHeader: "courseId", prefix: "CRS" },
+  instructorSchedules: { idHeader: "scheduleId", prefix: "SCH" },
+  trainingCharges: { idHeader: "chargeId", prefix: "CHG" },
+  trainingLogs: { idHeader: "trainingLogId", prefix: "TL" },
+  notifications: { idHeader: "notificationId", prefix: "NTF" },
+  logs: { idHeader: "logId", prefix: "LOG" },
+  settings: { idHeader: "key", prefix: "SET" },
+};
+
+const TRAINING_CHARGE_HEADERS = ["chargeId", "studentId", "userId", "name", "phone", "chargeDate", "chargeType", "chargeHours", "chargeMinutes", "chargeAmount", "paidAmount", "paymentStatus", "memo", "createdAt", "updatedAt"];
+
+const STUDENT_HEADERS = ["studentId", "userId", "name", "nameEnglish", "email", "phone", "birthDate", "maritalStatus", "homeAddress", "address", "workAddress", "homePhone", "workPhone", "height", "weight", "eyesightLeft", "eyesightRight", "educationLevel", "major", "job", "workplace", "position", "militaryService", "vehicleType", "licenseName1", "licenseAgency1", "licenseDate1", "licenseNote1", "licenseName2", "licenseAgency2", "licenseDate2", "licenseNote2", "healthStatus", "emergencyContactName", "emergencyContactPhone", "emergencyContactRelation", "course", "trainingStartDate", "trainingStatus", "assignedInstructorId", "assignedInstructorName", "assignedAircraftIds", "initialChargeHours", "initialChargeMinutes", "initialChargeMemo", "initialChargedAt", "chargedTrainingMinutes", "totalChargedMinutes", "manualTrainingMinutes", "manualTrainingCount", "manualAdjustmentMemo", "manualAdjustedAt", "manualAdjustedBy", "usedTrainingMinutes", "usedMinutes", "usedTrainingHours", "usedHours", "remainingTrainingMinutes", "remainingMinutes", "remainingTrainingHours", "remainingHours", "completedTrainingCount", "lastTrainingLogId", "lastTrainingDate", "memo", "createdAt", "updatedAt"];
+
+const TRAINING_LOG_HEADERS = [
+  "trainingLogId", "bookingId", "studentId", "studentName", "userId",
+  "instructorId", "instructorName", "aircraftId", "aircraftName",
+  "trainingDate", "scheduledStartTime", "scheduledEndTime",
+  "actualStartTime", "actualEndTime", "scheduledMinutes",
+  "actualFlightMinutes", "groundBriefingMinutes", "trainingType",
+  "lessonTitle", "trainingItems", "instructorNotes", "studentNotes",
+  "homework", "cautionNotes", "nextTrainingPlan", "studentVisible",
+  "timeDeducted", "deductedMinutes", "status", "createdAt", "updatedAt"
+];
+
+function doGet(e) {
+  try {
+    const params = (e && e.parameter) || {};
+    const action = text_(params.action);
+
+    if (!action || action === "ping") {
+      return json_({ ok: true, success: true, message: "하늘누리 Apps Script API 연결 정상", now: nowIso_() });
+    }
+
+    if (action === "getSheet") return json_(getSheet_(params.sheet));
+    if (action === "getAllData") return json_(getAllData_());
+    if (action === "getDashboardData") return json_(getDashboardData_());
+    if (action === "getStudentTrainingLogs") return json_(getStudentTrainingLogs_(params));
+
+    return json_({ ok: false, success: false, message: "지원하지 않는 GET action입니다: " + action }, 400);
+  } catch (error) {
+    return error_(error);
+  }
+}
+
+function doPost(e) {
+  try {
+    const body = parseBody_(e);
+    const action = text_(body.action);
+    const data = body.data || {};
+
+    if (!action) {
+      return json_({ ok: false, success: false, message: "action 값이 필요합니다." }, 400);
+    }
+
+    if (action === "getDashboardData") return json_(getDashboardData_());
+    if (action === "getStudentTrainingLogs") return json_(getStudentTrainingLogs_(data));
+
+    if (action === "addBooking") return json_(appendRowByHeader_("bookings", normalizeBooking_(data)));
+    if (action === "updateBooking") return json_(updateRowById_("bookings", "bookingId", data.bookingId, normalizeBooking_(data)));
+
+    if (action === "addStudent") return json_(addStudent_(data));
+    if (action === "updateStudent") return json_(updateStudent_(data));
+    if (action === "approveBooking") return json_(updateBookingStatus_(data.bookingId, "확정", data));
+    if (action === "cancelBooking") return json_(updateBookingStatus_(data.bookingId, "취소", data));
+
+    if (action === "addTrainingCharge") return json_(addTrainingCharge_(data));
+
+    if (action === "addTrainingLog") return json_(addTrainingLog_(data));
+    if (action === "updateTrainingLog") return json_(updateTrainingLog_(data));
+
+    if (action === "addNotification") return json_(addNotification_(data));
+    if (action === "updateNotification") return json_(updateRowById_("notifications", "notificationId", data.notificationId, data));
+
+    if (action === "addRow") return json_(appendRowByHeader_(data.sheetName, data));
+    if (action === "updateRow") {
+      const sheetName = text_(data.sheetName);
+      const config = SHEET_CONFIG[sheetName] || {};
+      const idHeader = text_(data.idHeader || config.idHeader);
+      return json_(updateRowById_(sheetName, idHeader, data[idHeader], data));
+    }
+
+    return json_({ ok: false, success: false, message: "지원하지 않는 action입니다: " + action }, 400);
+  } catch (error) {
+    return error_(error);
+  }
+}
+
+function getSheet_(sheetName) {
+  const safeSheetName = text_(sheetName);
+  if (!safeSheetName) throw new Error("sheet 값이 필요합니다.");
+
+  const sheet = getSheetOptional_(safeSheetName);
+  const rows = sheet ? readRows_(sheet) : [];
+
+  const result = {
+    ok: true,
+    success: true,
+    sheet: safeSheetName,
+    rows: rows,
+    data: rows,
+    message: sheet ? "loaded" : safeSheetName + " 시트가 없어 빈 배열로 처리했습니다.",
+  };
+
+  result[safeSheetName] = rows;
+  return result;
+}
+
+function getAllData_() {
+  const result = { ok: true, success: true };
+  Object.keys(SHEET_CONFIG).forEach(function (sheetName) {
+    const sheet = getSheetOptional_(sheetName);
+    result[sheetName] = sheet ? readRows_(sheet) : [];
+  });
+  return result;
+}
+
+function getDashboardData_() {
+  const sheets = ["bookings", "users", "aircraft", "instructors", "students", "notifications", "instructorSchedules", "trainingCharges", "trainingLogs"];
+  const dashboard = {};
+  sheets.forEach(function (sheetName) {
+    const sheet = getSheetOptional_(sheetName);
+    dashboard[sheetName] = sheet ? readRows_(sheet) : [];
+  });
+  return { ok: true, success: true, dashboard: dashboard, data: dashboard, source: "getDashboardData" };
+}
+
+
+function isInactiveBookingStatus_(status) {
+  const raw = text_(status).replace(/\s/g, "");
+  return raw === "취소" || raw === "반려" || raw === "기상취소" || raw === "노쇼";
+}
+
+function timeToMinutes_(value) {
+  const normalized = normalizeTime_(value);
+  const match = normalized.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return -1;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function sameTextKey_(a, b) {
+  const left = text_(a).replace(/\s/g, "").toUpperCase();
+  const right = text_(b).replace(/\s/g, "").toUpperCase();
+  return Boolean(left && right && left === right);
+}
+
+function bookingAircraftMatches_(a, b) {
+  return (
+    sameTextKey_(a.aircraftId, b.aircraftId) ||
+    sameTextKey_(a.aircraftName, b.aircraftName) ||
+    sameTextKey_(a.aircraft, b.aircraft) ||
+    sameTextKey_(a.registrationNo, b.registrationNo) ||
+    sameTextKey_(a.aircraftName, b.aircraft) ||
+    sameTextKey_(a.aircraft, b.aircraftName) ||
+    sameTextKey_(a.aircraftId, b.aircraftName) ||
+    sameTextKey_(a.aircraftId, b.aircraft)
+  );
+}
+
+function bookingInstructorMatches_(a, b) {
+  return (
+    sameTextKey_(a.instructorId, b.instructorId) ||
+    sameTextKey_(a.instructorName, b.instructorName) ||
+    sameTextKey_(a.instructor, b.instructor) ||
+    sameTextKey_(a.instructorName, b.instructor) ||
+    sameTextKey_(a.instructor, b.instructorName)
+  );
+}
+
+function bookingTimeOverlaps_(a, b) {
+  const aStart = timeToMinutes_(a.startTime);
+  const aEnd = timeToMinutes_(a.endTime || a.bufferEndTime);
+  const bStart = timeToMinutes_(b.startTime);
+  const bEnd = timeToMinutes_(b.endTime || b.bufferEndTime);
+
+  if (aStart < 0 || aEnd < 0 || bStart < 0 || bEnd < 0) return false;
+  if (aStart >= aEnd || bStart >= bEnd) return false;
+
+  return aStart < bEnd && bStart < aEnd;
+}
+
+function bookingLabel_(row) {
+  const user = text_(row.userName || row.name || row.customerName || row.memberName || "예약자");
+  const aircraft = text_(row.aircraftName || row.aircraft || row.aircraftId || "항공기");
+  const instructor = text_(row.instructorName || row.instructor || row.instructorId || "");
+  const time = normalizeTime_(row.startTime) + "~" + normalizeTime_(row.endTime);
+  return user + " / " + aircraft + (instructor ? " / " + instructor : "") + " / " + time;
+}
+
+function assertBookingAvailable_(nextBooking, excludeBookingId) {
+  const next = normalizeBooking_(nextBooking);
+  const bookingDate = normalizeDate_(next.bookingDate);
+  const nextStatus = text_(next.status);
+
+  if (!bookingDate || isInactiveBookingStatus_(nextStatus)) return;
+
+  const nextStart = timeToMinutes_(next.startTime);
+  const nextEnd = timeToMinutes_(next.endTime || next.bufferEndTime);
+  if (nextStart < 0 || nextEnd < 0 || nextStart >= nextEnd) return;
+
+  const sheet = getSheetOptional_("bookings");
+  if (!sheet) return;
+
+  const rows = readRows_(sheet);
+  const excludeId = text_(excludeBookingId || next.bookingId);
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const existing = rows[i];
+    if (excludeId && sameTextKey_(existing.bookingId, excludeId)) continue;
+    if (isInactiveBookingStatus_(existing.status)) continue;
+    if (normalizeDate_(existing.bookingDate) !== bookingDate) continue;
+    if (!bookingTimeOverlaps_(next, existing)) continue;
+
+    if (bookingAircraftMatches_(next, existing)) {
+      throw new Error("해당 시간에는 선택한 항공기가 이미 예약되어 있습니다. 다른 시간 또는 다른 항공기를 선택해 주세요. 기존 예약: " + bookingLabel_(existing));
+    }
+
+    if (bookingInstructorMatches_(next, existing)) {
+      throw new Error("해당 시간에는 선택한 교관이 이미 배정되어 있습니다. 다른 시간 또는 다른 교관을 선택해 주세요. 기존 예약: " + bookingLabel_(existing));
+    }
+  }
+}
+
+function ensureLogsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("logs");
+
+  if (!sheet) {
+    sheet = ss.insertSheet("logs");
+    sheet.getRange(1, 1, 1, 9).setValues([[
+      "logId", "createdAt", "userId", "userName", "action", "targetSheet", "targetId", "status", "message"
+    ]]);
+    sheet.setFrozenRows(1);
+    return sheet;
+  }
+
+  const headers = getHeaders_(sheet);
+  const required = ["logId", "createdAt", "userId", "userName", "action", "targetSheet", "targetId", "status", "message"];
+  const missing = required.filter(function (header) { return headers.indexOf(header) < 0; });
+  if (missing.length > 0) {
+    sheet.getRange(1, sheet.getLastColumn() + 1, 1, missing.length).setValues([missing]);
+  }
+
+  return sheet;
+}
+
+function compactLogMessage_(data) {
+  const raw = JSON.stringify(data || {});
+  return raw.length > 1200 ? raw.slice(0, 1200) + "...(truncated)" : raw;
+}
+
+function bookingLogMessage_(data) {
+  const user = text_((data || {}).userName || (data || {}).name || (data || {}).customerName || (data || {}).memberName || (data || {}).studentName || "-");
+  const type = text_((data || {}).bookingType || (data || {}).reservationType || (data || {}).type || "-");
+  const aircraft = text_((data || {}).aircraftName || (data || {}).aircraft || (data || {}).aircraftId || "-");
+  const instructor = text_((data || {}).instructorName || (data || {}).instructor || (data || {}).instructorId || "");
+  const date = normalizeDate_((data || {}).bookingDate || (data || {}).date || (data || {}).reservationDate);
+  const start = normalizeTime_((data || {}).startTime || (data || {}).start);
+  const end = normalizeTime_((data || {}).endTime || (data || {}).end);
+  const status = text_((data || {}).status);
+  const parts = [user, type, aircraft, date, start && end ? start + "~" + end : ""];
+  if (instructor) parts.push("교관 " + instructor);
+  if (status) parts.push(status);
+  return parts.filter(function (item) { return text_(item); }).join(" · ");
+}
+
+function operationLogMessage_(targetSheet, action, data) {
+  const sheet = text_(targetSheet);
+  const actionText = text_(action);
+
+  if (sheet === "bookings") {
+    return bookingLogMessage_(data);
+  }
+
+  if (sheet === "users") {
+    const user = text_((data || {}).name || (data || {}).userName || (data || {}).phone || (data || {}).userId || "-");
+    const role = text_((data || {}).role);
+    const status = text_((data || {}).status);
+    return [user, role, status].filter(function (item) { return text_(item); }).join(" · ");
+  }
+
+  if (sheet === "students") {
+    const student = text_((data || {}).name || (data || {}).studentName || (data || {}).userName || (data || {}).studentId || "-");
+    const instructor = text_((data || {}).assignedInstructorName || (data || {}).instructorName);
+    const aircraft = text_((data || {}).assignedAircraftIds || (data || {}).aircraftName || (data || {}).aircraft);
+    return [student, instructor ? "교관 " + instructor : "", aircraft ? "항공기 " + aircraft : ""].filter(function (item) { return text_(item); }).join(" · ");
+  }
+
+  return compactLogMessage_(data);
+}
+
+
+
+function writeLog_(action, targetSheet, targetId, status, message, data) {
+  try {
+    if (text_(targetSheet) === "logs") return;
+
+    const rawMessage = text_(message);
+    const detailedMessage = (!rawMessage || rawMessage.indexOf("추가 완료") >= 0 || rawMessage.indexOf("수정 완료") >= 0)
+      ? operationLogMessage_(targetSheet, action, data)
+      : rawMessage;
+
+    const sheet = ensureLogsSheet_();
+    const headers = getHeaders_(sheet);
+    const row = {
+      logId: buildId_("logs"),
+      createdAt: nowIso_(),
+      userId: text_((data || {}).updatedBy || (data || {}).createdBy || (data || {}).userId),
+      userName: text_((data || {}).updatedByName || (data || {}).createdByName || (data || {}).userName || (data || {}).name),
+      action: text_(action),
+      targetSheet: text_(targetSheet),
+      targetId: text_(targetId),
+      status: text_(status || "success"),
+      message: text_(detailedMessage || compactLogMessage_(data)),
+    };
+
+    sheet.appendRow(headers.map(function (header) { return row[header] !== undefined ? row[header] : ""; }));
+  } catch (error) {
+    // 로그 기록 실패가 실제 업무 처리를 막으면 안 됩니다.
+  }
+}
+
+function withWriteLock_(callback) {
+  const lock = LockService.getScriptLock();
+
+  try {
+    lock.waitLock(10000);
+  } catch (error) {
+    throw new Error("다른 저장 작업이 진행 중입니다. 잠시 후 다시 시도해주세요.");
+  }
+
+  try {
+    return callback();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+
+function normalizeBooking_(data) {
+  const row = clone_(data);
+  if (!text_(row.bookingId)) row.bookingId = buildId_("bookings");
+  if (!text_(row.status)) row.status = "확정";
+
+  row.bookingDate = normalizeDate_(row.bookingDate);
+  row.startTime = normalizeTime_(row.startTime);
+  row.endTime = normalizeTime_(row.endTime);
+  row.updatedAt = nowIso_();
+
+  if (!text_(row.createdAt)) row.createdAt = nowIso_();
+  return row;
+}
+
+function updateBookingStatus_(bookingId, status, data) {
+  const row = clone_(data || {});
+  row.bookingId = bookingId;
+  row.status = status;
+  row.updatedAt = nowIso_();
+  return updateRowById_("bookings", "bookingId", bookingId, row);
+}
+
+function addTrainingLog_(data) {
+  ensureTrainingLogsSheet_();
+  return appendRowByHeader_("trainingLogs", normalizeTrainingLog_(data, true));
+}
+
+function updateTrainingLog_(data) {
+  ensureTrainingLogsSheet_();
+  const row = normalizeTrainingLog_(data, false);
+  return updateRowById_("trainingLogs", "trainingLogId", row.trainingLogId, row);
+}
+
+function normalizeTrainingLog_(data, isCreate) {
+  const row = clone_(data);
+  if (!text_(row.trainingLogId)) row.trainingLogId = buildId_("trainingLogs");
+  if (!text_(row.trainingDate)) throw new Error("교육일자를 입력하세요.");
+
+  row.trainingDate = normalizeDate_(row.trainingDate);
+  row.scheduledStartTime = normalizeTime_(row.scheduledStartTime);
+  row.scheduledEndTime = normalizeTime_(row.scheduledEndTime);
+  row.actualStartTime = normalizeTime_(row.actualStartTime);
+  row.actualEndTime = normalizeTime_(row.actualEndTime);
+  row.scheduledMinutes = number_(row.scheduledMinutes);
+  row.actualFlightMinutes = number_(row.actualFlightMinutes);
+  row.groundBriefingMinutes = number_(row.groundBriefingMinutes);
+  row.deductedMinutes = number_(row.deductedMinutes);
+  row.studentVisible = boolText_(row.studentVisible);
+  row.timeDeducted = boolText_(row.timeDeducted);
+
+  if (!text_(row.status)) row.status = row.timeDeducted === "TRUE" ? "차감완료" : "작성완료";
+  if (isCreate && !text_(row.createdAt)) row.createdAt = nowIso_();
+  row.updatedAt = nowIso_();
+
+  return row;
+}
+
+function getStudentTrainingLogs_(params) {
+  ensureTrainingLogsSheet_();
+
+  const userId = text_(params.userId);
+  const studentId = text_(params.studentId);
+  const limit = Math.max(1, Math.min(number_(params.limit) || 30, 100));
+
+  if (!userId && !studentId) throw new Error("userId 또는 studentId가 필요합니다.");
+
+  const rows = readRows_(getSheetRequired_("trainingLogs"));
+
+  const result = rows
+    .filter(function (row) { return text_(row.studentVisible).toUpperCase() === "TRUE"; })
+    .filter(function (row) {
+      const status = text_(row.status);
+      return status === "작성완료" || status === "차감완료";
+    })
+    .filter(function (row) {
+      const sameUser = userId && text_(row.userId) === userId;
+      const sameStudent = studentId && text_(row.studentId) === studentId;
+      return Boolean(sameUser || sameStudent);
+    })
+    .sort(function (a, b) {
+      const aKey = text_(a.trainingDate) + " " + text_(a.actualStartTime);
+      const bKey = text_(b.trainingDate) + " " + text_(b.actualStartTime);
+      return bKey.localeCompare(aKey);
+    })
+    .slice(0, limit)
+    .map(function (row) {
+      return {
+        trainingLogId: text_(row.trainingLogId),
+        bookingId: text_(row.bookingId),
+        studentId: text_(row.studentId),
+        studentName: text_(row.studentName),
+        userId: text_(row.userId),
+        instructorName: text_(row.instructorName),
+        aircraftName: text_(row.aircraftName),
+        trainingDate: normalizeDate_(row.trainingDate),
+        actualStartTime: normalizeTime_(row.actualStartTime),
+        actualEndTime: normalizeTime_(row.actualEndTime),
+        actualFlightMinutes: number_(row.actualFlightMinutes),
+        groundBriefingMinutes: number_(row.groundBriefingMinutes),
+        trainingType: text_(row.trainingType),
+        lessonTitle: text_(row.lessonTitle),
+        trainingItems: text_(row.trainingItems),
+        studentNotes: text_(row.studentNotes),
+        homework: text_(row.homework),
+        cautionNotes: text_(row.cautionNotes),
+        nextTrainingPlan: text_(row.nextTrainingPlan),
+        timeDeducted: text_(row.timeDeducted).toUpperCase() === "TRUE",
+        deductedMinutes: number_(row.deductedMinutes),
+        status: text_(row.status),
+        updatedAt: text_(row.updatedAt),
+      };
+    });
+
+  return { ok: true, success: true, trainingLogs: result };
+}
+
+function ensureTrainingLogsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("trainingLogs");
+
+  if (!sheet) {
+    sheet = ss.insertSheet("trainingLogs");
+    sheet.getRange(1, 1, 1, TRAINING_LOG_HEADERS.length).setValues([TRAINING_LOG_HEADERS]);
+    sheet.setFrozenRows(1);
+    return sheet;
+  }
+
+  const headers = getHeaders_(sheet);
+  const missing = TRAINING_LOG_HEADERS.filter(function (header) { return headers.indexOf(header) < 0; });
+
+  if (missing.length > 0) {
+    sheet.getRange(1, sheet.getLastColumn() + 1, 1, missing.length).setValues([missing]);
+  }
+
+  return sheet;
+}
+
+
+
+function ensureTrainingChargesSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("trainingCharges");
+
+  if (!sheet) {
+    sheet = ss.insertSheet("trainingCharges");
+    sheet.getRange(1, 1, 1, TRAINING_CHARGE_HEADERS.length).setValues([TRAINING_CHARGE_HEADERS]);
+    sheet.setFrozenRows(1);
+    return sheet;
+  }
+
+  const headers = getHeaders_(sheet);
+  const missing = TRAINING_CHARGE_HEADERS.filter(function (header) { return headers.indexOf(header) < 0; });
+
+  if (missing.length > 0) {
+    sheet.getRange(1, sheet.getLastColumn() + 1, 1, missing.length).setValues([missing]);
+  }
+
+  return sheet;
+}
+
+function normalizeTrainingCharge_(data) {
+  ensureTrainingChargesSheet_();
+
+  const row = clone_(data);
+  if (!text_(row.chargeId)) row.chargeId = buildId_("trainingCharges");
+  row.chargeDate = normalizeDate_(row.chargeDate) || normalizeDate_(nowIso_());
+  row.chargeType = text_(row.chargeType || "비행시간 충전");
+  row.chargeHours = Number(row.chargeHours || 0);
+  row.chargeMinutes = Number(row.chargeMinutes || row.chargeHours * 60 || 0);
+  row.chargeAmount = Number(row.chargeAmount || 0);
+  row.paidAmount = Number(row.paidAmount || 0);
+  row.paymentStatus = text_(row.paymentStatus || "미결제");
+  row.memo = text_(row.memo);
+  if (!text_(row.createdAt)) row.createdAt = nowIso_();
+  row.updatedAt = nowIso_();
+
+  return row;
+}
+
+function addTrainingCharge_(data) {
+  return appendRowByHeader_("trainingCharges", normalizeTrainingCharge_(data));
+}
+
+function ensureStudentsSheet_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName("students");
+
+  if (!sheet) {
+    sheet = ss.insertSheet("students");
+    sheet.getRange(1, 1, 1, STUDENT_HEADERS.length).setValues([STUDENT_HEADERS]);
+    sheet.setFrozenRows(1);
+    return sheet;
+  }
+
+  const headers = getHeaders_(sheet);
+  const missing = STUDENT_HEADERS.filter(function (header) { return headers.indexOf(header) < 0; });
+
+  if (missing.length > 0) {
+    sheet.getRange(1, sheet.getLastColumn() + 1, 1, missing.length).setValues([missing]);
+  }
+
+  return sheet;
+}
+
+function normalizeStudent_(data, isCreate) {
+  ensureStudentsSheet_();
+
+  const row = clone_(data);
+  if (!text_(row.studentId)) row.studentId = buildId_("students");
+  row.name = text_(row.name);
+  row.phone = text_(row.phone);
+  row.email = text_(row.email);
+  row.homeAddress = text_(row.homeAddress || row.address);
+  row.address = row.homeAddress;
+  row.course = text_(row.course || "교육");
+  row.trainingStartDate = normalizeDate_(row.trainingStartDate) || normalizeDate_(nowIso_());
+  row.birthDate = normalizeDate_(row.birthDate);
+  row.licenseDate1 = normalizeDate_(row.licenseDate1);
+  row.licenseDate2 = normalizeDate_(row.licenseDate2);
+  row.trainingStatus = text_(row.trainingStatus || "교육중");
+  const addChargeMinutes = Number(row.addChargeMinutes || 0);
+  const chargeMode = text_(row.chargeMode || (isCreate ? "initial" : "none"));
+  const existingTotalChargedMinutes = Number(row.totalChargedMinutes || row.chargedTrainingMinutes || row.initialChargeMinutes || 0);
+  const legacyInitialMinutes = Number(row.initialChargeMinutes || row.initialChargeHours * 60 || 0);
+
+  row.initialChargeHours = Number(row.initialChargeHours || 0);
+  row.initialChargeMinutes = Number(row.initialChargeMinutes || row.initialChargeHours * 60 || 0);
+  row.initialChargeMemo = text_(row.initialChargeMemo || row.chargeMemo);
+
+  if ((row.initialChargeMinutes || addChargeMinutes) && !text_(row.initialChargedAt)) row.initialChargedAt = nowIso_();
+
+  if (chargeMode === "initial") {
+    row.totalChargedMinutes = addChargeMinutes || existingTotalChargedMinutes || legacyInitialMinutes;
+  } else if (chargeMode === "append" && addChargeMinutes > 0) {
+    row.totalChargedMinutes = existingTotalChargedMinutes + addChargeMinutes;
+  } else {
+    row.totalChargedMinutes = existingTotalChargedMinutes || legacyInitialMinutes;
+  }
+
+  row.chargedTrainingMinutes = row.totalChargedMinutes;
+  row.manualTrainingMinutes = Number(row.manualTrainingMinutes || 0);
+  row.manualTrainingCount = Number(row.manualTrainingCount || 0);
+  row.manualAdjustmentMemo = text_(row.manualAdjustmentMemo);
+  if (row.manualAdjustmentMemo && !text_(row.manualAdjustedAt)) row.manualAdjustedAt = nowIso_();
+
+  row.usedTrainingMinutes = Number(row.usedTrainingMinutes || row.usedMinutes || 0);
+  row.usedMinutes = row.usedTrainingMinutes;
+  row.usedTrainingHours = Math.round((row.usedTrainingMinutes / 60) * 10) / 10;
+  row.usedHours = row.usedTrainingHours;
+
+  const calculatedRemaining = Math.max(Number(row.totalChargedMinutes || 0) - row.usedTrainingMinutes - row.manualTrainingMinutes, 0);
+  row.remainingTrainingMinutes = calculatedRemaining;
+  row.remainingMinutes = row.remainingTrainingMinutes;
+  row.remainingTrainingHours = Math.round((row.remainingTrainingMinutes / 60) * 10) / 10;
+  row.remainingHours = row.remainingTrainingHours;
+  row.completedTrainingCount = Number(row.completedTrainingCount || row.manualTrainingCount || 0);
+
+  if (isCreate && !text_(row.createdAt)) row.createdAt = nowIso_();
+  row.updatedAt = nowIso_();
+
+  return row;
+}
+
+function addStudent_(data) {
+  ensureStudentsSheet_();
+
+  const incoming = clone_(data);
+  const userId = text_(incoming.userId);
+
+  if (userId) {
+    const existingByUser = findRowByHeader_("students", "userId", userId);
+    if (existingByUser) {
+      const row = normalizeStudent_(Object.assign({}, existingByUser, incoming, { studentId: existingByUser.studentId, userId: userId }), false);
+      return updateRowById_("students", "studentId", row.studentId, row);
+    }
+  }
+
+  if (text_(incoming.studentId) && studentIdBelongsToAnotherUser_(incoming.studentId, incoming.userId)) {
+    incoming.studentId = "";
+  }
+
+  return appendRowByHeader_("students", normalizeStudent_(incoming, true));
+}
+
+function updateStudent_(data) {
+  ensureStudentsSheet_();
+
+  const incoming = clone_(data);
+  const userId = text_(incoming.userId);
+  const requestedId = text_(incoming.studentId);
+
+  if (userId) {
+    const existingByUser = findRowByHeader_("students", "userId", userId);
+    if (existingByUser) {
+      const row = normalizeStudent_(Object.assign({}, existingByUser, incoming, { studentId: existingByUser.studentId, userId: userId }), false);
+      return updateRowById_("students", "studentId", row.studentId, row);
+    }
+  }
+
+  if (requestedId) {
+    const existingByStudentId = findRowByHeader_("students", "studentId", requestedId);
+    if (existingByStudentId && (!userId || !text_(existingByStudentId.userId) || text_(existingByStudentId.userId) === userId)) {
+      const row = normalizeStudent_(Object.assign({}, existingByStudentId, incoming, { studentId: requestedId }), false);
+      return updateRowById_("students", "studentId", row.studentId, row);
+    }
+  }
+
+  incoming.studentId = "";
+  return addStudent_(incoming);
+}
+
+function addNotification_(data) {
+  const row = clone_(data);
+  if (!text_(row.notificationId)) row.notificationId = buildId_("notifications");
+  if (!text_(row.status)) row.status = "대기";
+  if (!text_(row.createdAt)) row.createdAt = nowIso_();
+  row.updatedAt = nowIso_();
+  return appendRowByHeader_("notifications", row);
+}
+
+function addRowByHeader_(sheetName, data) {
+  return appendRowByHeader_(sheetName, data);
+}
+
+function appendRowByHeader_(sheetName, data) {
+  return withWriteLock_(function () {
+    const safeSheetName = text_(sheetName);
+    if (!safeSheetName) throw new Error("sheetName이 없습니다.");
+
+    if (safeSheetName === "students") ensureStudentsSheet_();
+    if (safeSheetName === "trainingCharges") ensureTrainingChargesSheet_();
+    if (safeSheetName === "trainingLogs") ensureTrainingLogsSheet_();
+
+    const sheet = getSheetRequired_(safeSheetName);
+    const headers = getHeaders_(sheet);
+    if (headers.length === 0) throw new Error(safeSheetName + " 시트에 헤더가 없습니다.");
+
+    const config = SHEET_CONFIG[safeSheetName] || {};
+    const idHeader = text_(config.idHeader);
+    if (idHeader && headers.indexOf(idHeader) >= 0 && !text_(data[idHeader])) data[idHeader] = buildId_(safeSheetName);
+    if (headers.indexOf("createdAt") >= 0 && !text_(data.createdAt)) data.createdAt = nowIso_();
+    if (headers.indexOf("updatedAt") >= 0) data.updatedAt = nowIso_();
+
+    if (safeSheetName === "bookings") {
+      assertBookingAvailable_(data, "");
+    }
+
+    const row = headers.map(function (header) { return data[header] !== undefined ? data[header] : ""; });
+    sheet.appendRow(row);
+
+    if (typeof clearCache_ === "function") clearCache_();
+
+    const targetId = idHeader ? data[idHeader] : "";
+    writeLog_("append", safeSheetName, targetId, "success", safeSheetName + " 추가 완료", data);
+
+    return { ok: true, success: true, message: safeSheetName + " 추가 완료", data: data };
+  });
+}
+
+function findRowByHeader_(sheetName, headerName, value) {
+  const safeSheetName = text_(sheetName);
+  const safeHeaderName = text_(headerName);
+  const safeValue = text_(value);
+
+  if (!safeSheetName || !safeHeaderName || !safeValue) return null;
+
+  const sheet = getSheetOptional_(safeSheetName);
+  if (!sheet) return null;
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return null;
+
+  const headers = values[0].map(function (header) { return text_(header); });
+  const col = headers.indexOf(safeHeaderName);
+  if (col < 0) return null;
+
+  for (let i = 1; i < values.length; i += 1) {
+    if (text_(values[i][col]) === safeValue) {
+      return objectFromRow_(headers, values[i]);
+    }
+  }
+
+  return null;
+}
+
+function studentIdBelongsToAnotherUser_(studentId, userId) {
+  const existing = findRowByHeader_("students", "studentId", studentId);
+  if (!existing) return false;
+
+  const existingUserId = text_(existing.userId);
+  const nextUserId = text_(userId);
+
+  return Boolean(existingUserId && nextUserId && existingUserId !== nextUserId);
+}
+
+function findRowById_(sheetName, idHeader, idValue) {
+  const safeSheetName = text_(sheetName);
+  const safeIdHeader = text_(idHeader);
+  const safeIdValue = text_(idValue);
+
+  if (!safeSheetName || !safeIdHeader || !safeIdValue) return null;
+
+  const sheet = getSheetOptional_(safeSheetName);
+  if (!sheet) return null;
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return null;
+
+  const headers = values[0].map(function (header) { return text_(header); });
+  const idCol = headers.indexOf(safeIdHeader);
+  if (idCol < 0) return null;
+
+  for (let i = 1; i < values.length; i += 1) {
+    if (text_(values[i][idCol]) === safeIdValue) {
+      return objectFromRow_(headers, values[i]);
+    }
+  }
+
+  return null;
+}
+
+function updateRowById_(sheetName, idHeader, idValue, data) {
+  return withWriteLock_(function () {
+    const safeSheetName = text_(sheetName);
+    const safeIdHeader = text_(idHeader);
+    const safeIdValue = text_(idValue);
+
+    if (!safeSheetName) throw new Error("sheetName이 없습니다.");
+    if (!safeIdHeader) throw new Error("idHeader가 없습니다.");
+    if (!safeIdValue) throw new Error(safeIdHeader + " 값이 없습니다.");
+
+    if (safeSheetName === "students") ensureStudentsSheet_();
+    if (safeSheetName === "trainingCharges") ensureTrainingChargesSheet_();
+    if (safeSheetName === "trainingLogs") ensureTrainingLogsSheet_();
+
+    const sheet = getSheetRequired_(safeSheetName);
+    const values = sheet.getDataRange().getValues();
+
+    if (values.length < 2) throw new Error(safeSheetName + " 시트에 데이터가 없습니다.");
+
+    const headers = values[0].map(function (header) { return text_(header); });
+    const idCol = headers.indexOf(safeIdHeader);
+    if (idCol < 0) throw new Error(safeSheetName + " 시트에 " + safeIdHeader + " 헤더가 없습니다.");
+
+    let targetRowIndex = -1;
+    for (let i = 1; i < values.length; i += 1) {
+      if (text_(values[i][idCol]) === safeIdValue) {
+        targetRowIndex = i;
+        break;
+      }
+    }
+
+    if (targetRowIndex < 1) throw new Error("수정할 데이터를 찾을 수 없습니다: " + safeIdValue);
+    if (headers.indexOf("updatedAt") >= 0) data.updatedAt = nowIso_();
+
+    const nextRow = headers.map(function (header, index) {
+      return data[header] !== undefined ? data[header] : values[targetRowIndex][index];
+    });
+    const nextObject = objectFromRow_(headers, nextRow);
+
+    if (safeSheetName === "bookings") {
+      assertBookingAvailable_(nextObject, safeIdValue);
+    }
+
+    sheet.getRange(targetRowIndex + 1, 1, 1, headers.length).setValues([nextRow]);
+
+    if (typeof clearCache_ === "function") clearCache_();
+
+    writeLog_("update", safeSheetName, safeIdValue, "success", safeSheetName + " 수정 완료", nextObject);
+
+    return { ok: true, success: true, message: safeSheetName + " 수정 완료", data: nextObject };
+  });
+}
+
+function getSheetRequired_(sheetName) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error(sheetName + " 시트를 찾을 수 없습니다.");
+  return sheet;
+}
+
+function getSheetOptional_(sheetName) {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+}
+
+function getHeaders_(sheet) {
+  const lastColumn = sheet.getLastColumn();
+  if (lastColumn < 1) return [];
+  return sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(function (header) { return text_(header); });
+}
+
+function readRows_(sheet) {
+  // 스프레드시트에 보이는 시간값(예: 09:00)을 그대로 읽습니다.
+  const values = sheet.getDataRange().getDisplayValues();
+  if (values.length < 2) return [];
+
+  const headers = values[0].map(function (header) { return text_(header); });
+  return values.slice(1).map(function (row) { return objectFromRow_(headers, row); });
+}
+
+function objectFromRow_(headers, row) {
+  const obj = {};
+  headers.forEach(function (header, index) {
+    if (header) obj[header] = row[index];
+  });
+  return obj;
+}
+
+function parseBody_(e) {
+  if (!e || !e.postData || !e.postData.contents) return {};
+
+  try {
+    return JSON.parse(e.postData.contents);
+  } catch (error) {
+    throw new Error("요청 본문을 JSON으로 변환하지 못했습니다.");
+  }
+}
+
+function json_(data, statusCode) {
+  const payload = clone_(data || {});
+  payload.statusCode = statusCode || 200;
+  return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function error_(error) {
+  const message = error && error.message ? error.message : String(error);
+  return json_({ ok: false, success: false, message: message }, 500);
+}
+
+function clone_(value) {
+  return JSON.parse(JSON.stringify(value || {}));
+}
+
+function text_(value, fallback) {
+  const result = String(value === null || value === undefined ? "" : value).trim();
+  return result || fallback || "";
+}
+
+function number_(value) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+}
+
+function boolText_(value) {
+  const raw = text_(value).toUpperCase();
+  if (raw === "TRUE" || raw === "Y" || raw === "YES" || raw === "1" || raw === "공개" || raw === "완료") return "TRUE";
+  return "FALSE";
+}
+
+function normalizeDate_(value) {
+  const raw = text_(value);
+  if (!raw) return "";
+  if (raw.indexOf("T") >= 0) return raw.slice(0, 10);
+  return raw.slice(0, 10);
+}
+
+function normalizeTime_(value) {
+  const raw = text_(value);
+  const match = raw.match(/(\d{1,2}):(\d{1,2})/);
+  if (!match) return raw ? raw.slice(0, 5) : "";
+  return String(Number(match[1])).padStart(2, "0") + ":" + String(Number(match[2])).padStart(2, "0");
+}
+
+function nowIso_() {
+  return Utilities.formatDate(new Date(), "Asia/Seoul", "yyyy-MM-dd'T'HH:mm:ss");
+}
+
+function buildId_(sheetName) {
+  const config = SHEET_CONFIG[sheetName] || {};
+  const prefix = config.prefix || "ID";
+  const stamp = Utilities.formatDate(new Date(), "Asia/Seoul", "yyyyMMddHHmmss");
+  const random = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return prefix + "-" + stamp + "-" + random;
+}
+
+
+function clearCache_() {
+  try {
+    CacheService.getScriptCache().removeAll([
+      "getAllData",
+      "getDashboardData",
+      "sheet:bookings",
+      "sheet:users",
+      "sheet:students",
+      "sheet:aircraft",
+      "sheet:instructors",
+      "sheet:settings",
+      "sheet:instructorSchedules",
+      "sheet:trainingCharges",
+      "sheet:trainingLogs",
+      "sheet:notifications",
+      "sheet:logs"
+    ]);
+  } catch (error) {
+    // 캐시 정리 실패는 실제 데이터 처리 실패로 보지 않습니다.
+  }
+}
