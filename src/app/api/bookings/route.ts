@@ -1,523 +1,216 @@
 import { NextRequest, NextResponse } from "next/server";
-import { normalizeSettingsRows } from "@/lib/settingsOptions";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+type JsonRecord = Record<string, unknown>;
 
-
-const APPS_SCRIPT_TIMEOUT_MS = 12000;
-
-function createTimeoutSignal(timeoutMs = APPS_SCRIPT_TIMEOUT_MS) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-
-  return {
-    signal: controller.signal,
-    clear: () => clearTimeout(timer),
-  };
+function text(value: unknown, fallback = "") {
+  const result = String(value ?? "").trim();
+  return result || fallback;
 }
 
-function timeoutErrorMessage(context: string) {
-  return `${context} 요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.`;
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
 }
 
-function sleepRetry(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function dateText(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
-async function fetchWithRetry(input: RequestInfo | URL, init: RequestInit, context: string, retryCount = 1) {
-  let lastError: unknown = null;
-
-  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
-    const timeout = createTimeoutSignal();
-
-    try {
-      const response = await fetch(input, {
-        ...init,
-        signal: timeout.signal,
-      });
-
-      timeout.clear();
-
-      if (response.ok || attempt >= retryCount) {
-        return response;
-      }
-
-      lastError = new Error(`${context} 응답 오류: ${response.status}`);
-    } catch (error) {
-      timeout.clear();
-
-      if (error instanceof Error && error.name === "AbortError") {
-        lastError = new Error(timeoutErrorMessage(context));
-      } else {
-        lastError = error;
-      }
-
-      if (attempt >= retryCount) {
-        throw lastError instanceof Error ? lastError : new Error(`${context} 요청에 실패했습니다.`);
-      }
-    }
-
-    await sleepRetry(450 * (attempt + 1));
-  }
-
-  throw lastError instanceof Error ? lastError : new Error(`${context} 요청에 실패했습니다.`);
-}
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
-type ApiObject = Record<string, unknown>;
-
-type CachedBookingsGet = { expiresAt: number; data: ApiObject };
-const bookingsGetCache = new Map<string, CachedBookingsGet>();
-const BOOKINGS_GET_CACHE_TTL_MS = 8_000;
-
-function shouldBypassRouteCache(request: NextRequest) {
-  const params = request.nextUrl.searchParams;
-  return params.get("noCache") === "1" || params.get("refresh") === "1";
-}
-
-function clearBookingsRouteCache() {
-  bookingsGetCache.clear();
-}
-
-function kstDateText(date: Date) {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Seoul",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-
-  return formatter.format(date);
-}
-
-function addDaysText(dateText: string, offset: number) {
-  const [year, month, day] = dateText.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  date.setUTCDate(date.getUTCDate() + offset);
-
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
-}
-
-function getBookingRangeParams(request: NextRequest) {
-  const today = kstDateText(new Date());
-  const params = request.nextUrl.searchParams;
-  const fromDate = params.get("fromDate") || params.get("startDate") || addDaysText(today, -7);
-  const toDate = params.get("toDate") || params.get("endDate") || addDaysText(today, 90);
-
-  return { fromDate, toDate };
-}
-
-
-function normalizeRows(data: unknown): ApiObject[] {
-  if (Array.isArray(data)) {
-    return data as ApiObject[];
-  }
-
-  if (data && typeof data === "object") {
-    const obj = data as ApiObject;
-
-    if (Array.isArray(obj.data)) return obj.data as ApiObject[];
-    if (Array.isArray(obj.rows)) return obj.rows as ApiObject[];
-    if (Array.isArray(obj.values)) return obj.values as ApiObject[];
-    if (Array.isArray(obj.bookings)) return obj.bookings as ApiObject[];
-  }
-
-  return [];
-}
-
-async function readJsonResponse(response: Response, context: string) {
-  const rawText = await response.text();
-
-  if (!rawText.trim()) {
-    throw new Error(`${context} 응답이 비어 있습니다.`);
-  }
-
-  try {
-    return JSON.parse(rawText) as unknown;
-  } catch {
-    throw new Error(`${context} 응답을 JSON으로 변환하지 못했습니다.`);
-  }
-}
-
-function textValue(value: unknown) {
-  return String(value ?? "").trim();
-}
-
-
-function normalizeBookingStatusForApi(value: unknown, action: string) {
-  const raw = textValue(value).replace(/\s/g, "");
-
-  if (action === "addBooking") return raw || "확정";
-  if (raw === "승인" || raw === "승인완료") return "확정";
-  if (raw === "예약확정") return "확정";
-  if (raw === "완료처리") return "완료";
-  if (raw === "기상" || raw === "기상취소처리") return "기상취소";
-  if (raw === "취소승인" || raw === "관리자취소") return "취소";
-  if (raw === "취소요청") return "취소요청";
-  if (["요청", "확정", "예정", "완료", "취소", "기상취소", "노쇼", "반려"].includes(raw)) return raw;
-
-  return raw || "확정";
-}
-
-function normalizeBookingTypeForApi(value: unknown) {
-  const raw = textValue(value).replace(/\s/g, "");
-
-  if (raw.includes("렌탈")) return "렌탈비행";
-  if (raw.includes("교육")) return "교육비행";
-  if (raw.includes("체험")) return "체험비행";
-  if (raw.includes("정비") || raw.includes("점검")) return "정비";
-  if (raw) return raw;
-
-  return "기타";
-}
-
-
-function normalizeExactBookingTime(value: unknown) {
-  const raw = String(value ?? "").trim();
+function timeText(value: unknown) {
+  const raw = text(value);
   const match = raw.match(/(\d{1,2}):(\d{1,2})/);
-
-  if (!match) return raw.slice(0, 5);
-
+  if (!match) return raw ? raw.slice(0, 5) : "";
   return `${String(Number(match[1])).padStart(2, "0")}:${String(Number(match[2])).padStart(2, "0")}`;
 }
 
-function normalizeOutgoingBooking(action: string, data: ApiObject) {
-  const next: ApiObject = { ...data };
+function toCamelKey(key: string) {
+  return key.replace(/_([a-z0-9])/g, (_, char: string) => char.toUpperCase());
+}
 
-  next.bookingDate = normalizeSheetDate(next.bookingDate);
-  next.startTime = normalizeExactBookingTime(next.startTime);
-  next.endTime = normalizeExactBookingTime(next.endTime);
-  next.bookingType = normalizeBookingTypeForApi(next.bookingType);
-  next.status = normalizeBookingStatusForApi(next.status, action);
+function toSnakeKey(key: string) {
+  return key.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
+}
+
+function toCamelObject(row: JsonRecord) {
+  const result: JsonRecord = {};
+
+  Object.entries(row || {}).forEach(([key, value]) => {
+    result[toCamelKey(key)] = value ?? "";
+  });
+
+  return result;
+}
+
+function toSnakeObject(row: JsonRecord) {
+  const result: JsonRecord = {};
+
+  Object.entries(row || {}).forEach(([key, value]) => {
+    result[toSnakeKey(key)] = value;
+  });
+
+  return result;
+}
+
+function removeEmptyUndefined(row: JsonRecord) {
+  const result: JsonRecord = {};
+
+  Object.entries(row).forEach(([key, value]) => {
+    if (value === undefined) return;
+    result[key] = value;
+  });
+
+  return result;
+}
+
+function withBookingAliases(row: JsonRecord) {
+  const next = { ...row };
 
   if (next.aircraftName && !next.aircraft) next.aircraft = next.aircraftName;
-  if (next.aircraft && !next.aircraftName) next.aircraftName = next.aircraft;
+  if (next.userName && !next.name) next.name = next.userName;
+  if (next.instructorName && !next.instructor) next.instructor = next.instructorName;
 
-  if (next.bookingType !== "체험비행") {
-    next.paymentStatus = "";
-  }
+  if (next.bookingId && !next.id) next.id = next.bookingId;
+  if (next.bookingType && !next.type) next.type = next.bookingType;
+  if (next.reservationType && !next.bookingType) next.bookingType = next.reservationType;
 
   return next;
 }
 
-function parseSheetDateTime(value: unknown) {
-  const raw = textValue(value);
-
-  if (!raw) return null;
-
-  if (raw.includes("T")) {
-    const date = new Date(raw);
-
-    if (!Number.isNaN(date.getTime())) {
-      const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-
-      return {
-        year: kst.getUTCFullYear(),
-        month: String(kst.getUTCMonth() + 1).padStart(2, "0"),
-        day: String(kst.getUTCDate()).padStart(2, "0"),
-        hour: kst.getUTCHours(),
-        minute: kst.getUTCMinutes(),
-      };
-    }
-  }
-
-  const dateTimeLike = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{1,2})/);
-  if (dateTimeLike) {
-    return {
-      year: Number(dateTimeLike[1].slice(0, 4)),
-      month: dateTimeLike[1].slice(5, 7),
-      day: dateTimeLike[1].slice(8, 10),
-      hour: Number(dateTimeLike[2]),
-      minute: Number(dateTimeLike[3]),
-    };
-  }
-
-  const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (dateOnly) {
-    return {
-      year: Number(dateOnly[1]),
-      month: dateOnly[2],
-      day: dateOnly[3],
-      hour: 0,
-      minute: 0,
-    };
-  }
-
-  const timeOnly = raw.match(/^(\d{1,2}):(\d{1,2})/);
-  if (timeOnly) {
-    return {
-      year: 0,
-      month: "00",
-      day: "00",
-      hour: Number(timeOnly[1]),
-      minute: Number(timeOnly[2]),
-    };
-  }
-
-  return null;
+function mapRows(rows: JsonRecord[] | null | undefined, alias = false) {
+  return (rows || []).map((row) => {
+    const camel = toCamelObject(row);
+    return alias ? withBookingAliases(camel) : camel;
+  });
 }
 
-function minutesToTime(totalMinutes: number) {
-  const normalized = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
-  const hour = Math.floor(normalized / 60);
-  const minute = normalized % 60;
-
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+function parseDateParam(value: string | null, fallback: string) {
+  const raw = text(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  return fallback;
 }
 
-function normalizeSheetDate(value: unknown) {
-  const parts = parseSheetDateTime(value);
-
-  if (parts && parts.year) {
-    return `${parts.year}-${parts.month}-${parts.day}`;
-  }
-
-  const raw = textValue(value);
-  return raw ? raw.slice(0, 10) : "";
+function buildId(prefix: string) {
+  const now = new Date();
+  const stamp = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+    String(now.getHours()).padStart(2, "0"),
+    String(now.getMinutes()).padStart(2, "0"),
+    String(now.getSeconds()).padStart(2, "0"),
+  ].join("");
+  const random = Math.random().toString(36).slice(2, 7).toUpperCase();
+  return `${prefix}-${stamp}-${random}`;
 }
 
-function normalizeSheetTime(value: unknown) {
-  const raw = textValue(value);
+function normalizeBookingPayload(input: JsonRecord, existing?: JsonRecord) {
+  const now = new Date().toISOString();
+  const bookingId = text(input.bookingId || input.id || existing?.booking_id || existing?.bookingId) || buildId("BKG");
 
-  if (!raw) return "";
-
-  // Plain HH:mm values from the frontend or getDisplayValues() must be preserved exactly.
-  const timeOnly = raw.match(/^(\d{1,2}):(\d{1,2})(?::\d{1,2})?$/);
-  if (timeOnly) {
-    return `${String(Number(timeOnly[1])).padStart(2, "0")}:${String(Number(timeOnly[2])).padStart(2, "0")}`;
-  }
-
-  // Plain date-time strings without timezone should be read as written.
-  const dateTimeLike = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{1,2})(?::\d{1,2})?/);
-  if (dateTimeLike && !raw.endsWith("Z")) {
-    return `${String(Number(dateTimeLike[2])).padStart(2, "0")}:${String(Number(dateTimeLike[3])).padStart(2, "0")}`;
-  }
-
-  // Google Sheets time-only cells often arrive as ISO/Z values around 1899-12-30T...Z.
-  // Those represent spreadsheet time values. Convert UTC to Korea time and preserve minutes.
-  if (raw.includes("T")) {
-    const date = new Date(raw);
-
-    if (!Number.isNaN(date.getTime())) {
-      const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
-      return `${String(kst.getUTCHours()).padStart(2, "0")}:${String(kst.getUTCMinutes()).padStart(2, "0")}`;
-    }
-  }
-
-  const parts = parseSheetDateTime(value);
-  if (parts) {
-    return `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
-  }
-
-  return raw.slice(0, 5);
-}
-
-function normalizeBookingRows(rows: ApiObject[]) {
-  return rows.map((row) => ({
-    ...row,
-    bookingDate: normalizeSheetDate(row.bookingDate),
-    requestDate: normalizeSheetDate(row.requestDate),
-    startTime: normalizeSheetTime(row.startTime),
-    endTime: normalizeSheetTime(row.endTime),
-    bufferEndTime: normalizeSheetTime(row.bufferEndTime),
-  }));
-}
-
-
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function fetchAppsScriptJson(url: string, context: string, retryCount = 2) {
-  let lastError: unknown = null;
-
-  for (let attempt = 0; attempt <= retryCount; attempt += 1) {
-    try {
-      const response = await fetch(url, {
-        method: "GET",
-        cache: "no-store",
-      });
-
-      const rawText = await response.text();
-
-      if (!response.ok) {
-        const detail = rawText.trim().slice(0, 300);
-        throw new Error(
-          detail
-            ? `${context} Apps Script API 오류: ${response.status} / ${detail}`
-            : `${context} Apps Script API 오류: ${response.status}`
-        );
-      }
-
-      if (!rawText.trim()) {
-        throw new Error(`${context} 응답이 비어 있습니다.`);
-      }
-
-      try {
-        const parsedData = JSON.parse(rawText) as unknown;
-
-        if (
-          parsedData &&
-          typeof parsedData === "object" &&
-          "success" in parsedData &&
-          (parsedData as ApiObject).success === false
-        ) {
-          throw new Error(
-            String((parsedData as ApiObject).message || "") ||
-              `${context} 데이터를 불러오지 못했습니다.`
-          );
-        }
-
-        return parsedData;
-      } catch (error) {
-        if (error instanceof SyntaxError) {
-          throw new Error(`${context} 응답을 JSON으로 변환하지 못했습니다.`);
-        }
-
-        throw error;
-      }
-    } catch (error) {
-      lastError = error;
-
-      if (attempt < retryCount) {
-        await sleep(350 * (attempt + 1));
-        continue;
-      }
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error(`${context} 요청에 실패했습니다.`);
-}
-
-function extractRowsFromAllData(allData: unknown, sheetName: string) {
-  if (!allData || typeof allData !== "object") return [];
-
-  const obj = allData as ApiObject;
-
-  if (Array.isArray(obj[sheetName])) {
-    return obj[sheetName] as ApiObject[];
-  }
-
-  if (obj.data && typeof obj.data === "object" && Array.isArray((obj.data as ApiObject)[sheetName])) {
-    return (obj.data as ApiObject)[sheetName] as ApiObject[];
-  }
-
-  return [];
-}
-
-async function fetchBookingsRange(fromDate: string, toDate: string) {
-  if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
-  }
-
-  const url = new URL(API_URL);
-  url.searchParams.set("action", "getBookingsRange");
-  url.searchParams.set("fromDate", fromDate);
-  url.searchParams.set("toDate", toDate);
-  url.searchParams.set("_ts", String(Date.now()));
-
-  const parsedData = await fetchAppsScriptJson(url.toString(), "예약 범위", 2);
-  return normalizeRows(parsedData);
-}
-
-async function fetchMasterSheets() {
-  if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
-  }
-
-  const url = new URL(API_URL);
-  url.searchParams.set("action", "getAllData");
-  url.searchParams.set("sheets", "students,instructors,aircraft,settings,courseCatalog,rentalPilots");
-  url.searchParams.set("_ts", String(Date.now()));
-
-  const allData = await fetchAppsScriptJson(url.toString(), "예약관리 기준 시트", 2);
-
-  return {
-    students: extractRowsFromAllData(allData, "students"),
-    instructors: extractRowsFromAllData(allData, "instructors"),
-    aircraft: extractRowsFromAllData(allData, "aircraft"),
-    settings: normalizeSettingsRows(extractRowsFromAllData(allData, "settings")),
-    courseCatalog: extractRowsFromAllData(allData, "courseCatalog"),
-    rentalPilots: extractRowsFromAllData(allData, "rentalPilots"),
-  };
-}
-
-async function fetchAllSheets(request: NextRequest) {
-  const { fromDate, toDate } = getBookingRangeParams(request);
-
-  const [bookingsResult, masterResult] = await Promise.allSettled([
-    fetchBookingsRange(fromDate, toDate),
-    fetchMasterSheets(),
-  ]);
-
-  const fallbackMaster = async () => {
-    const students = await fetchSheet("students", { optional: true });
-    const instructors = await fetchSheet("instructors", { optional: true });
-    const aircraft = await fetchSheet("aircraft", { optional: true });
-    const rawSettings = await fetchSheet("settings", { optional: true });
-    const settings = normalizeSettingsRows(rawSettings);
-    const courseCatalog = await fetchSheet("courseCatalog", { optional: true });
-    const rentalPilots = await fetchSheet("rentalPilots", { optional: true });
-    return { students, instructors, aircraft, settings, courseCatalog, rentalPilots };
+  const raw: JsonRecord = {
+    booking_id: bookingId,
+    booking_date: text(input.bookingDate || input.booking_date || existing?.booking_date),
+    start_time: timeText(input.startTime || input.start_time || existing?.start_time),
+    end_time: timeText(input.endTime || input.end_time || existing?.end_time),
+    booking_type: text(input.bookingType || input.booking_type || input.type || existing?.booking_type || "기타"),
+    reservation_type: text(input.reservationType || input.reservation_type || existing?.reservation_type),
+    course_name: text(input.courseName || input.course_name || existing?.course_name),
+    user_id: text(input.userId || input.user_id || existing?.user_id),
+    user_name: text(input.userName || input.user_name || input.name || existing?.user_name),
+    phone: text(input.phone || existing?.phone),
+    instructor_id: text(input.instructorId || input.instructor_id || existing?.instructor_id),
+    instructor_name: text(input.instructorName || input.instructor_name || existing?.instructor_name),
+    aircraft_id: text(input.aircraftId || input.aircraft_id || existing?.aircraft_id),
+    aircraft_name: text(input.aircraftName || input.aircraft_name || input.aircraft || existing?.aircraft_name),
+    status: text(input.status || existing?.status || "확정"),
+    payment_status: text(input.paymentStatus || input.payment_status || existing?.payment_status),
+    memo: text(input.memo || existing?.memo),
+    request_date: text(input.requestDate || input.request_date || existing?.request_date),
+    duration_minutes: Number(input.durationMinutes || input.duration_minutes || existing?.duration_minutes || 0) || null,
+    buffer_end_time: timeText(input.bufferEndTime || input.buffer_end_time || existing?.buffer_end_time),
+    updated_at: now,
   };
 
-  const bookings = bookingsResult.status === "fulfilled"
-    ? bookingsResult.value
-    : await fetchSheet("bookings");
+  if (!existing?.created_at && !existing?.createdAt) {
+    raw.created_at = text(input.createdAt || input.created_at) || now;
+  }
 
-  const masters = masterResult.status === "fulfilled"
-    ? masterResult.value
-    : await fallbackMaster();
+  if (!raw.reservation_type) raw.reservation_type = raw.booking_type;
+  if (!raw.request_date) raw.request_date = raw.booking_date;
 
-  return {
+  return removeEmptyUndefined(raw);
+}
+
+async function selectTable(table: string, options?: {
+  orderColumn?: string;
+  ascending?: boolean;
+  limit?: number;
+}) {
+  const supabase = getSupabaseServerClient();
+
+  let query = supabase.from(table).select("*");
+
+  if (options?.orderColumn) {
+    query = query.order(options.orderColumn, { ascending: options.ascending ?? true });
+  }
+
+  if (options?.limit) {
+    query = query.limit(options.limit);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    throw new Error(`${table} 조회 실패: ${error.message}`);
+  }
+
+  return mapRows(data as JsonRecord[]);
+}
+
+async function selectBookings(fromDate: string, toDate: string) {
+  const supabase = getSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("bookings")
+    .select("*")
+    .gte("booking_date", fromDate)
+    .lte("booking_date", toDate)
+    .order("booking_date", { ascending: true })
+    .order("start_time", { ascending: true });
+
+  if (error) {
+    throw new Error(`bookings 조회 실패: ${error.message}`);
+  }
+
+  return mapRows(data as JsonRecord[], true);
+}
+
+async function loadBookingsPageData(fromDate: string, toDate: string) {
+  const [
     bookings,
-    students: masters.students,
-    instructors: masters.instructors,
-    aircraft: masters.aircraft,
-    settings: masters.settings,
-    courseCatalog: masters.courseCatalog,
-    rentalPilots: masters.rentalPilots,
-    range: { fromDate, toDate },
-  };
-}
-
-async function fetchSheet(sheetName: string, options?: { optional?: boolean }) {
-  if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
-  }
-
-  try {
-    const url = new URL(API_URL);
-    url.searchParams.set("action", "getSheet");
-    url.searchParams.set("_ts", String(Date.now()));
-    url.searchParams.set("sheet", sheetName);
-
-    const parsedData = await fetchAppsScriptJson(url.toString(), `${sheetName} 시트`, 2);
-
-    return normalizeRows(parsedData);
-  } catch (error) {
-    if (options?.optional) {
-      console.warn(`[bookings optional sheet skipped] ${sheetName}: ${error instanceof Error ? error.message : String(error)}`);
-      return [];
-    }
-
-    throw error;
-  }
-}
-
-async function fetchSheetsSequentialFallback() {
-  const bookings = await fetchSheet("bookings");
-  const students = await fetchSheet("students", { optional: true });
-  const instructors = await fetchSheet("instructors", { optional: true });
-  const aircraft = await fetchSheet("aircraft", { optional: true });
-  const rawSettings = await fetchSheet("settings", { optional: true });
-  const settings = normalizeSettingsRows(rawSettings);
-  const courseCatalog = await fetchSheet("courseCatalog", { optional: true });
-  const rentalPilots = await fetchSheet("rentalPilots", { optional: true });
+    students,
+    instructors,
+    aircraft,
+    settings,
+    courseCatalog,
+    rentalPilots,
+  ] = await Promise.all([
+    selectBookings(fromDate, toDate),
+    selectTable("students", { orderColumn: "student_id", ascending: true }),
+    selectTable("instructors", { orderColumn: "instructor_id", ascending: true }),
+    selectTable("aircraft", { orderColumn: "aircraft_id", ascending: true }),
+    selectTable("settings", { orderColumn: "id", ascending: true }),
+    selectTable("course_catalog", { orderColumn: "course_id", ascending: true }),
+    selectTable("rental_pilots", { orderColumn: "pilot_id", ascending: true }),
+  ]);
 
   return {
     bookings,
@@ -530,110 +223,155 @@ async function fetchSheetsSequentialFallback() {
   };
 }
 
-async function postToAppsScript(action: string, data: ApiObject) {
-  if (!API_URL) {
-    throw new Error("NEXT_PUBLIC_API_URL이 설정되어 있지 않습니다.");
+async function insertBooking(data: JsonRecord) {
+  const supabase = getSupabaseServerClient();
+  const row = normalizeBookingPayload(data);
+
+  const { data: inserted, error } = await supabase
+    .from("bookings")
+    .insert(row)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
   }
 
-  const response = await fetchWithRetry(API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "text/plain;charset=utf-8",
-    },
-    body: JSON.stringify({
-      action,
-      data,
-    }),
-    cache: "no-store",
-  }, "Apps Script", 1);
+  return withBookingAliases(toCamelObject(inserted as JsonRecord));
+}
 
-  if (!response.ok) {
-    throw new Error(`Apps Script API 오류: ${response.status}`);
+async function updateBooking(data: JsonRecord) {
+  const supabase = getSupabaseServerClient();
+  const bookingId = text(data.bookingId || data.booking_id || data.id);
+
+  if (!bookingId) {
+    throw new Error("bookingId가 필요합니다.");
   }
 
-  const parsedData = await readJsonResponse(response, "Apps Script");
+  const { data: existing, error: existingError } = await supabase
+    .from("bookings")
+    .select("*")
+    .eq("booking_id", bookingId)
+    .maybeSingle();
 
-  if (
-    parsedData &&
-    typeof parsedData === "object" &&
-    "success" in parsedData &&
-    (parsedData as ApiObject).success === false
-  ) {
-    throw new Error(
-      String((parsedData as ApiObject).message || "") ||
-        "Apps Script 처리에 실패했습니다."
-    );
+  if (existingError) {
+    throw new Error(existingError.message);
   }
 
-  return parsedData;
+  if (!existing) {
+    throw new Error(`수정할 예약을 찾을 수 없습니다: ${bookingId}`);
+  }
+
+  const row = normalizeBookingPayload(data, existing as JsonRecord);
+
+  const { data: updated, error } = await supabase
+    .from("bookings")
+    .update(row)
+    .eq("booking_id", bookingId)
+    .select("*")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return withBookingAliases(toCamelObject(updated as JsonRecord));
+}
+
+async function updateBookingStatus(data: JsonRecord, status: string) {
+  return updateBooking({
+    ...data,
+    status,
+  });
+}
+
+async function handlePost(body: JsonRecord) {
+  const action = text(body.action);
+  const data = (body.data || body) as JsonRecord;
+
+  if (!action) {
+    throw new Error("action 값이 필요합니다.");
+  }
+
+  if (action === "addBooking") {
+    const booking = await insertBooking(data);
+    return { message: "예약을 등록했습니다.", booking, data: booking };
+  }
+
+  if (action === "updateBooking") {
+    const booking = await updateBooking(data);
+    return { message: "예약을 수정했습니다.", booking, data: booking };
+  }
+
+  if (action === "approveBooking") {
+    const booking = await updateBookingStatus(data, "확정");
+    return { message: "예약을 확정했습니다.", booking, data: booking };
+  }
+
+  if (action === "cancelBooking") {
+    const booking = await updateBookingStatus(data, "취소");
+    return { message: "예약을 취소했습니다.", booking, data: booking };
+  }
+
+  // 기존 화면에서 generic addRow/updateRow를 예약에 쓰는 경우 방어
+  if (action === "addRow" && text(data.sheetName) === "bookings") {
+    const booking = await insertBooking(data);
+    return { message: "예약을 등록했습니다.", booking, data: booking };
+  }
+
+  if (action === "updateRow" && text(data.sheetName) === "bookings") {
+    const booking = await updateBooking(data);
+    return { message: "예약을 수정했습니다.", booking, data: booking };
+  }
+
+  throw new Error(`지원하지 않는 예약 action입니다: ${action}`);
 }
 
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now();
+
   try {
-    const { fromDate, toDate } = getBookingRangeParams(request);
-    const cacheKey = `${fromDate}:${toDate}`;
-    const cached = bookingsGetCache.get(cacheKey);
+    const now = new Date();
+    const defaultFromDate = dateText(addDays(now, -7));
+    const defaultToDate = dateText(addDays(now, 90));
 
-    if (!shouldBypassRouteCache(request) && cached && cached.expiresAt > Date.now()) {
-      return NextResponse.json({
-        ...cached.data,
-        cached: true,
-        cacheTtlSeconds: Math.ceil((cached.expiresAt - Date.now()) / 1000),
-      });
-    }
+    const { searchParams } = new URL(request.url);
+    const fromDate = parseDateParam(searchParams.get("fromDate"), defaultFromDate);
+    const toDate = parseDateParam(searchParams.get("toDate"), defaultToDate);
 
-    let sheets;
+    const pageData = await loadBookingsPageData(fromDate, toDate);
 
-    try {
-      sheets = await fetchAllSheets(request);
-    } catch (bulkError) {
-      console.warn(
-        "[bookings GET range fallback]",
-        bulkError instanceof Error ? bulkError.message : String(bulkError)
-      );
-      sheets = await fetchSheetsSequentialFallback();
-    }
-
-    const normalizedBookings = normalizeBookingRows(sheets.bookings);
-
-    const responseData: ApiObject = {
+    return NextResponse.json({
       ok: true,
-      cached: false,
-      cacheTtlSeconds: BOOKINGS_GET_CACHE_TTL_MS / 1000,
-      bookings: normalizedBookings,
-      students: sheets.students,
-      instructors: sheets.instructors,
-      aircraft: sheets.aircraft,
-      settings: sheets.settings,
-      courseCatalog: sheets.courseCatalog,
-      rentalPilots: sheets.rentalPilots,
-      range: "range" in sheets ? sheets.range : { fromDate, toDate },
-      rangeLimited: "range" in sheets,
-    };
+      success: true,
+      source: "supabase",
+      service: "skynuri-supabase-bookings",
+      range: { fromDate, toDate },
+      elapsedMs: Date.now() - startedAt,
 
-    bookingsGetCache.set(cacheKey, {
-      expiresAt: Date.now() + BOOKINGS_GET_CACHE_TTL_MS,
-      data: responseData,
+      ...pageData,
+
+      data: pageData,
+
+      counts: {
+        bookings: pageData.bookings.length,
+        students: pageData.students.length,
+        instructors: pageData.instructors.length,
+        aircraft: pageData.aircraft.length,
+        settings: pageData.settings.length,
+        courseCatalog: pageData.courseCatalog.length,
+        rentalPilots: pageData.rentalPilots.length,
+      },
     });
-
-    return NextResponse.json(responseData);
   } catch (error) {
-    console.error("[bookings GET error]", error);
-
     return NextResponse.json(
       {
         ok: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "예약 데이터를 불러오지 못했습니다.",
-        bookings: [],
-        students: [],
-        instructors: [],
-        aircraft: [],
-        settings: [],
-        courseCatalog: [],
-        rentalPilots: [],
+        success: false,
+        source: "supabase",
+        service: "skynuri-supabase-bookings",
+        message: error instanceof Error ? error.message : "Supabase 예약관리 조회에 실패했습니다.",
+        elapsedMs: Date.now() - startedAt,
       },
       { status: 500 }
     );
@@ -641,62 +379,29 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const startedAt = Date.now();
+
   try {
-    clearBookingsRouteCache();
-    const body = await request.json();
-    const action = String(body.action || "").trim();
-    const data = (body.data || {}) as ApiObject;
-
-    if (!action) {
-      return NextResponse.json(
-        {
-          ok: false,
-          success: false,
-          message: "action 값이 필요합니다.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const allowedActions = new Set([
-      "addBooking",
-      "updateBooking",
-      "approveBooking",
-      "cancelBooking",
-    ]);
-
-    if (!allowedActions.has(action)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          success: false,
-          message: `지원하지 않는 action입니다: ${action}`,
-        },
-        { status: 400 }
-      );
-    }
-
-    const outgoingData = normalizeOutgoingBooking(action, data);
-
-    const result = await postToAppsScript(action, outgoingData);
-    clearBookingsRouteCache();
+    const body = (await request.json()) as JsonRecord;
+    const result = await handlePost(body);
 
     return NextResponse.json({
       ok: true,
       success: true,
-      result,
+      source: "supabase",
+      service: "skynuri-supabase-bookings",
+      elapsedMs: Date.now() - startedAt,
+      ...result,
     });
   } catch (error) {
-    console.error("[bookings POST error]", error);
-
     return NextResponse.json(
       {
         ok: false,
         success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "예약 처리 중 오류가 발생했습니다.",
+        source: "supabase",
+        service: "skynuri-supabase-bookings",
+        message: error instanceof Error ? error.message : "Supabase 예약 처리에 실패했습니다.",
+        elapsedMs: Date.now() - startedAt,
       },
       { status: 500 }
     );
