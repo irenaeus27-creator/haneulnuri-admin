@@ -2701,14 +2701,6 @@ export default async function DashboardPage({
   return (
     <PageContainer title="관리자 대시보드" description="하늘누리 비행교육원의 운영 현황을 한눈에 확인하세요.">
       <DashboardTimeSunSummary today={today} />
-      <DashboardDebugPanel
-        bookings={bookings}
-        aircraft={visibleDashboardAircraft}
-        selectedDate={selectedDate}
-        today={today}
-        scheduleItems={filteredScheduleItems}
-        aircraftRows={aircraftRows}
-      />
       <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(0,1fr)_350px]">
         <div className="grid h-full min-h-0 grid-rows-[auto_1fr] gap-4">
           <ScheduleGraph
