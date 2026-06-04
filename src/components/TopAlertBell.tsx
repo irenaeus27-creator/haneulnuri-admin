@@ -34,6 +34,26 @@ type ApprovalItem = {
   badge: string;
 };
 
+type PendingState = {
+  bookings: BookingRow[];
+  users: UserRow[];
+  pendingBookingCount: number;
+  pendingUserCount: number;
+};
+
+const EMPTY_PENDING_STATE: PendingState = {
+  bookings: [],
+  users: [],
+  pendingBookingCount: 0,
+  pendingUserCount: 0,
+};
+
+let cachedPendingState: PendingState | null = null;
+let cachedAt = 0;
+let pendingPromise: Promise<PendingState> | null = null;
+
+const PENDING_CACHE_MS = 10000;
+
 function text(value: unknown, fallback = "") {
   if (value === null || value === undefined) return fallback;
   const v = String(value).trim();
@@ -72,34 +92,74 @@ function roleLabel(role: unknown) {
   return map[v] || v || "회원";
 }
 
+function normalizePendingPayload(payload: Record<string, unknown>): PendingState {
+  const rawBookings = Array.isArray(payload.bookings) ? (payload.bookings as BookingRow[]) : [];
+  const rawUsers = Array.isArray(payload.users) ? (payload.users as UserRow[]) : [];
+
+  const pendingBookings = rawBookings.filter((item) => isBookingPending(item.status));
+  const pendingUsers = rawUsers.filter((item) => isUserPending(item.status));
+
+  return {
+    bookings: pendingBookings,
+    users: pendingUsers,
+    pendingBookingCount: Number(payload.pendingBookingCount ?? pendingBookings.length) || pendingBookings.length,
+    pendingUserCount: Number(payload.pendingUserCount ?? pendingUsers.length) || pendingUsers.length,
+  };
+}
+
+async function fetchPendingApprovals(force = false): Promise<PendingState> {
+  const now = Date.now();
+
+  if (!force && cachedPendingState && now - cachedAt < PENDING_CACHE_MS) {
+    return cachedPendingState;
+  }
+
+  if (pendingPromise) {
+    return pendingPromise;
+  }
+
+  pendingPromise = fetch("/api/pending-approvals", { cache: "no-store" })
+    .then(async (response) => {
+      const responseText = await response.text();
+      const payload = responseText.trim() ? JSON.parse(responseText) : {};
+
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.message || "승인 대기 알림 조회에 실패했습니다.");
+      }
+
+      const normalized = normalizePendingPayload(payload);
+      cachedPendingState = normalized;
+      cachedAt = Date.now();
+
+      return normalized;
+    })
+    .catch(() => {
+      cachedPendingState = EMPTY_PENDING_STATE;
+      cachedAt = Date.now();
+      return EMPTY_PENDING_STATE;
+    })
+    .finally(() => {
+      pendingPromise = null;
+    });
+
+  return pendingPromise;
+}
+
 export function usePendingApprovals() {
-  const [bookings, setBookings] = useState<BookingRow[]>([]);
-  const [users, setUsers] = useState<UserRow[]>([]);
+  const [pendingState, setPendingState] = useState<PendingState>(() => cachedPendingState || EMPTY_PENDING_STATE);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
-      try {
-        const response = await fetch("/api/pending-approvals", { cache: "no-store" });
-        const rawText = await response.text();
-        const data = rawText.trim() ? JSON.parse(rawText) : {};
-
-        if (!cancelled) {
-          setBookings(Array.isArray(data.bookings) ? data.bookings : []);
-          setUsers(Array.isArray(data.users) ? data.users : []);
-        }
-      } catch {
-        if (!cancelled) {
-          setBookings([]);
-          setUsers([]);
-        }
-      }
+    async function load(force = false) {
+      const nextState = await fetchPendingApprovals(force);
+      if (!cancelled) setPendingState(nextState);
     }
 
     void load();
+
     const timer = window.setInterval(() => {
-      void load();
+      void load(true);
     }, 60000);
 
     return () => {
@@ -108,14 +168,8 @@ export function usePendingApprovals() {
     };
   }, []);
 
-  const pendingBookings = useMemo(
-    () => bookings.filter((item) => isBookingPending(item.status)),
-    [bookings],
-  );
-  const pendingUsers = useMemo(
-    () => users.filter((item) => isUserPending(item.status)),
-    [users],
-  );
+  const pendingBookings = pendingState.bookings;
+  const pendingUsers = pendingState.users;
 
   const items = useMemo<ApprovalItem[]>(() => {
     const bookingItems = pendingBookings.slice(0, 4).map((item, index): ApprovalItem => {
@@ -147,9 +201,9 @@ export function usePendingApprovals() {
   }, [pendingBookings, pendingUsers]);
 
   return {
-    pendingBookingCount: pendingBookings.length,
-    pendingUserCount: pendingUsers.length,
-    totalCount: pendingBookings.length + pendingUsers.length,
+    pendingBookingCount: pendingState.pendingBookingCount,
+    pendingUserCount: pendingState.pendingUserCount,
+    totalCount: pendingState.pendingBookingCount + pendingState.pendingUserCount,
     items,
   };
 }
@@ -206,11 +260,11 @@ export default function TopAlertBell({ className = "" }: { className?: string })
           </div>
 
           <div className="mb-3 grid grid-cols-2 gap-2">
-            <Link href="/bookings" className="rounded-2xl border border-[#e5edf7] bg-[#fbfdff] px-3 py-2 text-left hover:bg-[#f4f8fd]">
+            <Link href="/bookings" prefetch={false} className="rounded-2xl border border-[#e5edf7] bg-[#fbfdff] px-3 py-2 text-left hover:bg-[#f4f8fd]">
               <p className="text-xs font-bold text-[#6d7f96]">예약 승인</p>
               <p className="mt-1 text-xl font-black text-[#102544]">{pendingBookingCount}</p>
             </Link>
-            <Link href="/users" className="rounded-2xl border border-[#e5edf7] bg-[#fbfdff] px-3 py-2 text-left hover:bg-[#f4f8fd]">
+            <Link href="/users" prefetch={false} className="rounded-2xl border border-[#e5edf7] bg-[#fbfdff] px-3 py-2 text-left hover:bg-[#f4f8fd]">
               <p className="text-xs font-bold text-[#6d7f96]">회원 승인</p>
               <p className="mt-1 text-xl font-black text-[#102544]">{pendingUserCount}</p>
             </Link>
@@ -226,6 +280,7 @@ export default function TopAlertBell({ className = "" }: { className?: string })
                 <Link
                   key={item.id}
                   href={item.href}
+                  prefetch={false}
                   className="flex items-start justify-between gap-3 rounded-2xl border border-[#e8eef7] bg-white px-3 py-3 hover:bg-[#f8fbff]"
                 >
                   <div className="min-w-0">
