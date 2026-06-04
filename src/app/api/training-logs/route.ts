@@ -6,6 +6,20 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BASE_
 
 type ApiObject = Record<string, unknown>;
 
+type CachedTrainingLogsGet = { expiresAt: number; data: ApiObject };
+let trainingLogsGetCache: CachedTrainingLogsGet | undefined;
+const TRAINING_LOGS_GET_CACHE_TTL_MS = 15_000;
+
+function shouldBypassRouteCache(request: NextRequest) {
+  const params = request.nextUrl.searchParams;
+  return params.get("noCache") === "1" || params.get("refresh") === "1";
+}
+
+function clearTrainingLogsRouteCache() {
+  trainingLogsGetCache = undefined;
+}
+
+
 function text(value: unknown, fallback = "") {
   const result = String(value ?? "").trim();
   return result || fallback;
@@ -373,8 +387,15 @@ function validateTrainingLog(data: ApiObject) {
   return "";
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    if (!shouldBypassRouteCache(request) && trainingLogsGetCache && trainingLogsGetCache.expiresAt > Date.now()) {
+      return NextResponse.json({
+        ...trainingLogsGetCache.data,
+        cached: true,
+        cacheTtlSeconds: Math.ceil((trainingLogsGetCache.expiresAt - Date.now()) / 1000),
+      });
+    }
     const [trainingLogs, bookings, students, instructors, aircraft] = await Promise.all([
       fetchSheet("trainingLogs", true),
       fetchSheet("bookings", true),
@@ -385,15 +406,24 @@ export async function GET() {
 
     const pendingLogs = createPendingLogsFromBookings(bookings, trainingLogs);
 
-    return NextResponse.json({
+    const responseData: ApiObject = {
       ok: true,
+      cached: false,
+      cacheTtlSeconds: TRAINING_LOGS_GET_CACHE_TTL_MS / 1000,
       trainingLogs,
       pendingLogs,
       bookings,
       students,
       instructors,
       aircraft,
-    });
+    };
+
+    trainingLogsGetCache = {
+      expiresAt: Date.now() + TRAINING_LOGS_GET_CACHE_TTL_MS,
+      data: responseData,
+    };
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error("[training-logs GET error]", error);
 
@@ -415,6 +445,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    clearTrainingLogsRouteCache();
     const body = await request.json();
     const action = text(body.action);
     const data = (body.data || {}) as ApiObject;
@@ -487,6 +518,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await postToAppsScript(action, payload);
+    clearTrainingLogsRouteCache();
 
     let deduction: ApiObject = {
       deducted: false,

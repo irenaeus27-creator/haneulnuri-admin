@@ -8,6 +8,20 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 type ApiObject = Record<string, unknown>;
 
+type CachedBookingsGet = { expiresAt: number; data: ApiObject };
+let bookingsGetCache: CachedBookingsGet | undefined;
+const BOOKINGS_GET_CACHE_TTL_MS = 8_000;
+
+function shouldBypassRouteCache(request: NextRequest) {
+  const params = request.nextUrl.searchParams;
+  return params.get("noCache") === "1" || params.get("refresh") === "1";
+}
+
+function clearBookingsRouteCache() {
+  bookingsGetCache = undefined;
+}
+
+
 function normalizeRows(data: unknown): ApiObject[] {
   if (Array.isArray(data)) {
     return data as ApiObject[];
@@ -313,6 +327,7 @@ async function fetchAllSheets() {
 
   const url = new URL(API_URL);
   url.searchParams.set("action", "getAllData");
+  url.searchParams.set("sheets", "bookings,students,instructors,aircraft,settings,courseCatalog,rentalPilots");
   url.searchParams.set("_ts", String(Date.now()));
 
   const allData = await fetchAppsScriptJson(url.toString(), "전체 시트", 2);
@@ -411,8 +426,15 @@ async function postToAppsScript(action: string, data: ApiObject) {
   return parsedData;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    if (!shouldBypassRouteCache(request) && bookingsGetCache && bookingsGetCache.expiresAt > Date.now()) {
+      return NextResponse.json({
+        ...bookingsGetCache.data,
+        cached: true,
+        cacheTtlSeconds: Math.ceil((bookingsGetCache.expiresAt - Date.now()) / 1000),
+      });
+    }
     let sheets;
 
     try {
@@ -427,8 +449,10 @@ export async function GET() {
 
     const normalizedBookings = normalizeBookingRows(sheets.bookings);
 
-    return NextResponse.json({
+    const responseData: ApiObject = {
       ok: true,
+      cached: false,
+      cacheTtlSeconds: BOOKINGS_GET_CACHE_TTL_MS / 1000,
       bookings: normalizedBookings,
       students: sheets.students,
       instructors: sheets.instructors,
@@ -436,7 +460,14 @@ export async function GET() {
       settings: sheets.settings,
       courseCatalog: sheets.courseCatalog,
       rentalPilots: sheets.rentalPilots,
-    });
+    };
+
+    bookingsGetCache = {
+      expiresAt: Date.now() + BOOKINGS_GET_CACHE_TTL_MS,
+      data: responseData,
+    };
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error("[bookings GET error]", error);
 
@@ -462,6 +493,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    clearBookingsRouteCache();
     const body = await request.json();
     const action = String(body.action || "").trim();
     const data = (body.data || {}) as ApiObject;
@@ -498,6 +530,7 @@ export async function POST(request: NextRequest) {
     const outgoingData = normalizeOutgoingBooking(action, data);
 
     const result = await postToAppsScript(action, outgoingData);
+    clearBookingsRouteCache();
 
     return NextResponse.json({
       ok: true,

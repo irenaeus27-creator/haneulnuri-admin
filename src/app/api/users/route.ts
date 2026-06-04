@@ -6,6 +6,20 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BASE_
 
 type ApiObject = Record<string, unknown>;
 
+type CachedUsersGet = { expiresAt: number; data: ApiObject };
+let usersGetCache: CachedUsersGet | undefined;
+const USERS_GET_CACHE_TTL_MS = 20_000;
+
+function shouldBypassRouteCache(request: NextRequest) {
+  const params = request.nextUrl.searchParams;
+  return params.get("noCache") === "1" || params.get("refresh") === "1";
+}
+
+function clearUsersRouteCache() {
+  usersGetCache = undefined;
+}
+
+
 function text(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -341,15 +355,31 @@ async function autoRegisterByJoinType(user: ApiObject) {
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    if (!shouldBypassRouteCache(request) && usersGetCache && usersGetCache.expiresAt > Date.now()) {
+      return NextResponse.json({
+        ...usersGetCache.data,
+        cached: true,
+        cacheTtlSeconds: Math.ceil((usersGetCache.expiresAt - Date.now()) / 1000),
+      });
+    }
     const users = await fetchSheet("users", true);
 
-    return NextResponse.json({
+    const responseData: ApiObject = {
       ok: true,
       success: true,
+      cached: false,
+      cacheTtlSeconds: USERS_GET_CACHE_TTL_MS / 1000,
       users,
-    });
+    };
+
+    usersGetCache = {
+      expiresAt: Date.now() + USERS_GET_CACHE_TTL_MS,
+      data: responseData,
+    };
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.warn("[users GET warning]", error instanceof Error ? error.message : error);
 
@@ -371,6 +401,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    clearUsersRouteCache();
     const body = (await request.json()) as ApiObject;
     const rawAction = text(body.action);
     const bodyData = ((body.data as ApiObject | undefined) || {}) as ApiObject;

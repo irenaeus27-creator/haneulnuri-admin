@@ -6,6 +6,20 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 type ApiObject = Record<string, unknown>;
 
+type CachedStudentsGet = { expiresAt: number; data: ApiObject };
+let studentsGetCache: CachedStudentsGet | undefined;
+const STUDENTS_GET_CACHE_TTL_MS = 20_000;
+
+function shouldBypassRouteCache(request: NextRequest) {
+  const params = request.nextUrl.searchParams;
+  return params.get("noCache") === "1" || params.get("refresh") === "1";
+}
+
+function clearStudentsRouteCache() {
+  studentsGetCache = undefined;
+}
+
+
 function normalizeRows(data: unknown): ApiObject[] {
   if (Array.isArray(data)) {
     return data as ApiObject[];
@@ -347,8 +361,15 @@ function mergeTrainingLogUsage(students: ApiObject[], trainingLogs: ApiObject[])
   });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    if (!shouldBypassRouteCache(request) && studentsGetCache && studentsGetCache.expiresAt > Date.now()) {
+      return NextResponse.json({
+        ...studentsGetCache.data,
+        cached: true,
+        cacheTtlSeconds: Math.ceil((studentsGetCache.expiresAt - Date.now()) / 1000),
+      });
+    }
     const [studentsSheetRows, instructors, aircraft, users, trainingLogs] = await Promise.all([
       fetchSheet("students", { optional: true }),
       fetchSheet("instructors", { optional: true }),
@@ -362,8 +383,10 @@ export async function GET() {
     const baseStudents = dedupeStudents(rawStudents);
     const students = mergeTrainingLogUsage(baseStudents, trainingLogs);
 
-    return NextResponse.json({
+    const responseData: ApiObject = {
       ok: true,
+      cached: false,
+      cacheTtlSeconds: STUDENTS_GET_CACHE_TTL_MS / 1000,
       students,
       instructors,
       aircraft,
@@ -372,7 +395,14 @@ export async function GET() {
       trainingLogsCount: trainingLogs.length,
       dedupedCount: rawStudents.length - baseStudents.length,
       source: studentsSheetRows.length > 0 ? "students" : "users-fallback",
-    });
+    };
+
+    studentsGetCache = {
+      expiresAt: Date.now() + STUDENTS_GET_CACHE_TTL_MS,
+      data: responseData,
+    };
+
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error("[students GET error]", error);
 
@@ -394,6 +424,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    clearStudentsRouteCache();
     const body = await request.json();
 
     const mode = String(body.mode || "").trim();
@@ -411,6 +442,7 @@ export async function POST(request: NextRequest) {
 
     if (mode === "add") {
       const result = await postToAppsScript("addStudent", data);
+      clearStudentsRouteCache();
 
       return NextResponse.json({
         ok: true,
@@ -420,6 +452,7 @@ export async function POST(request: NextRequest) {
 
     if (mode === "update") {
       const result = await postToAppsScript("updateStudent", data);
+      clearStudentsRouteCache();
 
       return NextResponse.json({
         ok: true,

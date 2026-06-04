@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BASE_URL || "";
-const CACHE_TTL_MS = 20_000;
+const CACHE_TTL_MS = 10_000;
 const DASHBOARD_SHEETS = [
   "bookings",
   "users",
