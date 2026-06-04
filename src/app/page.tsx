@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import type { ReactNode } from "react";
 import ContentCard from "@/components/ContentCard";
 import PageContainer from "@/components/PageContainer";
+import { DashboardWeatherDetailClient, DashboardWeatherSummaryClient } from "@/components/DashboardWeatherClient";
 import { formatBookingDate as sharedFormatBookingDate, formatBookingTime as sharedFormatBookingTime } from "@/lib/formatDateTime";
 
 type Row = Record<string, unknown>;
@@ -2772,7 +2773,7 @@ function DashboardSidePanel({
         pendingUsers={pendingUsers}
         todayBookings={todayBookings}
       />
-      <WeatherSummaryCard weather={weather} />
+      <DashboardWeatherSummaryClient initialWeather={weather} />
     </div>
   );
 }
@@ -2902,7 +2903,7 @@ export default async function DashboardPage({
             )}
             </MiniTable>
 
-            <WeatherDetailPanel weather={weather} />
+            <DashboardWeatherDetailClient initialWeather={weather} />
 
             <InstructorAssignmentSummaryPanel items={instructorAssignmentSummary} className="h-full min-h-[430px]" />
           </div>
