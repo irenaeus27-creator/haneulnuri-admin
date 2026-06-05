@@ -1703,7 +1703,7 @@ function buildRecentActivities(logs: Row[], notifications: Row[], bookings: Row[
   return [...logItems, ...notificationItems, ...bookingItems]
     .filter((item) => item.time || item.title)
     .sort((a, b) => b.time.localeCompare(a.time))
-    .slice(0, 8);
+    .slice(0, 5);
 }
 
 function shortActivityTime(value: string) {
@@ -2047,8 +2047,8 @@ function StatCard({
   tone: string;
 }) {
   return (
-    <ContentCard className="p-4">
-      <div className="flex items-center gap-3">
+    <ContentCard className="p-3">
+      <div className="flex items-center gap-2.5">
         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tone}`}>
           {icon}
         </div>
@@ -2087,11 +2087,11 @@ function ReservationChart({ data }: { data: DailyPoint[] }) {
 
   return (
     <div>
-      <div className="mb-1 flex items-center gap-4 px-2 text-xs font-bold text-[#526a89]">
+      <div className="mb-1 flex items-center gap-2.5 px-2 text-xs font-bold text-[#526a89]">
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#1264f4]" />예약 건수</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#10b981]" />총 비행시간</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-[220px] w-full">
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-[190px] w-full">
         {[0, 1, 2, 3, 4, 5].map((index) => {
           const y = top + innerH - (index / 5) * innerH;
           return (
@@ -2183,7 +2183,7 @@ function DonutChart({ items }: { items: DonutItem[] }) {
 
       <div className="space-y-3">
         {segments.map((segment) => (
-          <div key={segment.label} className="flex items-center justify-between gap-3">
+          <div key={segment.label} className="flex items-center justify-between gap-2.5">
             <span className="flex items-center gap-2 text-sm font-bold text-[#314965]">
               <span className="h-3 w-3 rounded-full" style={{ backgroundColor: segment.color }} />
               {segment.label}
@@ -2226,7 +2226,7 @@ function ScheduleGraph({
 
   return (
     <ContentCard className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
-      <div className="flex flex-col gap-4 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
+      <div className="flex flex-col gap-2.5 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-[-0.02em] text-[#10213f]">운항 일정</h2>
           <p className="mt-0.5 text-[12px] font-medium text-[#61758f]">항공기별 예약·PFI·정비 타임라인</p>
@@ -2286,7 +2286,7 @@ function ScheduleGraph({
             return (
               <div
                 key={aircraftName}
-                className="grid min-h-[92px] grid-cols-[116px_1fr] border-b border-[#edf2f7]"
+                className="grid min-h-[74px] grid-cols-[116px_1fr] border-b border-[#edf2f7]"
               >
                 <div className="flex items-center gap-2 text-[15px] font-extrabold text-[#10213f]">
                   <span className="text-[#1264f4]">✈</span>
@@ -2393,7 +2393,7 @@ function MiniTable({
 }) {
   return (
     <ContentCard className={`flex flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)] ${className}`}>
-      <div className="flex shrink-0 items-center justify-between px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between px-3 py-2">
         <h3 className="text-lg font-bold text-[#10213f]">{title}</h3>
         <Link href={href} className="text-xs font-bold text-[#1264f4]">
           전체 보기 ›
@@ -2438,7 +2438,7 @@ function InstructorScheduleTable({
           <div className="space-y-3">
             {items.map((group) => (
               <div key={group.instructorName} className="rounded-2xl border border-[#e2ebf5] bg-white p-3.5">
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center justify-between gap-2.5">
                   <div className="font-bold text-[#10213f]">{group.instructorName}</div>
                   <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
                     {group.count}건
@@ -2495,7 +2495,7 @@ function OperationChecklist({
   };
 
   return (
-    <ContentCard className="rounded-[22px] border border-[#d9e6f5] bg-white/95 p-4 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
+    <ContentCard className="rounded-[22px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="text-lg font-bold text-[#10213f]">오늘 처리할 일</h3>
@@ -2554,13 +2554,13 @@ function WeatherSummaryCard({ weather }: { weather: WeatherData }) {
         </div>
       ) : (
         <div className="space-y-4 px-5 pb-5">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
               <p className="text-[11px] font-semibold text-blue-700">Active RWY</p>
               <p className="mt-1 text-2xl font-bold text-[#10213f]">{runway?.label || "-"}</p>
               <p className="mt-1 text-xs font-medium text-[#61758f]">활주로 {runway?.heading || "-"}° 기준</p>
             </div>
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
               <p className="text-[11px] font-semibold text-emerald-700">현재 바람</p>
               <p className="mt-1 text-2xl font-bold text-[#10213f]">{numberText(current.windSpeed, "kt")}</p>
               <p className="mt-1 text-xs font-medium text-[#61758f]">{numberText(current.windDirection, "°")} · 돌풍 {numberText(current.windGust, "kt")}</p>
@@ -2568,15 +2568,15 @@ function WeatherSummaryCard({ weather }: { weather: WeatherData }) {
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-[20px] border border-[#e7eef7] bg-white px-4 py-3.5 shadow-[0_8px_24px_rgba(20,46,80,0.04)]">
+            <div className="rounded-[20px] border border-[#e7eef7] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(20,46,80,0.04)]">
               <p className="text-[11px] font-medium text-[#6b7f99]">측풍</p>
               <p className="mt-1 text-lg font-bold text-[#10213f]">{numberText(components?.crosswind, "kt")}</p>
             </div>
-            <div className="rounded-[20px] border border-[#e7eef7] bg-white px-4 py-3.5 shadow-[0_8px_24px_rgba(20,46,80,0.04)]">
+            <div className="rounded-[20px] border border-[#e7eef7] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(20,46,80,0.04)]">
               <p className="text-[11px] font-medium text-[#6b7f99]">정풍</p>
               <p className="mt-1 text-lg font-bold text-[#10213f]">{numberText(components?.headwind, "kt")}</p>
             </div>
-            <div className="rounded-[20px] border border-[#e7eef7] bg-white px-4 py-3.5 shadow-[0_8px_24px_rgba(20,46,80,0.04)]">
+            <div className="rounded-[20px] border border-[#e7eef7] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(20,46,80,0.04)]">
               <p className="text-[11px] font-medium text-[#6b7f99]">배풍</p>
               <p className="mt-1 text-lg font-bold text-[#10213f]">{numberText(components?.tailwind, "kt")}</p>
             </div>
@@ -2692,7 +2692,7 @@ function WeatherLineChart({
   const chartIdBase = title.replace(/\s+/g, "-").toLowerCase();
 
   return (
-    <div className="rounded-[22px] border border-[#dfe8f5] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] px-4 py-4 shadow-[0_10px_30px_rgba(20,46,80,0.05)]">
+    <div className="rounded-[22px] border border-[#dfe8f5] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] px-3 py-2.5 shadow-[0_10px_30px_rgba(20,46,80,0.05)]">
       <div className="mb-2.5 flex items-start justify-between gap-2">
         <div>
           <p className="text-[17px] font-bold tracking-[-0.02em] text-[#10213f]">{title}</p>
@@ -2874,7 +2874,7 @@ function WeatherDetailPanel({ weather }: { weather: WeatherData }) {
             07:00~20:00 기상 정보를 불러오지 못했습니다.
           </div>
         ) : (
-          <div className="grid gap-3">
+          <div className="grid gap-2.5">
             <WeatherLineChart
               title="풍속·돌풍 변화"
               subtitle="시간에 따른 바람 세기 변화"
@@ -2920,7 +2920,7 @@ function RecentActivityPanel({
   };
 
   return (
-    <ContentCard className={`flex min-h-0 flex-col p-4 ${className}`}>
+    <ContentCard className={`flex min-h-0 flex-col p-3 ${className}`}>
       <div className="mb-3 flex shrink-0 items-center justify-between">
         <div>
           <h3 className="text-lg font-bold text-[#10213f]">최근 작업 내역</h3>
@@ -2936,15 +2936,15 @@ function RecentActivityPanel({
       ) : (
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {activities.map((activity, index) => (
-            <div key={`${activity.time}-${activity.title}-${index}`} className="flex gap-3 rounded-xl border border-[#edf2f7] bg-white px-3 py-2.5">
+            <div key={`${activity.time}-${activity.title}-${index}`} className="flex gap-2.5 rounded-xl border border-[#edf2f7] bg-white px-3 py-2">
               <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dotClass[activity.tone] || "bg-slate-400"}`} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="min-w-0 truncate text-sm font-bold text-[#10213f]" title={activity.title}>{activity.title}</p>
-                  <span className="shrink-0 text-[11px] font-semibold text-[#8a9ab0]">{shortActivityTime(activity.time)}</span>
+                  <p className="min-w-0 truncate text-sm font-semibold text-[#10213f]" title={activity.title}>{activity.title}</p>
+                  <span className="shrink-0 text-[11px] font-medium text-[#8a9ab0]">{shortActivityTime(activity.time)}</span>
                 </div>
                 {activity.detail ? (
-                  <p className="mt-1 truncate text-[12px] font-medium leading-snug text-[#61758f]" title={activity.detail}>
+                  <p className="mt-0.5 truncate text-xs font-medium text-[#61758f]" title={activity.detail}>
                     {activity.detail}
                   </p>
                 ) : null}
@@ -2991,7 +2991,7 @@ function InstructorAssignmentSummaryPanel({
 
   return (
     <ContentCard className={`flex flex-col overflow-hidden p-0 ${className}`}>
-      <div className="flex shrink-0 items-center justify-between px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between px-3 py-2">
         <div>
           <h3 className="text-[16px] font-bold text-[#10213f]">교관별 오늘 배정</h3>
           <p className="mt-1 text-[11px] font-medium text-[#61758f]">상태·일정·휴무 여부</p>
@@ -3001,7 +3001,7 @@ function InstructorAssignmentSummaryPanel({
 
       <div className="grid min-h-0 flex-1 gap-1.5 overflow-y-auto px-4 pb-4 sm:grid-cols-2 xl:grid-cols-1">
         {items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#dbe5f1] bg-[#f8fbff] p-4 text-center text-sm font-medium text-[#6f8199]">
+          <div className="rounded-2xl border border-dashed border-[#dbe5f1] bg-[#f8fbff] p-3 text-center text-sm font-medium text-[#6f8199]">
             배정된 교관 일정이 없습니다.
           </div>
         ) : (
@@ -3097,7 +3097,7 @@ function DashboardDebugPanel({
   }));
 
   return (
-    <ContentCard className="rounded-[18px] border border-amber-200 bg-amber-50/80 p-4 text-[12px] text-[#5f4517]">
+    <ContentCard className="rounded-[18px] border border-amber-200 bg-amber-50/80 p-3 text-[12px] text-[#5f4517]">
       <div className="mb-2 text-[14px] font-bold text-amber-800">대시보드 디버그</div>
       <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
         <div><b>today</b><br />{today}</div>
@@ -3109,7 +3109,7 @@ function DashboardDebugPanel({
         <div><b>aircraft</b><br />{aircraft.length}대</div>
         <div><b>aircraftRows</b><br />{aircraftRows.length}대</div>
       </div>
-      <pre className="mt-3 max-h-[220px] overflow-auto rounded-xl border border-amber-200 bg-white/80 p-3 text-[11px] leading-5 text-[#263b55]">
+      <pre className="mt-3 max-h-[190px] overflow-auto rounded-xl border border-amber-200 bg-white/80 p-3 text-[11px] leading-5 text-[#263b55]">
         {JSON.stringify({ aircraftRows, sampleBookings }, null, 2)}
       </pre>
     </ContentCard>
@@ -3131,7 +3131,7 @@ function DashboardSidePanel({
   weather: WeatherData;
 }) {
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-2.5">
       <OperationChecklist
         pendingRequests={pendingRequests}
         cancelRequests={cancelRequests}
@@ -3197,7 +3197,7 @@ export default async function DashboardPage({
     .filter((booking) => normalizeDate(getBookingDateValue(booking)) >= today)
     .filter(isActiveBooking)
     .sort((a, b) => `${normalizeDate(getBookingDateValue(a))} ${normalizeTime(getBookingStartValue(a))}`.localeCompare(`${normalizeDate(getBookingDateValue(b))} ${normalizeTime(getBookingStartValue(b))}`))
-    .slice(0, 8);
+    .slice(0, 5);
   const recentActivities = buildRecentActivities(logs, notifications, bookings);
   const instructorAssignmentSummary = buildInstructorAssignmentSummary(activeInstructors, todayScheduleItems, instructorSchedules, today, currentKstMinutes());
 
@@ -3205,8 +3205,8 @@ export default async function DashboardPage({
     <PageContainer title="관리자 대시보드" description="하늘누리 비행교육원의 운영 현황을 한눈에 확인하세요.">
       <DashboardTimeSunSummary today={today} />
       <div className="w-full overflow-x-auto pb-3">
-      <div className="grid w-[1690px] shrink-0 items-stretch gap-4 grid-cols-[1310px_360px]">
-        <div className="grid h-full min-h-0 grid-rows-[auto_1fr] gap-4">
+      <div className="grid w-[1690px] shrink-0 items-stretch gap-2.5 grid-cols-[1310px_360px]">
+        <div className="grid h-full min-h-0 grid-rows-[auto_1fr] gap-2.5">
           <ScheduleGraph
             aircraftRows={aircraftRows}
             scheduleItems={filteredScheduleItems}
@@ -3218,7 +3218,7 @@ export default async function DashboardPage({
             currentTimeMinutes={currentKstMinutes()}
           />
 
-          <div className="grid min-h-0 items-stretch gap-4 grid-cols-[560px_430px_288px]">
+          <div className="grid min-h-0 items-stretch gap-2.5 grid-cols-[560px_430px_288px]">
             <MiniTable title="다가오는 예약" href="/bookings" headers={["예약자", "시간", "유형", "항공기", "교관", "상태"]} className="h-full min-h-[430px]">
             {upcomingBookings.length === 0 ? (
             <tr><td colSpan={6} className="text-center text-[#6f8199]">다가오는 예약이 없습니다.</td></tr>
@@ -3274,7 +3274,7 @@ export default async function DashboardPage({
           </div>
         </div>
 
-        <div className="grid h-full min-h-0 grid-rows-[auto_1fr] gap-4">
+        <div className="grid h-full min-h-0 grid-rows-[auto_1fr] gap-2.5">
           <DashboardSidePanel
             pendingRequests={pendingRequestBookings.length}
             cancelRequests={cancelRequestBookings.length}
