@@ -4143,18 +4143,25 @@ export default function BookingsPage() {
 
 
         <section ref={formRef} className="min-w-0 rounded-[24px] border border-[#d9e6f5] bg-white/95 p-2.5 shadow-[0_12px_34px_rgba(20,46,80,0.065)]">
-          <div className="mb-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-[#10213f]">{editing ? "예약 상세 수정" : "예약 신규 등록"}</h2>
+          <div className="mb-2 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-[#10213f]">{editing ? "예약 상세 수정" : "예약 신규 등록"}</h2>
+                <span className={`rounded-full px-1.5 py-0.5 text-[13px] font-medium ${editing ? "bg-amber-50 text-amber-700 ring-1 ring-amber-100" : "bg-blue-50 text-blue-700 ring-1 ring-blue-100"}`}>
+                  {editing ? "수정 모드" : "신규 등록"}
+                </span>
+              </div>
               <p className="mt-0.5 text-[13px] font-normal text-[#61758f]">필수 항목을 선택하면 대상자 정보와 점유 시간이 자동으로 정리됩니다.</p>
               <div className="mt-1.5 rounded-xl border border-[#e1eaf6] bg-[#f8fbff] px-3 py-1.5 text-[13px] font-medium text-[#536b87]">
                 입력 요약: {compactFormSummary(form)}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-1.5 py-0.5 text-[13px] font-medium ${editing ? "bg-amber-50 text-amber-700 ring-1 ring-amber-100" : "bg-blue-50 text-blue-700 ring-1 ring-blue-100"}`}>
-                {editing ? "수정 모드 · 기존 예약 변경" : "신규 등록"}
-              </span>
+            <div className="flex flex-wrap items-center justify-end gap-2 lg:max-w-[560px]">
+              {bookingTypeGuideMessage() ? (
+                <span className="inline-flex min-h-9 items-center rounded-xl border border-blue-100 bg-blue-50/70 px-3 text-[13px] font-medium text-blue-800">
+                  {bookingTypeGuideMessage()}
+                </span>
+              ) : null}
               <button
                 type="button"
                 onClick={startCreate}
@@ -4291,12 +4298,6 @@ export default function BookingsPage() {
                 <input value={form.endTime || "자동"} disabled className="input-disabled compact-input" />
               </Field>
             </FormGroup>
-
-            {bookingTypeGuideMessage() ? (
-              <div className="min-w-0 rounded-[14px] border border-blue-100 bg-blue-50/70 px-3 py-2 text-[13px] font-medium text-blue-800">
-                {bookingTypeGuideMessage()}
-              </div>
-            ) : null}
 
             {(isEducationForm && form.userId) ? (
               <div className="grid gap-2 rounded-[14px] border border-blue-100 bg-blue-50/70 px-3 py-2 text-[13px] text-[#28486d] md:grid-cols-3">
