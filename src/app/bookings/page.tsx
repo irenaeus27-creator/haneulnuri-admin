@@ -3866,7 +3866,7 @@ export default function BookingsPage() {
                                 ) : null}
 
                                 <div
-                                  className={`group absolute top-3 z-20 h-[56px] min-w-0 overflow-hidden rounded-xl border px-1.5 py-1.5 text-left shadow-[0_8px_18px_rgba(20,46,80,0.08)] ring-1 ring-white/70 transition hover:z-30 hover:shadow-[0_12px_24px_rgba(20,46,80,0.14)] ${
+                                  className={`group absolute top-3 z-20 h-[56px] min-w-0 overflow-hidden rounded-xl border px-1.5 py-1 text-left shadow-[0_8px_18px_rgba(20,46,80,0.08)] ring-1 ring-white/70 transition hover:z-30 hover:shadow-[0_12px_24px_rgba(20,46,80,0.14)] ${
                                     calendarMoveDrag?.bookingId === bookingId || calendarResizeDrag?.bookingId === bookingId ? "scale-[1.02] opacity-90" : "hover:scale-[1.02]"
                                   } ${calendarBookingCardClass(booking)} ${isUnpaidExperience(booking) ? "ring-2 ring-amber-200" : ""} ${isSelectedBooking(booking) ? "ring-2 ring-blue-500 shadow-[0_0_0_4px_rgba(37,99,235,0.16),0_12px_24px_rgba(37,99,235,0.22)]" : ""}`}
                                   style={calendarBlockStyleByTime(previewTimes.startTime, previewTimes.endTime)}
@@ -3899,16 +3899,16 @@ export default function BookingsPage() {
                                     }}
                                     className="block h-full w-full cursor-grab overflow-hidden text-left active:cursor-grabbing"
                                   >
-                                    <div className="flex h-full flex-col justify-center gap-0.5 overflow-hidden">
-                                      <div className={`${isShortCalendarBlock(booking) ? "text-[13px]" : "text-[13px]"} truncate font-semibold leading-tight opacity-85`}>
-                                        {isPendingBooking(booking) ? <span className="mr-1 rounded bg-white/75 px-1 py-0.5 text-[13px] text-slate-600 ring-1 ring-slate-300">요청</span> : null}
+                                    <div className="flex h-full flex-col justify-start overflow-hidden">
+                                      <div className={`${isShortCalendarBlock(booking) ? "text-[11px]" : "text-[12px]"} truncate font-semibold leading-[1.05] opacity-85`}>
+                                        {isPendingBooking(booking) ? <span className="mr-1 rounded bg-white/75 px-1 py-0 text-[10px] text-slate-600 ring-1 ring-slate-300">요청</span> : null}
                                         {compactBookingTypeLabel(booking.bookingType)}
                                       </div>
-                                      <div className={`${isShortCalendarBlock(booking) ? "text-[13px]" : "text-[13px]"} truncate font-bold leading-tight text-current`}>
+                                      <div className={`${isShortCalendarBlock(booking) ? "text-[12px]" : "text-[13px]"} truncate font-bold leading-[1.08] text-current`}>
                                         {calendarPersonLabel(booking)}
                                       </div>
                                       {calendarInstructorLabel(booking) ? (
-                                        <div className={`${isShortCalendarBlock(booking) ? "text-[13px]" : "text-[13px]"} truncate font-medium leading-tight opacity-80`}>
+                                        <div className={`${isShortCalendarBlock(booking) ? "text-[11px]" : "text-[12px]"} truncate font-medium leading-[1.08] opacity-80`}>
                                           {calendarInstructorLabel(booking)}
                                         </div>
                                       ) : null}
@@ -3983,14 +3983,14 @@ export default function BookingsPage() {
                                     key={`${text(booking.bookingId, "booking")}-${index}`}
                                     type="button"
                                     onClick={() => startEdit(booking)}
-                                    title={bookingTooltip(booking)} className={`w-full rounded-xl border px-2.5 py-2 text-left shadow-sm ${calendarTypeClass(booking.bookingType)}`}
+                                    title={bookingTooltip(booking)} className={`w-full rounded-xl border px-2 py-1.5 text-left shadow-sm ${calendarTypeClass(booking.bookingType)}`}
                                   >
-                                    <div className="truncate text-[13px] font-semibold opacity-80">{compactBookingTypeLabel(booking.bookingType)}</div>
-                                    <div className="mt-1 truncate text-[14px] font-semibold">{calendarPersonLabel(booking)}</div>
+                                    <div className="truncate text-[12px] font-semibold leading-tight opacity-80">{compactBookingTypeLabel(booking.bookingType)}</div>
+                                    <div className="mt-0.5 truncate text-[13px] font-semibold leading-tight">{calendarPersonLabel(booking)}</div>
                                     {calendarInstructorLabel(booking) ? (
-                                      <div className="mt-0.5 truncate text-[13px] font-semibold opacity-75">{calendarInstructorLabel(booking)}</div>
+                                      <div className="mt-0.5 truncate text-[12px] font-semibold leading-tight opacity-75">{calendarInstructorLabel(booking)}</div>
                                     ) : null}
-                                    <div className="mt-0.5 text-[13px] font-semibold opacity-70">
+                                    <div className="mt-0.5 text-[12px] font-semibold leading-tight opacity-70">
                                       {normalizeTime(booking.startTime)}~{normalizeTime(booking.endTime)}
                                     </div>
                                   </button>
