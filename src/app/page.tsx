@@ -234,6 +234,16 @@ const SCHEDULE_START_MIN = SCHEDULE_START_HOUR * 60;
 const SCHEDULE_END_MIN = SCHEDULE_END_HOUR * 60;
 const SCHEDULE_TOTAL_MIN = SCHEDULE_END_MIN - SCHEDULE_START_MIN;
 
+const DASHBOARD_PANEL_HEADER_CLASS = "flex h-[62px] shrink-0 items-start justify-between px-4 py-3";
+const DASHBOARD_PANEL_TITLE_CLASS = "text-[15px] font-semibold leading-none tracking-[-0.01em] text-[#10213f]";
+const DASHBOARD_PANEL_DESC_CLASS = "mt-1 text-[12px] font-medium leading-none text-[#61758f]";
+const DASHBOARD_PANEL_ACTION_CLASS = "mt-0.5 text-xs font-medium text-[#1264f4]";
+const DASHBOARD_PANEL_BADGE_CLASS = "mt-0.5 rounded-full px-3 py-1 text-xs font-medium";
+const DASHBOARD_WEATHER_INNER_TITLE_CLASS = "text-[11px] font-medium leading-none tracking-[-0.005em] text-[#243b63]";
+const DASHBOARD_WEATHER_INNER_DESC_CLASS = "mt-0.5 text-[9px] font-medium leading-none text-[#7a8ca3]";
+const DASHBOARD_SCHEDULE_STICKER_HEIGHT = "h-[58px]";
+const DASHBOARD_SCHEDULE_STICKER_TOP = "top-2";
+
 const FALLBACK_AIRCRAFT = [
   "HL-C081",
   "HL-C083",
@@ -2053,7 +2063,7 @@ function StatCard({
           {icon}
         </div>
         <div>
-          <p className="text-[13px] font-semibold text-[#243b63]">{title}</p>
+          <p className="text-[10px] font-medium leading-tight tracking-[-0.005em] text-[#243b63]">{title}</p>
           <p className="mt-1 text-[24px] font-semibold leading-none tracking-[-0.02em] text-[#10213f]">
             {value}
           </p>
@@ -2329,32 +2339,32 @@ function ScheduleGraph({
                         data-end-time={item.endTime}
                         title={scheduleTooltipText(item)}
                         aria-label={scheduleTooltipText(item)}
-                        className={`absolute top-3 h-[68px] cursor-help rounded-xl border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                        className={`absolute ${DASHBOARD_SCHEDULE_STICKER_TOP} ${DASHBOARD_SCHEDULE_STICKER_HEIGHT} cursor-help rounded-xl border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
                           item.bookingType === "PFI"
                             ? "z-10 overflow-hidden px-0 py-0"
                             : isShortBlock
-                              ? "z-20 overflow-hidden px-0.5 py-1"
-                              : "z-20 overflow-hidden px-2.5 py-2"
+                              ? "z-20 overflow-hidden px-1.5 py-1.5"
+                              : "z-20 overflow-hidden px-2.5 py-1.5"
                         } ${scheduleColorClass(item.bookingType)}`}
                         style={{
                           left: `${displayLeft}%`,
                           width: `${Math.min(width, 100 - displayLeft)}%`,
-                          minWidth: "0px",
+                          minWidth: item.bookingType === "PFI" ? "46px" : isShortBlock ? "78px" : "94px",
                         }}
                       >
                         {item.bookingType === "PFI" ? (
                           <div className="flex h-full w-full items-center justify-center text-[13px] font-semibold leading-none text-sky-900" aria-label="PFI">PFI</div>
                         ) : isShortBlock ? (
-                          <div className="flex h-full min-h-0 flex-col items-center justify-center text-center text-[#16365f]">
-                            <div className="max-w-full truncate text-[11px] font-semibold leading-[14px] text-[#102a52]">{item.userName}</div>
-                            <div className="max-w-full truncate text-[9px] font-normal leading-[11px] text-[#405a78]">{item.bookingType.replace("비행", "")}</div>
-                            {item.instructorName ? <div className="max-w-full truncate text-[10.5px] font-normal leading-[12px] text-[#405a78]">{item.instructorName.replace(/^교관\s*/, "")}</div> : null}
+                          <div className="flex h-full min-h-0 flex-col justify-center gap-0.5 text-[#16365f]">
+                            <div className="truncate text-[10.5px] font-medium leading-[12px] text-[#405a78]">{item.bookingType.replace("비행", "")}</div>
+                            <div className="truncate text-[12px] font-semibold leading-[13px] text-[#102a52]">{item.userName}</div>
+                            {item.instructorName ? <div className="truncate text-[10.5px] font-medium leading-[12px] text-[#405a78]">{item.instructorName.replace(/^교관\s*/, "")}</div> : null}
                           </div>
                         ) : (
                           <div className="flex h-full min-h-0 flex-col justify-center gap-0.5 text-[#16365f]">
-                            <div className="truncate text-[11px] font-medium leading-[15px]">{item.bookingType}</div>
-                            <div className="truncate text-[13px] font-semibold leading-[17px] text-[#102a52]">{item.userName}</div>
-                            {item.instructorName ? <div className="truncate text-[12px] font-normal leading-[16px] text-[#405a78]">{item.instructorName}</div> : null}
+                            <div className="truncate text-[11px] font-medium leading-[13px]">{item.bookingType}</div>
+                            <div className="truncate text-[13px] font-semibold leading-[14px] text-[#102a52]">{item.userName}</div>
+                            {item.instructorName ? <div className="truncate text-[11px] font-medium leading-[13px] text-[#405a78]">{item.instructorName}</div> : null}
                           </div>
                         )}
                       </div>
@@ -2393,9 +2403,12 @@ function MiniTable({
 }) {
   return (
     <ContentCard className={`flex flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)] ${className}`}>
-      <div className="flex h-[66px] shrink-0 items-start justify-between px-4 py-3">
-        <h3 className="pt-0.5 text-[16px] font-semibold leading-tight tracking-[-0.01em] text-[#10213f]">{title}</h3>
-        <Link href={href} className="mt-0.5 text-xs font-medium text-[#1264f4]">
+      <div className={DASHBOARD_PANEL_HEADER_CLASS}>
+        <div className="min-w-0">
+          <h3 className={DASHBOARD_PANEL_TITLE_CLASS}>{title}</h3>
+          <p className={DASHBOARD_PANEL_DESC_CLASS}>오늘 이후 확정 예약</p>
+        </div>
+        <Link href={href} className={DASHBOARD_PANEL_ACTION_CLASS}>
           전체 보기 ›
         </Link>
       </div>
@@ -2695,8 +2708,8 @@ function WeatherLineChart({
     <div className="rounded-[22px] border border-[#dfe8f5] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] px-3 py-2.5 shadow-[0_10px_30px_rgba(20,46,80,0.05)]">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
-          <p className="text-[12px] font-medium leading-tight text-[#10213f]">{title}</p>
-          <p className="mt-0.5 text-[10px] font-medium leading-tight text-[#61758f]">{subtitle}</p>
+          <p className={DASHBOARD_WEATHER_INNER_TITLE_CLASS}>{title}</p>
+          <p className={DASHBOARD_WEATHER_INNER_DESC_CLASS}>{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {series.map((item) => {
@@ -2706,14 +2719,14 @@ function WeatherLineChart({
             return (
               <span
                 key={item.key}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/70 bg-white/90 px-3 py-1 text-[12px] font-medium text-[#31455f] shadow-sm"
+                className="inline-flex items-center gap-1 rounded-full border border-white/70 bg-white/90 px-2 py-0.5 text-[10px] font-medium text-[#42566f] shadow-sm"
               >
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: palette.solid }} />
                 {item.label} {latest}
               </span>
             );
           })}
-          <span className="ml-1 shrink-0 text-[12px] font-semibold text-[#263b55]">{unit}</span>
+          <span className="ml-0.5 shrink-0 text-[10px] font-semibold text-[#334963]">{unit}</span>
         </div>
       </div>
 
@@ -2860,12 +2873,12 @@ function WeatherDetailPanel({ weather }: { weather: WeatherData }) {
 
   return (
     <ContentCard className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
-      <div className="flex h-[66px] shrink-0 items-start justify-between px-4 py-3">
-        <div className="min-w-0 pt-0.5">
-          <h3 className="text-[16px] font-semibold leading-tight tracking-[-0.01em] text-[#10213f]">시간별 기상 그래프</h3>
-          <p className="mt-1 text-[11px] font-medium leading-tight text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
+      <div className={DASHBOARD_PANEL_HEADER_CLASS}>
+        <div className="min-w-0">
+          <h3 className={DASHBOARD_PANEL_TITLE_CLASS}>시간별 기상 그래프</h3>
+          <p className={DASHBOARD_PANEL_DESC_CLASS}>07:00~20:00 전체 시간대 표시</p>
         </div>
-        <span className="mt-0.5 rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">Open-Meteo</span>
+        <span className={`${DASHBOARD_PANEL_BADGE_CLASS} bg-sky-50 text-sky-700`}>Open-Meteo</span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden px-4 pb-4">
@@ -2991,12 +3004,12 @@ function InstructorAssignmentSummaryPanel({
 
   return (
     <ContentCard className={`flex flex-col overflow-hidden p-0 ${className}`}>
-      <div className="flex h-[66px] shrink-0 items-start justify-between px-4 py-3">
-        <div className="min-w-0 pt-0.5">
-          <h3 className="text-[16px] font-semibold leading-tight tracking-[-0.01em] text-[#10213f]">교관별 오늘 배정</h3>
-          <p className="mt-1 text-[11px] font-medium leading-tight text-[#61758f]">상태·일정·휴무 여부</p>
+      <div className={DASHBOARD_PANEL_HEADER_CLASS}>
+        <div className="min-w-0">
+          <h3 className={DASHBOARD_PANEL_TITLE_CLASS}>교관별 오늘 배정</h3>
+          <p className={DASHBOARD_PANEL_DESC_CLASS}>상태·일정·휴무 여부</p>
         </div>
-        <span className="mt-0.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">총 {totalAssigned}건</span>
+        <span className={`${DASHBOARD_PANEL_BADGE_CLASS} bg-blue-50 text-blue-700`}>총 {totalAssigned}건</span>
       </div>
 
       <div className="grid min-h-0 flex-1 gap-1.5 overflow-y-auto px-4 pb-4 sm:grid-cols-2 xl:grid-cols-1">
@@ -3230,7 +3243,7 @@ export default async function DashboardPage({
             <tr key={text(booking.bookingId) || index}>
             <td className="truncate font-semibold text-[#10213f]">{text(booking.userName || booking.name || booking.customerName || booking.memberName, "-")}</td>
             <td>
-            <div className="font-bold text-[#10213f]">{normalizeDate(getBookingDateValue(booking)).slice(5)}</div>
+            <div className="font-semibold text-[#10213f]">{normalizeDate(getBookingDateValue(booking)).slice(5)}</div>
             <div className="text-xs font-semibold text-[#6f8199]">{normalizeTime(getBookingStartValue(booking))}~{normalizeTime(getBookingEndValue(booking))}</div>
             </td>
             <td>
