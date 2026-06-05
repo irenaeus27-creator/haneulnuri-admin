@@ -930,7 +930,7 @@ function actionButtonTitle(nextStatus: string) {
 }
 
 function displayFilterSummary(showFinal: boolean, statusFilter: string, typeFilter: string, dateFilter: string, keyword: string) {
-  const parts = ["오늘 이후"];
+  const parts = ["현재 이후"];
 
   if (statusFilter !== "전체") parts.push(`상태 ${statusFilter}`);
   else parts.push("요청/확정 중심");
@@ -1044,6 +1044,20 @@ function todayIsoText() {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function currentTimeText() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+function isBookingAfterCurrentTime(bookingDate: string, startTime: string, today: string, nowTime: string) {
+  if (!bookingDate) return true;
+  if (bookingDate < today) return false;
+  if (bookingDate > today) return true;
+  if (!startTime) return true;
+
+  return startTime >= nowTime;
 }
 
 function buildActionMemo(existingMemo: string, actionLabel?: string, note?: string) {
@@ -2008,14 +2022,16 @@ export default function BookingsPage() {
   const filteredBookings = useMemo(() => {
     const q = keyword.trim().toLowerCase();
     const today = todayIsoText();
+    const nowTime = currentTimeText();
 
     return bookings
       .filter((item) => {
         const status = normalizedStatusOf(item);
         const bookingType = text(item.bookingType, "");
         const bookingDate = normalizeDate(item.bookingDate);
+        const startTime = normalizeTime(item.startTime);
 
-        if (bookingDate && bookingDate < today) return false;
+        if (!isBookingAfterCurrentTime(bookingDate, startTime, today, nowTime)) return false;
         if (!isVisibleOperationalBooking(item, showCancelledBookings)) return false;
         if (statusFilter !== "전체" && status !== statusFilter) return false;
         if (typeFilter !== "전체" && bookingType !== typeFilter) return false;
