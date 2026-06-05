@@ -2394,7 +2394,7 @@ function MiniTable({
   return (
     <ContentCard className={`flex flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)] ${className}`}>
       <div className="flex shrink-0 items-center justify-between px-3 py-2">
-        <h3 className="text-[16px] font-semibold leading-tight text-[#10213f]">{title}</h3>
+        <h3 className="text-[13px] font-semibold leading-tight text-[#10213f]">{title}</h3>
         <Link href={href} className="text-xs font-medium text-[#1264f4]">
           전체 보기 ›
         </Link>
@@ -2695,7 +2695,7 @@ function WeatherLineChart({
     <div className="rounded-[22px] border border-[#dfe8f5] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] px-3 py-2.5 shadow-[0_10px_30px_rgba(20,46,80,0.05)]">
       <div className="mb-2.5 flex items-start justify-between gap-2">
         <div>
-          <p className="text-[16px] font-semibold leading-tight text-[#10213f]">{title}</p>
+          <p className="text-[13px] font-semibold leading-tight text-[#10213f]">{title}</p>
           <p className="mt-0.5 text-[11px] font-medium text-[#61758f]">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
