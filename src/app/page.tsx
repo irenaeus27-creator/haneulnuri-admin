@@ -816,19 +816,19 @@ function DashboardTimeSunSummary({ today }: { today: string }) {
     <div className="fixed right-[88px] top-7 z-30 hidden justify-end xl:flex">
       <div className="grid grid-cols-4 overflow-hidden rounded-2xl border border-[#d9e6f5] bg-white/90 shadow-[0_12px_30px_rgba(20,46,80,0.07)] backdrop-blur">
         <div className="border-r border-[#edf2f7] px-4 py-2.5">
-          <p className="text-[11px] font-bold text-[#7b8da5]">현재 날짜</p>
+          <p className="text-[11px] font-semibold text-[#7b8da5]">현재 날짜</p>
           <p className="mt-0.5 text-sm font-extrabold text-[#10213f]">{dateLabel}</p>
         </div>
         <div className="border-r border-[#edf2f7] px-4 py-2.5">
-          <p className="text-[11px] font-bold text-[#7b8da5]">현재 시간</p>
+          <p className="text-[11px] font-semibold text-[#7b8da5]">현재 시간</p>
           <p className="mt-0.5 text-sm font-extrabold text-[#10213f]">{timeLabel}</p>
         </div>
         <div className="border-r border-[#edf2f7] px-4 py-2.5">
-          <p className="text-[11px] font-bold text-[#7b8da5]">일출</p>
+          <p className="text-[11px] font-semibold text-[#7b8da5]">일출</p>
           <p className="mt-0.5 text-sm font-extrabold text-orange-600">{sunrise}</p>
         </div>
         <div className="px-4 py-2.5">
-          <p className="text-[11px] font-bold text-[#7b8da5]">일몰</p>
+          <p className="text-[11px] font-semibold text-[#7b8da5]">일몰</p>
           <p className="mt-0.5 text-sm font-extrabold text-blue-700">{sunset}</p>
         </div>
       </div>
@@ -2053,11 +2053,11 @@ function StatCard({
           {icon}
         </div>
         <div>
-          <p className="text-[13px] font-bold text-[#243b63]">{title}</p>
-          <p className="mt-1 text-[24px] font-bold leading-none tracking-[-0.02em] text-[#10213f]">
+          <p className="text-[13px] font-semibold text-[#243b63]">{title}</p>
+          <p className="mt-1 text-[24px] font-semibold leading-none tracking-[-0.02em] text-[#10213f]">
             {value}
           </p>
-          <p className="mt-1.5 text-[11px] font-bold text-[#6f8199]">{sub}</p>
+          <p className="mt-1.5 text-[11px] font-semibold text-[#6f8199]">{sub}</p>
         </div>
       </div>
     </ContentCard>
@@ -2087,7 +2087,7 @@ function ReservationChart({ data }: { data: DailyPoint[] }) {
 
   return (
     <div>
-      <div className="mb-1 flex items-center gap-2.5 px-2 text-xs font-bold text-[#526a89]">
+      <div className="mb-1 flex items-center gap-2.5 px-2 text-xs font-semibold text-[#526a89]">
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#1264f4]" />예약 건수</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#10b981]" />총 비행시간</span>
       </div>
@@ -2184,11 +2184,11 @@ function DonutChart({ items }: { items: DonutItem[] }) {
       <div className="space-y-3">
         {segments.map((segment) => (
           <div key={segment.label} className="flex items-center justify-between gap-2.5">
-            <span className="flex items-center gap-2 text-sm font-bold text-[#314965]">
+            <span className="flex items-center gap-2 text-sm font-semibold text-[#314965]">
               <span className="h-3 w-3 rounded-full" style={{ backgroundColor: segment.color }} />
               {segment.label}
             </span>
-            <span className="text-sm font-bold text-[#526a89]">
+            <span className="text-sm font-semibold text-[#526a89]">
               {segment.value}건 ({segment.percent}%)
             </span>
           </div>
@@ -2394,8 +2394,8 @@ function MiniTable({
   return (
     <ContentCard className={`flex flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)] ${className}`}>
       <div className="flex shrink-0 items-center justify-between px-3 py-2">
-        <h3 className="text-[16px] font-bold leading-tight text-[#10213f]">{title}</h3>
-        <Link href={href} className="text-xs font-bold text-[#1264f4]">
+        <h3 className="text-[16px] font-semibold leading-tight text-[#10213f]">{title}</h3>
+        <Link href={href} className="text-xs font-medium text-[#1264f4]">
           전체 보기 ›
         </Link>
       </div>
@@ -2421,17 +2421,17 @@ function InstructorScheduleTable({
     <ContentCard className="overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="flex items-center justify-between px-5 py-3.5">
         <div>
-          <h3 className="text-[17px] font-bold text-[#10213f]">교관별 오늘 일정</h3>
-          <p className="mt-1 text-xs font-bold text-[#6f8199]">교육·체험 등 교관이 필요한 비행만 표시합니다.</p>
+          <h3 className="text-[17px] font-semibold text-[#10213f]">교관별 오늘 일정</h3>
+          <p className="mt-1 text-xs font-semibold text-[#6f8199]">교육·체험 등 교관이 필요한 비행만 표시합니다.</p>
         </div>
-        <Link href="/instructor-schedules" className="text-xs font-bold text-[#1264f4]">
+        <Link href="/instructor-schedules" className="text-xs font-medium text-[#1264f4]">
           교관 스케줄 ›
         </Link>
       </div>
 
       <div className="max-h-[330px] overflow-y-auto overflow-x-hidden px-5 pb-5">
         {items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#dbe5f1] bg-[#f8fbfe] p-8 text-center text-sm font-bold text-[#6f8199]">
+          <div className="rounded-2xl border border-dashed border-[#dbe5f1] bg-[#f8fbfe] p-8 text-center text-sm font-semibold text-[#6f8199]">
             오늘 교관 배정 일정이 없습니다.
           </div>
         ) : (
@@ -2439,24 +2439,24 @@ function InstructorScheduleTable({
             {items.map((group) => (
               <div key={group.instructorName} className="rounded-2xl border border-[#e2ebf5] bg-white p-3.5">
                 <div className="flex items-center justify-between gap-2.5">
-                  <div className="font-bold text-[#10213f]">{group.instructorName}</div>
-                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                  <div className="font-semibold text-[#10213f]">{group.instructorName}</div>
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
                     {group.count}건
                   </span>
                 </div>
                 <div className="mt-3 space-y-2">
                   {group.items.slice(0, 4).map((item) => (
                     <div key={item.id} className="grid grid-cols-[82px_1fr_78px] items-center gap-2 text-sm">
-                      <div className="font-bold text-[#10213f]">{item.startTime}</div>
+                      <div className="font-semibold text-[#10213f]">{item.startTime}</div>
                       <div className="min-w-0">
                         <div className="truncate font-bold text-[#314965]">{item.bookingType} · {item.userName}</div>
-                        <div className="truncate text-xs font-bold text-[#6f8199]">{item.courseName}</div>
+                        <div className="truncate text-xs font-semibold text-[#6f8199]">{item.courseName}</div>
                       </div>
-                      <div className="truncate text-right text-xs font-bold text-[#526a89]">{item.aircraftName}</div>
+                      <div className="truncate text-right text-xs font-semibold text-[#526a89]">{item.aircraftName}</div>
                     </div>
                   ))}
                   {group.items.length > 4 ? (
-                    <div className="text-xs font-bold text-[#6f8199]">외 {group.items.length - 4}건 더 있음</div>
+                    <div className="text-xs font-medium text-[#6f8199]">외 {group.items.length - 4}건 더 있음</div>
                   ) : null}
                 </div>
               </div>
@@ -2498,10 +2498,10 @@ function OperationChecklist({
     <ContentCard className="rounded-[22px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-[16px] font-bold leading-tight text-[#10213f]">오늘 처리할 일</h3>
-          <p className="mt-1 text-xs font-bold text-[#6f8199]">승인·취소·운항 전 확인 항목</p>
+          <h3 className="text-[16px] font-semibold leading-tight text-[#10213f]">오늘 처리할 일</h3>
+          <p className="mt-1 text-xs font-semibold text-[#6f8199]">승인·취소·운항 전 확인 항목</p>
         </div>
-        <span className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-bold text-[#526a89]">
+        <span className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-semibold text-[#526a89]">
           운영 체크
         </span>
       </div>
@@ -2513,8 +2513,8 @@ function OperationChecklist({
             href={item.href}
             className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 transition hover:bg-white hover:shadow-sm ${toneClass[item.tone]}`}
           >
-            <span className="text-sm font-bold">{item.label}</span>
-            <span className="flex items-center gap-2 text-lg font-bold">
+            <span className="text-sm font-semibold">{item.label}</span>
+            <span className="flex items-center gap-2 text-lg font-semibold">
               {item.value}건
               <span className="text-xs opacity-50">›</span>
             </span>
@@ -2538,12 +2538,12 @@ function WeatherSummaryCard({ weather }: { weather: WeatherData }) {
     <ContentCard className="overflow-hidden p-0">
       <div className="flex items-start justify-between px-5 py-3.5">
         <div>
-          <h3 className="text-[16px] font-bold leading-tight text-[#10213f]">오늘 기상 요약</h3>
+          <h3 className="text-[16px] font-semibold leading-tight text-[#10213f]">오늘 기상 요약</h3>
           <p className="mt-1 text-[11px] font-medium text-[#61758f]">
             Open-Meteo · 좌표 37.106759, 126.765010
           </p>
         </div>
-        <span className={`rounded-full border px-3 py-1 text-xs font-bold ${weatherToneClass(decision?.tone)}`}>
+        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${weatherToneClass(decision?.tone)}`}>
           {decision?.label || "확인 필요"}
         </span>
       </div>
@@ -2556,12 +2556,12 @@ function WeatherSummaryCard({ weather }: { weather: WeatherData }) {
         <div className="space-y-4 px-5 pb-5">
           <div className="grid grid-cols-2 gap-2.5">
             <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
-              <p className="text-[11px] font-semibold text-blue-700">Active RWY</p>
+              <p className="text-[11px] font-medium text-blue-700">Active RWY</p>
               <p className="mt-1 text-2xl font-bold text-[#10213f]">{runway?.label || "-"}</p>
               <p className="mt-1 text-[11px] font-medium text-[#61758f]">활주로 {runway?.heading || "-"}° 기준</p>
             </div>
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
-              <p className="text-[11px] font-semibold text-emerald-700">현재 바람</p>
+              <p className="text-[11px] font-medium text-emerald-700">현재 바람</p>
               <p className="mt-1 text-2xl font-bold text-[#10213f]">{numberText(current.windSpeed, "kt")}</p>
               <p className="mt-1 text-[11px] font-medium text-[#61758f]">{numberText(current.windDirection, "°")} · 돌풍 {numberText(current.windGust, "kt")}</p>
             </div>
@@ -2570,15 +2570,15 @@ function WeatherSummaryCard({ weather }: { weather: WeatherData }) {
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-[20px] border border-[#e7eef7] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(20,46,80,0.04)]">
               <p className="text-[11px] font-medium text-[#6b7f99]">측풍</p>
-              <p className="mt-1 text-[16px] font-bold leading-tight text-[#10213f]">{numberText(components?.crosswind, "kt")}</p>
+              <p className="mt-1 text-[16px] font-semibold leading-tight text-[#10213f]">{numberText(components?.crosswind, "kt")}</p>
             </div>
             <div className="rounded-[20px] border border-[#e7eef7] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(20,46,80,0.04)]">
               <p className="text-[11px] font-medium text-[#6b7f99]">정풍</p>
-              <p className="mt-1 text-[16px] font-bold leading-tight text-[#10213f]">{numberText(components?.headwind, "kt")}</p>
+              <p className="mt-1 text-[16px] font-semibold leading-tight text-[#10213f]">{numberText(components?.headwind, "kt")}</p>
             </div>
             <div className="rounded-[20px] border border-[#e7eef7] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(20,46,80,0.04)]">
               <p className="text-[11px] font-medium text-[#6b7f99]">배풍</p>
-              <p className="mt-1 text-[16px] font-bold leading-tight text-[#10213f]">{numberText(components?.tailwind, "kt")}</p>
+              <p className="mt-1 text-[16px] font-semibold leading-tight text-[#10213f]">{numberText(components?.tailwind, "kt")}</p>
             </div>
           </div>
 
@@ -2591,7 +2591,7 @@ function WeatherSummaryCard({ weather }: { weather: WeatherData }) {
           </div>
 
           <div className="rounded-2xl border border-dashed border-[#dbe5f1] bg-[#fbfdff] p-3">
-            <p className="text-xs font-bold text-[#10213f]">{current.weatherText || "-"} · {decision?.message}</p>
+            <p className="text-xs font-semibold text-[#10213f]">{current.weatherText || "-"} · {decision?.message}</p>
             <p className="mt-1 text-[11px] font-medium text-[#7b8da5]">업데이트 {formatWeatherTime(current.time)}</p>
           </div>
 
@@ -2695,7 +2695,7 @@ function WeatherLineChart({
     <div className="rounded-[22px] border border-[#dfe8f5] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] px-3 py-2.5 shadow-[0_10px_30px_rgba(20,46,80,0.05)]">
       <div className="mb-2.5 flex items-start justify-between gap-2">
         <div>
-          <p className="text-[16px] font-bold leading-tight text-[#10213f]">{title}</p>
+          <p className="text-[16px] font-semibold leading-tight text-[#10213f]">{title}</p>
           <p className="mt-0.5 text-[11px] font-medium text-[#61758f]">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -2862,10 +2862,10 @@ function WeatherDetailPanel({ weather }: { weather: WeatherData }) {
     <ContentCard className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="flex h-[72px] shrink-0 items-start justify-between px-4 py-3">
         <div className="min-w-0 pt-0.5">
-          <h3 className="text-[16px] font-bold leading-tight text-[#10213f]">시간별 기상 그래프</h3>
+          <h3 className="text-[16px] font-semibold leading-tight text-[#10213f]">시간별 기상 그래프</h3>
           <p className="mt-1 text-[11px] font-medium leading-tight text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
         </div>
-        <span className="mt-0.5 rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">Open-Meteo</span>
+        <span className="mt-0.5 rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">Open-Meteo</span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden px-4 pb-4">
@@ -2923,10 +2923,10 @@ function RecentActivityPanel({
     <ContentCard className={`flex min-h-0 flex-col p-3 ${className}`}>
       <div className="mb-3 flex shrink-0 items-center justify-between">
         <div>
-          <h3 className="text-[16px] font-bold leading-tight text-[#10213f]">최근 작업 내역</h3>
+          <h3 className="text-[16px] font-semibold leading-tight text-[#10213f]">최근 작업 내역</h3>
           <p className="mt-1 text-[11px] font-medium text-[#61758f]">예약·회원·교육생 기준 최근 작업</p>
         </div>
-        <Link href="/logs" className="text-xs font-semibold text-[#1264f4]">로그 보기 ›</Link>
+        <Link href="/logs" className="text-xs font-medium text-[#1264f4]">로그 보기 ›</Link>
       </div>
 
       {activities.length === 0 ? (
@@ -2940,7 +2940,7 @@ function RecentActivityPanel({
               <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dotClass[activity.tone] || "bg-slate-400"}`} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="min-w-0 truncate text-sm font-semibold text-[#10213f]" title={activity.title}>{activity.title}</p>
+                  <p className="min-w-0 truncate text-sm font-medium text-[#10213f]" title={activity.title}>{activity.title}</p>
                   <span className="shrink-0 text-[11px] font-medium text-[#8a9ab0]">{shortActivityTime(activity.time)}</span>
                 </div>
                 {activity.detail ? (
@@ -2993,10 +2993,10 @@ function InstructorAssignmentSummaryPanel({
     <ContentCard className={`flex flex-col overflow-hidden p-0 ${className}`}>
       <div className="flex h-[72px] shrink-0 items-start justify-between px-4 py-3">
         <div className="min-w-0 pt-0.5">
-          <h3 className="text-[16px] font-bold leading-tight text-[#10213f]">교관별 오늘 배정</h3>
+          <h3 className="text-[16px] font-semibold leading-tight text-[#10213f]">교관별 오늘 배정</h3>
           <p className="mt-1 text-[11px] font-medium leading-tight text-[#61758f]">상태·일정·휴무 여부</p>
         </div>
-        <span className="mt-0.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">총 {totalAssigned}건</span>
+        <span className="mt-0.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">총 {totalAssigned}건</span>
       </div>
 
       <div className="grid min-h-0 flex-1 gap-1.5 overflow-y-auto px-4 pb-4 sm:grid-cols-2 xl:grid-cols-1">
@@ -3026,7 +3026,7 @@ function InstructorAssignmentSummaryPanel({
                 <div className="grid grid-cols-[minmax(54px,auto)_1fr_auto] items-center gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <p className="truncate text-[13px] font-bold text-[#10213f]">{item.name}</p>
+                      <p className="truncate text-[13px] font-semibold text-[#10213f]">{item.name}</p>
                       <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${instructorStatusBadgeClass(item.workTone)}`}>
                         {item.workLabel}
                       </span>
@@ -3228,10 +3228,10 @@ export default async function DashboardPage({
             const bookingType = getBookingType(booking);
             return (
             <tr key={text(booking.bookingId) || index}>
-            <td className="truncate font-semibold text-[#10213f]">{text(booking.userName || booking.name || booking.customerName || booking.memberName, "-")}</td>
+            <td className="truncate font-medium text-[#10213f]">{text(booking.userName || booking.name || booking.customerName || booking.memberName, "-")}</td>
             <td>
-            <div className="font-bold text-[#10213f]">{normalizeDate(getBookingDateValue(booking)).slice(5)}</div>
-            <div className="text-xs font-bold text-[#6f8199]">{normalizeTime(getBookingStartValue(booking))}~{normalizeTime(getBookingEndValue(booking))}</div>
+            <div className="font-semibold text-[#10213f]">{normalizeDate(getBookingDateValue(booking)).slice(5)}</div>
+            <div className="text-xs font-medium text-[#6f8199]">{normalizeTime(getBookingStartValue(booking))}~{normalizeTime(getBookingEndValue(booking))}</div>
             </td>
             <td>
             <span className={`ui-badge w-fit whitespace-nowrap px-2.5 py-1 text-[11px] ${scheduleColorClass(bookingType)}`}>
