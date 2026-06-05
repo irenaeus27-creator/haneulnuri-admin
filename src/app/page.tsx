@@ -2395,7 +2395,7 @@ function MiniTable({
     <ContentCard className={`flex flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)] ${className}`}>
       <div className="flex shrink-0 items-center justify-between px-3 py-2">
         <h3 className="text-[13px] font-semibold leading-tight text-[#10213f]">{title}</h3>
-        <Link href={href} className="text-xs font-medium text-[#1264f4]">
+        <Link href={href} className="mt-0.5 text-xs font-medium text-[#1264f4]">
           전체 보기 ›
         </Link>
       </div>
@@ -2860,9 +2860,9 @@ function WeatherDetailPanel({ weather }: { weather: WeatherData }) {
 
   return (
     <ContentCard className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
-      <div className="flex h-[72px] shrink-0 items-start justify-between px-4 py-3">
+      <div className="flex h-[66px] shrink-0 items-start justify-between px-4 py-3">
         <div className="min-w-0 pt-0.5">
-          <h3 className="text-[16px] font-semibold leading-tight text-[#10213f]">시간별 기상 그래프</h3>
+          <h3 className="text-[16px] font-semibold leading-tight tracking-[-0.01em] text-[#10213f]">시간별 기상 그래프</h3>
           <p className="mt-1 text-[11px] font-medium leading-tight text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
         </div>
         <span className="mt-0.5 rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">Open-Meteo</span>
@@ -2991,9 +2991,9 @@ function InstructorAssignmentSummaryPanel({
 
   return (
     <ContentCard className={`flex flex-col overflow-hidden p-0 ${className}`}>
-      <div className="flex h-[72px] shrink-0 items-start justify-between px-4 py-3">
+      <div className="flex h-[66px] shrink-0 items-start justify-between px-4 py-3">
         <div className="min-w-0 pt-0.5">
-          <h3 className="text-[16px] font-semibold leading-tight text-[#10213f]">교관별 오늘 배정</h3>
+          <h3 className="text-[16px] font-semibold leading-tight tracking-[-0.01em] text-[#10213f]">교관별 오늘 배정</h3>
           <p className="mt-1 text-[11px] font-medium leading-tight text-[#61758f]">상태·일정·휴무 여부</p>
         </div>
         <span className="mt-0.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">총 {totalAssigned}건</span>
@@ -3228,7 +3228,7 @@ export default async function DashboardPage({
             const bookingType = getBookingType(booking);
             return (
             <tr key={text(booking.bookingId) || index}>
-            <td className="truncate font-medium text-[#10213f]">{text(booking.userName || booking.name || booking.customerName || booking.memberName, "-")}</td>
+            <td className="truncate font-semibold text-[#10213f]">{text(booking.userName || booking.name || booking.customerName || booking.memberName, "-")}</td>
             <td>
             <div className="font-semibold text-[#10213f]">{normalizeDate(getBookingDateValue(booking)).slice(5)}</div>
             <div className="text-xs font-medium text-[#6f8199]">{normalizeTime(getBookingStartValue(booking))}~{normalizeTime(getBookingEndValue(booking))}</div>
