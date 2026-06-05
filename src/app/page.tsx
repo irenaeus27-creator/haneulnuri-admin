@@ -2860,12 +2860,12 @@ function WeatherDetailPanel({ weather }: { weather: WeatherData }) {
 
   return (
     <ContentCard className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
-      <div className="flex shrink-0 items-center justify-between px-5 py-3.5">
-        <div>
-          <h3 className="text-[17px] font-bold tracking-[-0.02em] text-[#10213f]">시간별 기상 그래프</h3>
-          <p className="mt-0.5 text-[12px] font-medium text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
+      <div className="flex h-[72px] shrink-0 items-start justify-between px-4 py-3">
+        <div className="min-w-0 pt-0.5">
+          <h3 className="text-[17px] font-bold leading-tight tracking-[-0.02em] text-[#10213f]">시간별 기상 그래프</h3>
+          <p className="mt-1 text-[12px] font-medium leading-tight text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
         </div>
-        <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">Open-Meteo</span>
+        <span className="mt-0.5 rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">Open-Meteo</span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden px-4 pb-4">
@@ -2991,12 +2991,12 @@ function InstructorAssignmentSummaryPanel({
 
   return (
     <ContentCard className={`flex flex-col overflow-hidden p-0 ${className}`}>
-      <div className="flex shrink-0 items-center justify-between px-3 py-2">
-        <div>
-          <h3 className="text-[16px] font-bold text-[#10213f]">교관별 오늘 배정</h3>
-          <p className="mt-1 text-[11px] font-medium text-[#61758f]">상태·일정·휴무 여부</p>
+      <div className="flex h-[72px] shrink-0 items-start justify-between px-4 py-3">
+        <div className="min-w-0 pt-0.5">
+          <h3 className="text-[17px] font-bold leading-tight tracking-[-0.02em] text-[#10213f]">교관별 오늘 배정</h3>
+          <p className="mt-1 text-[12px] font-medium leading-tight text-[#61758f]">상태·일정·휴무 여부</p>
         </div>
-        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">총 {totalAssigned}건</span>
+        <span className="mt-0.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">총 {totalAssigned}건</span>
       </div>
 
       <div className="grid min-h-0 flex-1 gap-1.5 overflow-y-auto px-4 pb-4 sm:grid-cols-2 xl:grid-cols-1">
