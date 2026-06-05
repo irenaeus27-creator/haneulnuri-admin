@@ -1533,6 +1533,87 @@ function cleanActivityText(value: unknown) {
     .trim();
 }
 
+function compactActivityDate(value: unknown) {
+  const raw = text(value, "");
+  const match = raw.match(/(\d{4})-(\d{2})-(\d{2})/);
+
+  if (!match) return raw;
+
+  return `${match[2]}.${match[3]}`;
+}
+
+function compactActivityTimeRange(value: unknown) {
+  const raw = text(value, "");
+  const range = raw.match(/(\d{1,2}:\d{2})\s*~\s*(\d{1,2}:\d{2})/);
+
+  if (range) return `${range[1]}~${range[2]}`;
+
+  const single = raw.match(/(\d{1,2}:\d{2})/);
+  return single ? single[1] : "";
+}
+
+function compactBookingTypeLabelForActivity(value: unknown) {
+  const raw = text(value, "");
+
+  if (raw.includes("렌탈")) return "렌탈";
+  if (raw.includes("교육")) return "교육";
+  if (raw.includes("체험")) return "체험";
+  if (raw.includes("정비") || raw.includes("점검")) return "정비";
+
+  return raw;
+}
+
+function compactAircraftLabelForActivity(value: unknown) {
+  const raw = text(value, "");
+  const hl = raw.match(/HL-[A-Z0-9]+/i);
+
+  if (hl) return hl[0].toUpperCase();
+
+  return raw;
+}
+
+function compactActivityName(value: unknown) {
+  const raw = text(value, "")
+    .replace(/^예약자\s*미입력$/, "")
+    .replace(/^(교관|감독)\s+/, "")
+    .trim();
+
+  return raw;
+}
+
+function compactActivityTitle(title: string) {
+  const parts = title.split("·").map((item) => item.trim()).filter(Boolean);
+  const first = parts[0] || title;
+  const action = first.replace(/예약\s+/, "예약 ").trim();
+  const name = compactActivityName(parts[1]);
+
+  return name ? `${action} · ${name}` : action;
+}
+
+function compactActivityDetail(value: unknown) {
+  const raw = cleanActivityText(value);
+  if (!raw) return "";
+
+  const parts = raw.split("·").map((item) => item.trim()).filter(Boolean);
+  const datePart = parts.find((item) => /\d{4}-\d{2}-\d{2}/.test(item)) || "";
+  const timePart = parts.find((item) => /\d{1,2}:\d{2}/.test(item)) || "";
+  const typePart = parts.find((item) => /렌탈|교육|체험|정비|점검/.test(item)) || "";
+  const aircraftPart = parts.find((item) => /HL-|A-\d+/i.test(item)) || "";
+
+  const compactDate = compactActivityDate(datePart || timePart);
+  const compactTime = compactActivityTimeRange(timePart || datePart);
+  const compactType = compactBookingTypeLabelForActivity(typePart);
+  const compactAircraft = compactAircraftLabelForActivity(aircraftPart);
+
+  return [
+    [compactDate, compactTime].filter(Boolean).join(" "),
+    compactType,
+    compactAircraft,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function parseActivityFromDetail(defaultTitle: string, detailValue: unknown, fallbackSubject?: unknown) {
   const rawDetail = cleanActivityText(detailValue);
   const fallback = cleanActivityText(fallbackSubject);
@@ -1541,49 +1622,41 @@ function parseActivityFromDetail(defaultTitle: string, detailValue: unknown, fal
     .map((item) => item.trim())
     .filter(Boolean);
 
-  let title = defaultTitle;
+  let title = fallback ? `${defaultTitle} · ${fallback}` : defaultTitle;
   let detailParts = slashParts;
 
   if (slashParts.length > 0) {
     const first = slashParts[0];
     const dotParts = first.split("·").map((item) => item.trim()).filter(Boolean);
+    const firstLooksLikeAction = /예약|회원|교육생|항공기|교관|코스|문서|파일|로그|알림/.test(dotParts[0] || "");
 
-    if (dotParts.length >= 2) {
+    if (dotParts.length >= 2 && firstLooksLikeAction) {
       const kind = dotParts[0];
-      const subject = dotParts.slice(1).join(" · ");
-      title = `${kind || defaultTitle} · ${subject}`;
+      const subject = dotParts[1];
+      title = compactActivityName(subject) ? `${kind} · ${compactActivityName(subject)}` : kind;
       detailParts = slashParts.slice(1);
-    } else if (fallback) {
-      title = `${defaultTitle} · ${fallback}`;
     }
-  } else if (fallback) {
-    title = `${defaultTitle} · ${fallback}`;
   }
 
-  const detail = detailParts
-    .map((item) => item.replace(/\s+/g, " ").trim())
-    .filter((item) => item && item !== title)
-    .join(" · ");
+  const detail = compactActivityDetail(detailParts.join(" · ") || rawDetail);
 
   return {
-    title,
-    detail: detail || rawDetail,
+    title: compactActivityTitle(title),
+    detail,
   };
 }
 
 function bookingActivityDetail(booking: Row) {
-  const date = normalizeDate(getBookingDateValue(booking));
+  const date = compactActivityDate(normalizeDate(getBookingDateValue(booking)));
   const start = normalizeTime(getBookingStartValue(booking));
   const end = normalizeTime(getBookingEndValue(booking));
-  const type = getBookingType(booking);
-  const aircraftName = text(booking.aircraftName || booking.aircraft || booking.registrationNo || booking.aircraftId, "");
-  const instructorName = text(booking.instructorName || booking.instructor || booking.supervisorName || booking.supervisor || "");
+  const type = compactBookingTypeLabelForActivity(getBookingType(booking));
+  const aircraftName = compactAircraftLabelForActivity(booking.aircraftName || booking.aircraft || booking.registrationNo || booking.aircraftId);
 
   return [
     [date, start && end ? `${start}~${end}` : start].filter(Boolean).join(" "),
     type,
     aircraftName,
-    instructorName ? `교관 ${instructorName}` : "",
   ]
     .filter(Boolean)
     .join(" · ");
@@ -1603,14 +1676,8 @@ function buildRecentActivities(logs: Row[], notifications: Row[], bookings: Row[
   });
 
   const notificationItems = notifications.map((notification) => {
-    const title = cleanActivityText(notification.title || notification.message || notification.type) || "알림 기록";
-    const detail = [
-      cleanActivityText(notification.body || notification.memo),
-      cleanActivityText(notification.targetUserName || notification.targetName),
-      cleanActivityText(notification.status),
-    ]
-      .filter(Boolean)
-      .join(" · ");
+    const title = compactActivityTitle(cleanActivityText(notification.title || notification.message || notification.type) || "알림 기록");
+    const detail = compactActivityDetail(notification.body || notification.memo);
 
     return {
       time: text(notification.createdAt || notification.sentAt || notification.updatedAt),
@@ -1623,7 +1690,7 @@ function buildRecentActivities(logs: Row[], notifications: Row[], bookings: Row[
   const bookingItems = bookings.map((booking) => {
     const status = text(getBookingStatus(booking), "변경");
     const userName = text(booking.userName || booking.name || booking.customerName || booking.memberName, "예약자 미입력");
-    const title = `예약 ${status} · ${userName}`;
+    const title = compactActivityTitle(`예약 ${status} · ${userName}`);
 
     return {
       time: text(booking.updatedAt || booking.createdAt || `${normalizeDate(getBookingDateValue(booking))} ${normalizeTime(getBookingStartValue(booking))}`),
@@ -2877,7 +2944,7 @@ function RecentActivityPanel({
                   <span className="shrink-0 text-[11px] font-semibold text-[#8a9ab0]">{shortActivityTime(activity.time)}</span>
                 </div>
                 {activity.detail ? (
-                  <p className="mt-1 text-[12px] font-medium leading-snug text-[#61758f]" title={activity.detail}>
+                  <p className="mt-1 truncate text-[12px] font-medium leading-snug text-[#61758f]" title={activity.detail}>
                     {activity.detail}
                   </p>
                 ) : null}
