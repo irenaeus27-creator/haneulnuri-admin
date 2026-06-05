@@ -3218,7 +3218,7 @@ export default async function DashboardPage({
             currentTimeMinutes={currentKstMinutes()}
           />
 
-          <div className="grid min-h-0 items-stretch gap-2.5 grid-cols-[560px_430px_288px]">
+          <div className="grid min-h-0 items-stretch gap-2.5 grid-cols-[520px_430px_328px]">
             <MiniTable title="다가오는 예약" href="/bookings" headers={["예약자", "시간", "유형", "항공기", "교관", "상태"]} className="h-full min-h-[430px]">
             {upcomingBookings.length === 0 ? (
             <tr><td colSpan={6} className="text-center text-[#6f8199]">다가오는 예약이 없습니다.</td></tr>
