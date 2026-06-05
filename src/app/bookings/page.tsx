@@ -1711,8 +1711,6 @@ export default function BookingsPage() {
     [requiredFieldWarnings]
   );
 
-  const canShowReadyMessage = form.bookingDate && form.startTime && form.endTime && form.userName.trim() && saveBlockMessages.length === 0;
-
   const selectableAircraftForForm = useMemo(() => {
     if (isEducationForm) {
       return selectedEducationStudent ? educationAssignedAircraft : activeAircraft;
@@ -4156,9 +4154,12 @@ export default function BookingsPage() {
                 입력 요약: {compactFormSummary(form)}
               </div>
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-2 lg:max-w-[560px]">
+            <div className="flex flex-nowrap items-center justify-end gap-2 lg:max-w-[520px]">
               {bookingTypeGuideMessage() ? (
-                <span className="inline-flex min-h-9 items-center rounded-xl border border-blue-100 bg-blue-50/70 px-3 text-[13px] font-medium text-blue-800">
+                <span
+                  title={bookingTypeGuideMessage()}
+                  className="inline-flex h-8 max-w-[360px] items-center truncate rounded-xl border border-blue-100 bg-blue-50/70 px-3 text-[13px] font-medium text-blue-800"
+                >
                   {bookingTypeGuideMessage()}
                 </span>
               ) : null}
@@ -4334,10 +4335,6 @@ export default function BookingsPage() {
                   ))}
                   {conflictWarnings.length > 3 ? <p>- 외 {conflictWarnings.length - 3}건</p> : null}
                 </div>
-              </div>
-            ) : canShowReadyMessage ? (
-              <div className="min-w-0 rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] font-medium text-emerald-800">
-                예약 가능 · PFI 포함 점유 시간 기준으로 확인된 항공기/교관 중복 예약이 없습니다.
               </div>
             ) : null}
 
