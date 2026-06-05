@@ -30,6 +30,7 @@ const STUDENT_COLUMNS = [
   "position",
   "military_service",
   "vehicle_type",
+  "license_type",
   "health_status",
   "emergency_contact_name",
   "emergency_contact_phone",
@@ -46,6 +47,8 @@ const STUDENT_COLUMNS = [
   "initial_charged_at",
   "charged_training_minutes",
   "total_charged_minutes",
+  "manual_flight_time",
+  "manual_flight_count",
   "manual_training_minutes",
   "manual_training_count",
   "manual_adjustment_memo",
@@ -65,14 +68,19 @@ const STUDENT_COLUMNS = [
   "memo",
   "created_at",
   "updated_at",
-];
+] as const;
 
 const DATE_COLUMNS = new Set([
   "birth_date",
   "training_start_date",
+  "last_training_date",
+]);
+
+const TIMESTAMP_COLUMNS = new Set([
+  "created_at",
+  "updated_at",
   "initial_charged_at",
   "manual_adjusted_at",
-  "last_training_date",
 ]);
 
 const NUMBER_COLUMNS = new Set([
@@ -82,6 +90,8 @@ const NUMBER_COLUMNS = new Set([
   "initial_charge_minutes",
   "charged_training_minutes",
   "total_charged_minutes",
+  "manual_flight_time",
+  "manual_flight_count",
   "manual_training_minutes",
   "manual_training_count",
   "used_training_minutes",
@@ -120,6 +130,7 @@ const FIELD_ALIASES: Record<string, string[]> = {
   position: ["position"],
   military_service: ["militaryService", "military_service"],
   vehicle_type: ["vehicleType", "vehicle_type"],
+  license_type: ["licenseType", "license_type"],
   health_status: ["healthStatus", "health_status"],
   emergency_contact_name: ["emergencyContactName", "emergency_contact_name"],
   emergency_contact_phone: ["emergencyContactPhone", "emergency_contact_phone"],
@@ -136,6 +147,8 @@ const FIELD_ALIASES: Record<string, string[]> = {
   initial_charged_at: ["initialChargedAt", "initial_charged_at"],
   charged_training_minutes: ["chargedTrainingMinutes", "charged_training_minutes"],
   total_charged_minutes: ["totalChargedMinutes", "total_charged_minutes"],
+  manual_flight_time: ["manualFlightTime", "manual_flight_time"],
+  manual_flight_count: ["manualFlightCount", "manual_flight_count"],
   manual_training_minutes: ["manualTrainingMinutes", "manual_training_minutes"],
   manual_training_count: ["manualTrainingCount", "manual_training_count"],
   manual_adjustment_memo: ["manualAdjustmentMemo", "manual_adjustment_memo"],
@@ -161,29 +174,45 @@ function hasOwn(input: JsonRecord, key: string) {
   return Object.prototype.hasOwnProperty.call(input, key);
 }
 
+function asRecord(value: unknown): JsonRecord {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as JsonRecord;
+  }
+  return {};
+}
+
 function readField(input: JsonRecord, column: string) {
   const aliases = FIELD_ALIASES[column] || [column];
 
   for (const alias of aliases) {
     if (hasOwn(input, alias)) {
-      return {
-        exists: true,
-        value: input[alias],
-      };
+      return { exists: true, value: input[alias] };
     }
   }
 
-  return {
-    exists: false,
-    value: undefined,
-  };
+  return { exists: false, value: undefined };
+}
+
+function toNumber(value: unknown) {
+  const raw = text(value);
+  if (!raw) return 0;
+  const numberValue = Number(raw);
+  return Number.isFinite(numberValue) ? numberValue : 0;
 }
 
 function normalizeDate(value: unknown) {
   const raw = text(value);
   if (!raw) return null;
   if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
-  return raw;
+  return null;
+}
+
+function normalizeTimestamp(value: unknown) {
+  const raw = text(value);
+  if (!raw) return null;
+  const time = Date.parse(raw);
+  if (Number.isNaN(time)) return null;
+  return new Date(time).toISOString();
 }
 
 function normalizeNumber(value: unknown) {
@@ -193,12 +222,35 @@ function normalizeNumber(value: unknown) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
+function minutesFromHours(value: unknown) {
+  return Math.round(toNumber(value) * 60);
+}
+
 function normalizeValue(column: string, value: unknown) {
   if (DATE_COLUMNS.has(column)) return normalizeDate(value);
+  if (TIMESTAMP_COLUMNS.has(column)) return normalizeTimestamp(value);
   if (NUMBER_COLUMNS.has(column)) return normalizeNumber(value);
+  return text(value);
+}
 
-  const raw = text(value);
-  return raw;
+function removeEmptyDatabaseValues(row: JsonRecord) {
+  Object.entries(row).forEach(([key, value]) => {
+    if (value === undefined) {
+      delete row[key];
+      return;
+    }
+
+    if (value === "" && (DATE_COLUMNS.has(key) || TIMESTAMP_COLUMNS.has(key) || NUMBER_COLUMNS.has(key))) {
+      delete row[key];
+      return;
+    }
+
+    if (value === null && (key === "student_id" || key === "name")) {
+      delete row[key];
+    }
+  });
+
+  return row;
 }
 
 function toCamelKey(key: string) {
@@ -223,10 +275,12 @@ function normalizeStudent(input: JsonRecord, options: { isCreate: boolean }) {
     if (column === "updated_at") continue;
 
     const field = readField(input, column);
-
     if (!field.exists) continue;
 
-    row[column] = normalizeValue(column, field.value);
+    const normalized = normalizeValue(column, field.value);
+    if (normalized !== null || !options.isCreate) {
+      row[column] = normalized;
+    }
   }
 
   if (options.isCreate) {
@@ -238,14 +292,7 @@ function normalizeStudent(input: JsonRecord, options: { isCreate: boolean }) {
 
   row.updated_at = now;
 
-  return row;
-}
-
-function asRecord(value: unknown): JsonRecord {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    return value as JsonRecord;
-  }
-  return {};
+  return removeEmptyDatabaseValues(row);
 }
 
 function getStudentId(input: JsonRecord) {
@@ -260,9 +307,176 @@ function getStudentId(input: JsonRecord) {
   );
 }
 
+function getAddChargeMinutes(input: JsonRecord, row?: JsonRecord) {
+  const explicitMinutes = toNumber(
+    input.addChargeMinutes ||
+      input.add_charge_minutes ||
+      input.chargeMinutes ||
+      input.charge_minutes ||
+      row?.initial_charge_minutes ||
+      input.initialChargeMinutes ||
+      input.initial_charge_minutes
+  );
+
+  if (explicitMinutes > 0) return Math.round(explicitMinutes);
+
+  return minutesFromHours(
+    input.addChargeHours ||
+      input.add_charge_hours ||
+      input.chargeHours ||
+      input.charge_hours ||
+      row?.initial_charge_hours ||
+      input.initialChargeHours ||
+      input.initial_charge_hours
+  );
+}
+
+function currentChargedMinutes(row: JsonRecord) {
+  const total = toNumber(row.total_charged_minutes || row.totalChargedMinutes);
+  if (total > 0) return Math.round(total);
+
+  const charged = toNumber(row.charged_training_minutes || row.chargedTrainingMinutes);
+  if (charged > 0) return Math.round(charged);
+
+  const initial = toNumber(row.initial_charge_minutes || row.initialChargeMinutes);
+  if (initial > 0) return Math.round(initial);
+
+  return minutesFromHours(row.initial_charge_hours || row.initialChargeHours);
+}
+
+function currentUsedMinutes(row: JsonRecord) {
+  const usedTraining = toNumber(row.used_training_minutes || row.usedTrainingMinutes);
+  const used = toNumber(row.used_minutes || row.usedMinutes);
+  const usedHours = minutesFromHours(row.used_training_hours || row.usedTrainingHours || row.used_hours || row.usedHours);
+
+  return Math.round(Math.max(usedTraining, used, usedHours, 0));
+}
+
+function applyTrainingCharge(row: JsonRecord, totalMinutes: number, usedMinutes = 0) {
+  const normalizedTotal = Math.max(Math.round(totalMinutes), 0);
+  const normalizedUsed = Math.max(Math.round(usedMinutes), 0);
+  const remaining = Math.max(normalizedTotal - normalizedUsed, 0);
+  const remainingHours = Number((remaining / 60).toFixed(2));
+
+  row.charged_training_minutes = normalizedTotal;
+  row.total_charged_minutes = normalizedTotal;
+  row.remaining_training_minutes = remaining;
+  row.remaining_minutes = remaining;
+  row.remaining_training_hours = remainingHours;
+  row.remaining_hours = remainingHours;
+
+  return row;
+}
+
+function applyInitialCharge(row: JsonRecord, input: JsonRecord) {
+  const addMinutes = getAddChargeMinutes(input, row);
+  if (addMinutes <= 0) return row;
+
+  const now = nowIso();
+
+  if (!toNumber(row.initial_charge_minutes)) row.initial_charge_minutes = addMinutes;
+  if (!toNumber(row.initial_charge_hours)) row.initial_charge_hours = Number((addMinutes / 60).toFixed(2));
+  if (!row.initial_charged_at) row.initial_charged_at = now;
+  if (!row.initial_charge_memo && text(input.chargeMemo || input.charge_memo)) {
+    row.initial_charge_memo = text(input.chargeMemo || input.charge_memo);
+  }
+
+  return applyTrainingCharge(row, addMinutes, currentUsedMinutes(row));
+}
+
+function applyAppendCharge(row: JsonRecord, input: JsonRecord, existing: JsonRecord) {
+  const addMinutes = getAddChargeMinutes(input);
+  if (addMinutes <= 0) return row;
+
+  const existingTotal = currentChargedMinutes(existing);
+  const nextTotal = existingTotal + addMinutes;
+
+  const usedMinutes = Math.max(
+    currentUsedMinutes(existing),
+    currentUsedMinutes(row)
+  );
+
+  return applyTrainingCharge(row, nextTotal, usedMinutes);
+}
+
+function buildLinkedUserId(row: JsonRecord, input: JsonRecord) {
+  const explicitUserId = text(
+    row.user_id ||
+      input.userId ||
+      input.user_id ||
+      asRecord(input.user).userId ||
+      asRecord(input.user).user_id
+  );
+
+  if (explicitUserId) return explicitUserId;
+
+  const studentId = text(row.student_id || input.studentId || input.student_id);
+  if (studentId) return studentId;
+
+  return buildId("U");
+}
+
+function cleanUserRow(row: JsonRecord) {
+  Object.entries(row).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === "") {
+      delete row[key];
+    }
+  });
+  return row;
+}
+
+async function ensureLinkedUser(row: JsonRecord, input: JsonRecord) {
+  const supabase = getSupabaseServerClient();
+  const now = nowIso();
+  const userId = buildLinkedUserId(row, input);
+
+  row.user_id = userId;
+
+  const userRow = cleanUserRow({
+    user_id: userId,
+    name: text(row.name || input.name || input.userName || input.studentName) || "교육생",
+    phone: text(row.phone || input.phone),
+    email: text(row.email || input.email),
+    role: "student",
+    status: "승인완료",
+    created_at: now,
+    approved_at: now,
+    memo: text(input.memo || row.memo),
+    notification_enabled: true,
+  });
+
+  const { error } = await supabase
+    .from("users")
+    .upsert(userRow, { onConflict: "user_id" });
+
+  if (error) {
+    throw new Error(`교육생 연결 회원 생성/확인에 실패했습니다: ${error.message}`);
+  }
+
+  return userId;
+}
+
+async function findExistingStudent(studentId: string) {
+  const supabase = getSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("students")
+    .select("*")
+    .eq("student_id", studentId)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+
+  return (data || {}) as JsonRecord;
+}
+
 async function insertStudent(data: JsonRecord) {
   const supabase = getSupabaseServerClient();
   const row = normalizeStudent(data, { isCreate: true });
+
+  applyInitialCharge(row, data);
+
+  await ensureLinkedUser(row, data);
 
   const { data: saved, error } = await supabase
     .from("students")
@@ -283,7 +497,22 @@ async function updateStudent(data: JsonRecord) {
     throw new Error("studentId가 필요합니다.");
   }
 
+  const existing = await findExistingStudent(studentId);
   const row = normalizeStudent(data, { isCreate: false });
+
+  if (hasOwn(row, "user_id")) {
+    if (text(row.user_id)) {
+      await ensureLinkedUser(row, data);
+    } else {
+      delete row.user_id;
+    }
+  }
+
+  const chargeMode = text(data.chargeMode || data.charge_mode);
+  const addChargeMinutes = getAddChargeMinutes(data);
+  if (chargeMode === "append" && addChargeMinutes > 0) {
+    applyAppendCharge(row, data, existing);
+  }
 
   delete row.student_id;
   delete row.created_at;
@@ -305,10 +534,11 @@ async function updateStudent(data: JsonRecord) {
 }
 
 async function handlePost(body: JsonRecord) {
-  const action = text(body.action);
+  const action = text(body.action || body.mode);
   const data = asRecord(body.data || body.student || body);
 
   if (
+    action === "add" ||
     action === "addStudent" ||
     action === "createStudent" ||
     action === "addRow"
@@ -318,6 +548,7 @@ async function handlePost(body: JsonRecord) {
   }
 
   if (
+    action === "update" ||
     action === "updateStudent" ||
     action === "saveStudent" ||
     action === "editStudent" ||

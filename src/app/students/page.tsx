@@ -472,6 +472,7 @@ export default function StudentsPage() {
   const [editing, setEditing] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [sortMode, setSortMode] = useState("recent");
+  const [studentViewMode, setStudentViewMode] = useState<"register" | "manage">("register");
 
   const loadData = useCallback(async (showLoading = true, forceFresh = false) => {
     try {
@@ -569,12 +570,14 @@ export default function StudentsPage() {
   }
 
   function startCreate() {
+    setStudentViewMode("register");
     setForm(emptyForm);
     setEditing(false);
     setFormOpen(true);
   }
 
   function startEdit(row: StudentRow) {
+    setStudentViewMode("register");
     setForm(toForm(row));
     setEditing(true);
     setFormOpen(true);
@@ -629,7 +632,7 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
       const response = await fetch("/api/students?noCache=1", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: editing ? "update" : "add", data: payload }),
+        body: JSON.stringify({ action: editing ? "updateStudent" : "addStudent", data: payload }),
       });
       const rawText = await response.text();
       if (!rawText.trim()) throw new Error("서버 응답이 비어 있습니다.");
@@ -653,6 +656,23 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
   }
 
   const selectedAircraftIds = form.assignedAircraftIds.split(",").map((value) => value.trim()).filter(Boolean);
+  const previewAircraftText = selectedAircraftIds.length
+    ? selectedAircraftIds
+        .map((aircraftId) => {
+          const row = aircraft.find((item) => text(item.aircraftId, "") === aircraftId || text(item.registrationNo, "") === aircraftId);
+          return row ? aircraftDisplay(row) : aircraftId;
+        })
+        .join(", ")
+    : "미배정";
+  const previewChargeMinutes = chargeMinutesFromHours(form.chargeHours);
+  const previewChargeText = previewChargeMinutes ? formatMinutes(previewChargeMinutes) : "충전 안 함";
+  const registrationChecklist = [
+    { label: "기본정보", done: Boolean(form.name.trim() && form.phone.trim()) },
+    { label: "교육 배정", done: Boolean(form.assignedInstructorId || selectedAircraftIds.length || form.course.trim()) },
+    { label: "비행시간 충전", done: previewChargeMinutes > 0 },
+    { label: "비상연락처", done: Boolean(form.emergencyContactName.trim() && form.emergencyContactPhone.trim()) },
+  ];
+  const completedChecklistCount = registrationChecklist.filter((item) => item.done).length;
 
   return (
     <PageContainer title="교육생 관리" description="교육생 등록, 비행시간 관리 및 현황을 확인할 수 있습니다.">
@@ -661,6 +681,32 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
           {operationMessage || "교육생 정보를 저장하는 중입니다..."}
         </ContentCard>
       ) : null}
+
+      <ContentCard className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] p-3 shadow-sm">
+        <div>
+          <div className="text-[15px] font-semibold text-[#07172f]">화면 모드</div>
+          <p className="mt-1 text-[12px] font-medium text-[#6f8199]">
+            신입 교육생 앞에서는 등록 모드로 개인정보 노출을 줄이고, 혼자 관리할 때만 목록을 표시합니다.
+          </p>
+        </div>
+        <div className="flex rounded-2xl border border-[#dbe5f1] bg-[#f8fbff] p-1">
+          <button
+            type="button"
+            onClick={() => setStudentViewMode("register")}
+            className={`rounded-xl px-4 py-2 text-[13px] font-semibold transition ${studentViewMode === "register" ? "bg-[#1264f4] text-white shadow-sm" : "text-[#405875] hover:bg-white"}`}
+          >
+            신규 등록 모드
+          </button>
+          <button
+            type="button"
+            onClick={() => setStudentViewMode("manage")}
+            className={`rounded-xl px-4 py-2 text-[13px] font-semibold transition ${studentViewMode === "manage" ? "bg-[#1264f4] text-white shadow-sm" : "text-[#405875] hover:bg-white"}`}
+          >
+            관리자 목록 모드
+          </button>
+        </div>
+      </ContentCard>
+
       <div className="grid gap-4 xl:grid-cols-[minmax(430px,0.9fr)_minmax(560px,1.1fr)]">
         <ContentCard className="rounded-[18px] p-5 shadow-sm">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -821,6 +867,7 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
           </div>
         </ContentCard>
 
+        {studentViewMode === "manage" ? (
         <ContentCard className="overflow-hidden rounded-[22px] p-0 shadow-sm">
           <div className="border-b border-[#e8eef7] bg-gradient-to-br from-white via-white to-[#f6faff] px-5 py-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -949,6 +996,92 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
             </div>
           </div>
         </ContentCard>
+        ) : (
+          <ContentCard className="overflow-hidden rounded-[22px] p-0 shadow-sm">
+            <div className="border-b border-[#e8eef7] bg-gradient-to-br from-white via-white to-[#f6faff] px-5 py-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-[#07172f]">신규 등록 진행 상태</h2>
+                  <p className="mt-1 text-[13px] font-medium text-[#6f8199]">입력 중인 교육생 정보만 보여주어 개인정보 노출을 줄입니다.</p>
+                </div>
+                <span className="rounded-full bg-blue-50 px-3 py-1 text-[12px] font-semibold text-[#1264f4]">
+                  {completedChecklistCount}/{registrationChecklist.length} 완료
+                </span>
+              </div>
+
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                {registrationChecklist.map((item) => (
+                  <div key={item.label} className={`rounded-2xl border px-4 py-3 ${item.done ? "border-blue-100 bg-blue-50/70" : "border-[#e2ebf6] bg-white"}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[13px] font-semibold text-[#10213f]">{item.label}</span>
+                      <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${item.done ? "bg-white text-[#1264f4]" : "bg-slate-50 text-[#8a9ab0]"}`}>
+                        {item.done ? "완료" : "미입력"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 p-5 xl:grid-cols-2">
+              <div className="rounded-2xl border border-[#e2ebf6] bg-white p-4 shadow-[0_8px_22px_rgba(16,33,63,0.04)] xl:col-span-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[14px] font-semibold text-[#07172f]">교육생 등록 미리보기</div>
+                    <p className="mt-1 text-[12px] font-medium text-[#6f8199]">등록 전에 입력된 핵심 정보를 한 번 더 확인합니다.</p>
+                  </div>
+                  <span className="rounded-full bg-[#edf4ff] px-3 py-1 text-[11px] font-semibold text-[#1264f4]">
+                    {editing ? "수정 중" : "신규 등록"}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl bg-[#f8fbff] px-4 py-3">
+                    <div className="text-[11px] font-semibold text-[#7a8ca3]">이름</div>
+                    <div className="mt-1 text-[15px] font-semibold text-[#07172f]">{form.name.trim() || "미입력"}</div>
+                  </div>
+                  <div className="rounded-xl bg-[#f8fbff] px-4 py-3">
+                    <div className="text-[11px] font-semibold text-[#7a8ca3]">연락처</div>
+                    <div className="mt-1 text-[15px] font-semibold text-[#07172f]">{form.phone.trim() || "미입력"}</div>
+                  </div>
+                  <div className="rounded-xl bg-[#f8fbff] px-4 py-3">
+                    <div className="text-[11px] font-semibold text-[#7a8ca3]">담당 교관</div>
+                    <div className="mt-1 text-[15px] font-semibold text-[#07172f]">{form.assignedInstructorName.trim() || "미배정"}</div>
+                  </div>
+                  <div className="rounded-xl bg-[#f8fbff] px-4 py-3">
+                    <div className="text-[11px] font-semibold text-[#7a8ca3]">배정 항공기</div>
+                    <div className="mt-1 text-[15px] font-semibold text-[#07172f]">{previewAircraftText}</div>
+                  </div>
+                  <div className="rounded-xl bg-[#f8fbff] px-4 py-3">
+                    <div className="text-[11px] font-semibold text-[#7a8ca3]">과정 / 상태</div>
+                    <div className="mt-1 text-[15px] font-semibold text-[#07172f]">{form.course.trim() || "교육"} · {form.trainingStatus}</div>
+                  </div>
+                  <div className="rounded-xl bg-[#f8fbff] px-4 py-3">
+                    <div className="text-[11px] font-semibold text-[#7a8ca3]">초기 충전</div>
+                    <div className="mt-1 text-[15px] font-semibold text-[#07172f]">{previewChargeText}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#e2ebf6] bg-white p-4 shadow-[0_8px_22px_rgba(16,33,63,0.04)]">
+                <div className="text-[14px] font-semibold text-[#07172f]">등록 후 자동 처리</div>
+                <div className="mt-3 space-y-2 text-[13px] font-medium text-[#405875]">
+                  <div className="rounded-xl bg-[#f8fbff] px-3 py-2">교육생 목록에 자동 추가</div>
+                  <div className="rounded-xl bg-[#f8fbff] px-3 py-2">담당 교관 / 배정 항공기 연결</div>
+                  <div className="rounded-xl bg-[#f8fbff] px-3 py-2">비행시간 충전 내역 반영</div>
+                  <div className="rounded-xl bg-[#f8fbff] px-3 py-2">비행일지 작성 준비</div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#e2ebf6] bg-white p-4 shadow-[0_8px_22px_rgba(16,33,63,0.04)]">
+                <div className="text-[14px] font-semibold text-[#07172f]">입력 안내</div>
+                <div className="mt-3 rounded-xl border border-dashed border-[#dbe5f1] bg-[#fbfdff] p-4 text-[13px] font-medium leading-6 text-[#516982]">
+                  신입 교육생과 함께 화면을 볼 때는 등록 모드를 사용하세요. 전체 교육생 목록과 다른 교육생의 연락처, 비행시간, 배정 정보는 관리자 목록 모드에서만 표시됩니다.
+                </div>
+              </div>
+            </div>
+          </ContentCard>
+        )}
       </div>
 
       {error ? (
@@ -960,6 +1093,7 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
         </ContentCard>
       ) : null}
 
+      {studentViewMode === "manage" ? (
       <ContentCard className="overflow-hidden rounded-[18px] p-0 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
           <div>
@@ -1053,6 +1187,32 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
           </div>
         )}
       </ContentCard>
+      ) : (
+        <ContentCard className="overflow-hidden rounded-[18px] p-0 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4">
+            <div>
+              <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-[#07172f]">신규 교육생 등록 체크리스트</h2>
+              <p className="mt-1 text-[13px] font-medium text-[#6f8199]">다른 교육생 목록 대신 등록에 필요한 확인 항목만 표시합니다.</p>
+            </div>
+            <button type="button" onClick={() => setStudentViewMode("manage")} className="ui-btn ui-btn-outline h-10">관리자 목록 보기</button>
+          </div>
+
+          <div className="grid gap-4 px-6 pb-6 xl:grid-cols-3 md:grid-cols-2">
+            <div className="rounded-2xl border border-[#e2ebf6] bg-[#fbfdff] p-5">
+              <div className="text-[15px] font-semibold text-[#07172f]">1. 기본정보 확인</div>
+              <p className="mt-2 text-[13px] font-medium leading-6 text-[#61758f]">이름, 전화번호, 교육 시작일, 비상 연락처를 입력합니다.</p>
+            </div>
+            <div className="rounded-2xl border border-[#e2ebf6] bg-[#fbfdff] p-5">
+              <div className="text-[15px] font-semibold text-[#07172f]">2. 교육 배정 확인</div>
+              <p className="mt-2 text-[13px] font-medium leading-6 text-[#61758f]">담당 교관과 배정 항공기를 연결합니다. 교육생은 배정된 항공기 기준으로 예약합니다.</p>
+            </div>
+            <div className="rounded-2xl border border-[#e2ebf6] bg-[#fbfdff] p-5">
+              <div className="text-[15px] font-semibold text-[#07172f]">3. 비행시간 충전</div>
+              <p className="mt-2 text-[13px] font-medium leading-6 text-[#61758f]">초기 충전 시간과 메모를 남기면 교육비/잔여시간 관리에 반영됩니다.</p>
+            </div>
+          </div>
+        </ContentCard>
+      )}
 
       <StudentTrainingLogDrawer
         student={selectedLogStudent}
