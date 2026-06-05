@@ -2229,7 +2229,7 @@ function ScheduleGraph({
       <div className="flex flex-col gap-2.5 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-[-0.02em] text-[#10213f]">운항 일정</h2>
-          <p className="mt-0.5 text-[12px] font-medium text-[#61758f]">항공기별 예약·PFI·정비 타임라인</p>
+          <p className="mt-0.5 text-[11px] font-medium text-[#61758f]">항공기별 예약·PFI·정비 타임라인</p>
         </div>
         <form className="flex flex-wrap items-end gap-2" action="/">
           <label className="grid gap-1 text-[13px] font-bold text-[#526a89]">
@@ -2367,7 +2367,7 @@ function ScheduleGraph({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-5 px-6 pb-4 pt-2 text-xs font-medium text-[#61758f]">
+      <div className="flex flex-wrap items-center gap-5 px-6 pb-4 pt-2 text-[11px] font-medium text-[#61758f]">
         <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-blue-500" />교육비행</span>
         <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />체험비행</span>
         <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-400" />렌탈비행</span>
@@ -2394,7 +2394,7 @@ function MiniTable({
   return (
     <ContentCard className={`flex flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)] ${className}`}>
       <div className="flex shrink-0 items-center justify-between px-3 py-2">
-        <h3 className="text-lg font-bold text-[#10213f]">{title}</h3>
+        <h3 className="text-[16px] font-bold leading-tight text-[#10213f]">{title}</h3>
         <Link href={href} className="text-xs font-bold text-[#1264f4]">
           전체 보기 ›
         </Link>
@@ -2498,7 +2498,7 @@ function OperationChecklist({
     <ContentCard className="rounded-[22px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-[#10213f]">오늘 처리할 일</h3>
+          <h3 className="text-[16px] font-bold leading-tight text-[#10213f]">오늘 처리할 일</h3>
           <p className="mt-1 text-xs font-bold text-[#6f8199]">승인·취소·운항 전 확인 항목</p>
         </div>
         <span className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-bold text-[#526a89]">
@@ -2538,8 +2538,8 @@ function WeatherSummaryCard({ weather }: { weather: WeatherData }) {
     <ContentCard className="overflow-hidden p-0">
       <div className="flex items-start justify-between px-5 py-3.5">
         <div>
-          <h3 className="text-lg font-bold text-[#10213f]">오늘 기상 요약</h3>
-          <p className="mt-1 text-xs font-medium text-[#61758f]">
+          <h3 className="text-[16px] font-bold leading-tight text-[#10213f]">오늘 기상 요약</h3>
+          <p className="mt-1 text-[11px] font-medium text-[#61758f]">
             Open-Meteo · 좌표 37.106759, 126.765010
           </p>
         </div>
@@ -2558,27 +2558,27 @@ function WeatherSummaryCard({ weather }: { weather: WeatherData }) {
             <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
               <p className="text-[11px] font-semibold text-blue-700">Active RWY</p>
               <p className="mt-1 text-2xl font-bold text-[#10213f]">{runway?.label || "-"}</p>
-              <p className="mt-1 text-xs font-medium text-[#61758f]">활주로 {runway?.heading || "-"}° 기준</p>
+              <p className="mt-1 text-[11px] font-medium text-[#61758f]">활주로 {runway?.heading || "-"}° 기준</p>
             </div>
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
               <p className="text-[11px] font-semibold text-emerald-700">현재 바람</p>
               <p className="mt-1 text-2xl font-bold text-[#10213f]">{numberText(current.windSpeed, "kt")}</p>
-              <p className="mt-1 text-xs font-medium text-[#61758f]">{numberText(current.windDirection, "°")} · 돌풍 {numberText(current.windGust, "kt")}</p>
+              <p className="mt-1 text-[11px] font-medium text-[#61758f]">{numberText(current.windDirection, "°")} · 돌풍 {numberText(current.windGust, "kt")}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-[20px] border border-[#e7eef7] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(20,46,80,0.04)]">
               <p className="text-[11px] font-medium text-[#6b7f99]">측풍</p>
-              <p className="mt-1 text-lg font-bold text-[#10213f]">{numberText(components?.crosswind, "kt")}</p>
+              <p className="mt-1 text-[16px] font-bold leading-tight text-[#10213f]">{numberText(components?.crosswind, "kt")}</p>
             </div>
             <div className="rounded-[20px] border border-[#e7eef7] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(20,46,80,0.04)]">
               <p className="text-[11px] font-medium text-[#6b7f99]">정풍</p>
-              <p className="mt-1 text-lg font-bold text-[#10213f]">{numberText(components?.headwind, "kt")}</p>
+              <p className="mt-1 text-[16px] font-bold leading-tight text-[#10213f]">{numberText(components?.headwind, "kt")}</p>
             </div>
             <div className="rounded-[20px] border border-[#e7eef7] bg-white px-3 py-2.5 shadow-[0_8px_24px_rgba(20,46,80,0.04)]">
               <p className="text-[11px] font-medium text-[#6b7f99]">배풍</p>
-              <p className="mt-1 text-lg font-bold text-[#10213f]">{numberText(components?.tailwind, "kt")}</p>
+              <p className="mt-1 text-[16px] font-bold leading-tight text-[#10213f]">{numberText(components?.tailwind, "kt")}</p>
             </div>
           </div>
 
@@ -2695,8 +2695,8 @@ function WeatherLineChart({
     <div className="rounded-[22px] border border-[#dfe8f5] bg-[linear-gradient(180deg,#ffffff_0%,#f9fbff_100%)] px-3 py-2.5 shadow-[0_10px_30px_rgba(20,46,80,0.05)]">
       <div className="mb-2.5 flex items-start justify-between gap-2">
         <div>
-          <p className="text-[17px] font-bold tracking-[-0.02em] text-[#10213f]">{title}</p>
-          <p className="mt-0.5 text-[12px] font-medium text-[#61758f]">{subtitle}</p>
+          <p className="text-[16px] font-bold leading-tight text-[#10213f]">{title}</p>
+          <p className="mt-0.5 text-[11px] font-medium text-[#61758f]">{subtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           {series.map((item) => {
@@ -2862,8 +2862,8 @@ function WeatherDetailPanel({ weather }: { weather: WeatherData }) {
     <ContentCard className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="flex h-[72px] shrink-0 items-start justify-between px-4 py-3">
         <div className="min-w-0 pt-0.5">
-          <h3 className="text-[17px] font-bold leading-tight tracking-[-0.02em] text-[#10213f]">시간별 기상 그래프</h3>
-          <p className="mt-1 text-[12px] font-medium leading-tight text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
+          <h3 className="text-[16px] font-bold leading-tight text-[#10213f]">시간별 기상 그래프</h3>
+          <p className="mt-1 text-[11px] font-medium leading-tight text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
         </div>
         <span className="mt-0.5 rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">Open-Meteo</span>
       </div>
@@ -2923,8 +2923,8 @@ function RecentActivityPanel({
     <ContentCard className={`flex min-h-0 flex-col p-3 ${className}`}>
       <div className="mb-3 flex shrink-0 items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-[#10213f]">최근 작업 내역</h3>
-          <p className="mt-1 text-xs font-medium text-[#61758f]">예약·회원·교육생 기준 최근 작업</p>
+          <h3 className="text-[16px] font-bold leading-tight text-[#10213f]">최근 작업 내역</h3>
+          <p className="mt-1 text-[11px] font-medium text-[#61758f]">예약·회원·교육생 기준 최근 작업</p>
         </div>
         <Link href="/logs" className="text-xs font-semibold text-[#1264f4]">로그 보기 ›</Link>
       </div>
@@ -2944,7 +2944,7 @@ function RecentActivityPanel({
                   <span className="shrink-0 text-[11px] font-medium text-[#8a9ab0]">{shortActivityTime(activity.time)}</span>
                 </div>
                 {activity.detail ? (
-                  <p className="mt-0.5 truncate text-xs font-medium text-[#61758f]" title={activity.detail}>
+                  <p className="mt-0.5 truncate text-[11px] font-medium text-[#61758f]" title={activity.detail}>
                     {activity.detail}
                   </p>
                 ) : null}
@@ -2993,8 +2993,8 @@ function InstructorAssignmentSummaryPanel({
     <ContentCard className={`flex flex-col overflow-hidden p-0 ${className}`}>
       <div className="flex h-[72px] shrink-0 items-start justify-between px-4 py-3">
         <div className="min-w-0 pt-0.5">
-          <h3 className="text-[17px] font-bold leading-tight tracking-[-0.02em] text-[#10213f]">교관별 오늘 배정</h3>
-          <p className="mt-1 text-[12px] font-medium leading-tight text-[#61758f]">상태·일정·휴무 여부</p>
+          <h3 className="text-[16px] font-bold leading-tight text-[#10213f]">교관별 오늘 배정</h3>
+          <p className="mt-1 text-[11px] font-medium leading-tight text-[#61758f]">상태·일정·휴무 여부</p>
         </div>
         <span className="mt-0.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">총 {totalAssigned}건</span>
       </div>
