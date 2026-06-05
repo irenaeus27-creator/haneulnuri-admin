@@ -1175,7 +1175,6 @@ export default function BookingsPage() {
   const formRef = useRef<HTMLDivElement | null>(null);
   const calendarDragClickBlockRef = useRef(false);
   const calendarBlockDragClickBlockRef = useRef(false);
-  const calendarBlockDragFinishingRef = useRef(false);
   const calendarTimelineRef = useRef<HTMLDivElement | null>(null);
   const calendarSectionRef = useRef<HTMLElement | null>(null);
 
@@ -1543,6 +1542,34 @@ export default function BookingsPage() {
     [aircraft]
   );
 
+  const selectedEducationStudent = useMemo(
+    () =>
+      students.find((item) => {
+        const studentId = formValue(item.studentId);
+        const userId = formValue(item.userId);
+        return Boolean(
+          (studentId && studentId === form.userId) ||
+            (userId && userId === form.userId) ||
+            (studentId && studentId === formValue(form.rentalPilotId))
+        );
+      }),
+    [students, form.userId, form.rentalPilotId]
+  );
+
+  const educationAssignedAircraft = useMemo(
+    () =>
+      selectedEducationStudent
+        ? findAircraftListByAnyIds(
+            selectedEducationStudent.assignedAircraftIds ||
+              selectedEducationStudent.assignedAircraftId ||
+              selectedEducationStudent.aircraftId ||
+              selectedEducationStudent.assignedAircraftName ||
+              selectedEducationStudent.aircraftName
+          )
+        : [],
+    [selectedEducationStudent, activeAircraft]
+  );
+
   const operationalAircraft = useMemo(
     () => activeAircraft.filter((item) => isAircraftOperational(item)),
     [activeAircraft]
@@ -1687,10 +1714,14 @@ export default function BookingsPage() {
   const canShowReadyMessage = form.bookingDate && form.startTime && form.endTime && form.userName.trim() && saveBlockMessages.length === 0;
 
   const selectableAircraftForForm = useMemo(() => {
+    if (isEducationForm) {
+      return selectedEducationStudent ? educationAssignedAircraft : activeAircraft;
+    }
+
     if (!isRentalType(form.bookingType) || !selectedRentalPilot) return activeAircraft;
 
     return activeAircraft.filter((item) => rentalPilotCanUseAircraft(selectedRentalPilot, item));
-  }, [activeAircraft, form.bookingType, selectedRentalPilot]);
+  }, [activeAircraft, form.bookingType, selectedRentalPilot, isEducationForm, selectedEducationStudent, educationAssignedAircraft]);
 
   const allActiveRentalPilots = useMemo(
     () =>
@@ -1700,6 +1731,12 @@ export default function BookingsPage() {
       }),
     [rentalPilots]
   );
+
+  const rentalPilotOptionsForForm = useMemo(() => {
+    if (!selectedAircraftForRental) return allActiveRentalPilots;
+
+    return allActiveRentalPilots.filter((item) => rentalPilotCanUseAircraft(item, selectedAircraftForRental));
+  }, [allActiveRentalPilots, selectedAircraftForRental]);
 
   function findAircraftByAnyId(value: unknown) {
     const keys = splitAssignedAircraftIds(value);
@@ -1716,6 +1753,35 @@ export default function BookingsPage() {
 
       return keys.some((key) => aircraftKeys.includes(key));
     });
+  }
+
+  function findAircraftListByAnyIds(value: unknown) {
+    const keys = splitAssignedAircraftIds(value);
+    if (keys.length === 0) return [] as AircraftRow[];
+
+    return activeAircraft.filter((item) => {
+      if (!isAircraftOperational(item)) return false;
+
+      const aircraftKeys = [
+        formValue(item.aircraftId),
+        formValue(item.aircraftName),
+        formValue(item.registrationNo),
+      ].filter(Boolean);
+
+      return keys.some((key) => aircraftKeys.includes(key));
+    });
+  }
+
+  function bookingTypeGuideMessage() {
+    if (isEducationForm) return "교육생 선택 후 배정된 항공기 중에서 예약하세요.";
+    if (isRentalForm) return "렌탈기장과 배정 항공기를 선택하세요.";
+    if (isExperienceForm) return "고객 정보와 항공기, 교관을 선택하세요.";
+    return "";
+  }
+
+  function assignedAircraftText(items: AircraftRow[]) {
+    if (items.length === 0) return "";
+    return items.map((item) => aircraftDisplay(item)).join(", ");
   }
 
   function scheduleDurationMinutes(value = durationMinutes, bookingType = form.bookingType) {
@@ -1860,16 +1926,14 @@ export default function BookingsPage() {
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
-      if (calendarMoveDrag || calendarResizeDrag || isCalendarDragging || saving || movingBookingId) return;
       void loadData(false);
     }, 15000);
 
     return () => window.clearInterval(intervalId);
-  }, [loadData, calendarMoveDrag, calendarResizeDrag, isCalendarDragging, saving, movingBookingId]);
+  }, [loadData]);
 
   useEffect(() => {
     function refreshOnFocus() {
-      if (calendarMoveDrag || calendarResizeDrag || isCalendarDragging || saving || movingBookingId) return;
       void loadData(false);
     }
 
@@ -1880,30 +1944,18 @@ export default function BookingsPage() {
       window.removeEventListener("focus", refreshOnFocus);
       document.removeEventListener("visibilitychange", refreshOnFocus);
     };
-  }, [loadData, calendarMoveDrag, calendarResizeDrag, isCalendarDragging, saving, movingBookingId]);
+  }, [loadData]);
 
 
   useEffect(() => {
     if (!calendarMoveDrag && !calendarResizeDrag) return;
 
     function handleWindowMouseMove(event: MouseEvent) {
-      // 가장 중요한 안전장치입니다.
-      // mouseup 이벤트를 브라우저가 놓쳐도, 왼쪽 버튼이 눌려 있지 않으면 드래그를 즉시 종료합니다.
-      if (event.buttons !== 1) {
-        cancelActiveCalendarBlockDrag();
-        return;
-      }
-
       updateCalendarMoveDrag(event);
       updateCalendarResizeDrag(event);
     }
 
-    function handleWindowMouseUp(event: MouseEvent) {
-      event.preventDefault();
-      void finishActiveCalendarBlockDrag();
-    }
-
-    function handleWindowPointerUp() {
+    function handleWindowMouseUp() {
       void finishActiveCalendarBlockDrag();
     }
 
@@ -1911,33 +1963,19 @@ export default function BookingsPage() {
       cancelActiveCalendarBlockDrag();
     }
 
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        cancelActiveCalendarBlockDrag();
-      }
-    }
-
     const previousUserSelect = document.body.style.userSelect;
-    const previousCursor = document.body.style.cursor;
 
     document.body.style.userSelect = "none";
-    document.body.style.cursor = calendarResizeDrag ? "ew-resize" : "grabbing";
-
     window.addEventListener("mousemove", handleWindowMouseMove);
     window.addEventListener("mouseup", handleWindowMouseUp);
-    window.addEventListener("pointerup", handleWindowPointerUp);
     window.addEventListener("blur", handleWindowCancel);
-    window.addEventListener("keydown", handleKeyDown);
     document.addEventListener("mouseleave", handleWindowCancel);
 
     return () => {
       document.body.style.userSelect = previousUserSelect;
-      document.body.style.cursor = previousCursor;
       window.removeEventListener("mousemove", handleWindowMouseMove);
       window.removeEventListener("mouseup", handleWindowMouseUp);
-      window.removeEventListener("pointerup", handleWindowPointerUp);
       window.removeEventListener("blur", handleWindowCancel);
-      window.removeEventListener("keydown", handleKeyDown);
       document.removeEventListener("mouseleave", handleWindowCancel);
     };
   }, [calendarMoveDrag, calendarResizeDrag, bookings]);
@@ -2195,6 +2233,7 @@ export default function BookingsPage() {
 
     setForm((prev) => ({
       ...prev,
+      rentalPilotId: text(selected.studentId, ""),
       userId: text(selected.userId || selected.studentId, ""),
       userName: text(selected.name, ""),
       phone: text(selected.phone, ""),
@@ -2776,36 +2815,25 @@ export default function BookingsPage() {
 
 
   async function finishActiveCalendarBlockDrag() {
-    if (calendarBlockDragFinishingRef.current) return;
-
-    const resizeSnapshot = calendarResizeDrag;
-    const moveSnapshot = calendarMoveDrag;
-    const activeDrag = resizeSnapshot || moveSnapshot;
+    const activeDrag = calendarResizeDrag || calendarMoveDrag;
 
     if (!activeDrag) return;
-
-    calendarBlockDragFinishingRef.current = true;
 
     const activeBooking = bookings.find((item) => formValue(item.bookingId) === activeDrag.bookingId);
 
     if (!activeBooking) {
       setCalendarMoveDrag(null);
       setCalendarResizeDrag(null);
-      calendarBlockDragFinishingRef.current = false;
       return;
     }
 
-    try {
-      if (resizeSnapshot?.bookingId === activeDrag.bookingId) {
-        await finishCalendarResizeDrag(activeBooking, resizeSnapshot);
-        return;
-      }
+    if (calendarResizeDrag?.bookingId === activeDrag.bookingId) {
+      await finishCalendarResizeDrag(activeBooking);
+      return;
+    }
 
-      if (moveSnapshot?.bookingId === activeDrag.bookingId) {
-        await finishCalendarMoveDrag(activeBooking, moveSnapshot);
-      }
-    } finally {
-      calendarBlockDragFinishingRef.current = false;
+    if (calendarMoveDrag?.bookingId === activeDrag.bookingId) {
+      await finishCalendarMoveDrag(activeBooking);
     }
   }
 
@@ -2814,18 +2842,13 @@ export default function BookingsPage() {
 
     setCalendarMoveDrag(null);
     setCalendarResizeDrag(null);
-    calendarBlockDragFinishingRef.current = false;
   }
 
   function beginCalendarMoveDrag(event: React.MouseEvent, booking: BookingRow) {
-    if (event.button !== 0) return;
-
     event.preventDefault();
     event.stopPropagation();
 
     calendarBlockDragClickBlockRef.current = false;
-    calendarBlockDragFinishingRef.current = false;
-    setCalendarResizeDrag(null);
 
     const bookingId = formValue(booking.bookingId);
 
@@ -2855,10 +2878,10 @@ export default function BookingsPage() {
     });
   }
 
-  async function finishCalendarMoveDrag(booking: BookingRow, dragSnapshot = calendarMoveDrag) {
-    if (!dragSnapshot || dragSnapshot.bookingId !== formValue(booking.bookingId)) return;
+  async function finishCalendarMoveDrag(booking: BookingRow) {
+    if (!calendarMoveDrag || calendarMoveDrag.bookingId !== formValue(booking.bookingId)) return;
 
-    const { deltaSteps, originalStartTime, originalEndTime } = dragSnapshot;
+    const { deltaSteps, originalStartTime, originalEndTime } = calendarMoveDrag;
 
     if (deltaSteps) {
       calendarBlockDragClickBlockRef.current = true;
@@ -2868,8 +2891,6 @@ export default function BookingsPage() {
     }
 
     setCalendarMoveDrag(null);
-    setCalendarMoveDrag(null);
-    setCalendarResizeDrag(null);
 
     if (!deltaSteps) return;
 
@@ -2947,14 +2968,10 @@ export default function BookingsPage() {
   }
 
   function beginCalendarResizeDrag(event: React.MouseEvent, booking: BookingRow) {
-    if (event.button !== 0) return;
-
     event.preventDefault();
     event.stopPropagation();
 
     calendarBlockDragClickBlockRef.current = false;
-    calendarBlockDragFinishingRef.current = false;
-    setCalendarMoveDrag(null);
 
     const bookingId = formValue(booking.bookingId);
 
@@ -2984,10 +3001,10 @@ export default function BookingsPage() {
     });
   }
 
-  async function finishCalendarResizeDrag(booking: BookingRow, dragSnapshot = calendarResizeDrag) {
-    if (!dragSnapshot || dragSnapshot.bookingId !== formValue(booking.bookingId)) return;
+  async function finishCalendarResizeDrag(booking: BookingRow) {
+    if (!calendarResizeDrag || calendarResizeDrag.bookingId !== formValue(booking.bookingId)) return;
 
-    const { deltaSteps, originalStartTime, originalEndTime } = dragSnapshot;
+    const { deltaSteps, originalStartTime, originalEndTime } = calendarResizeDrag;
 
     if (deltaSteps) {
       calendarBlockDragClickBlockRef.current = true;
@@ -3218,6 +3235,19 @@ export default function BookingsPage() {
       }
 
       const selectedAircraftForSave = aircraft.find((item) => text(item.aircraftId, "") === form.aircraftId);
+
+      if (isEducationForm && selectedEducationStudent && educationAssignedAircraft.length === 0) {
+        alert("이 교육생에게 배정된 항공기가 없습니다. 교육생관리에서 배정 항공기를 먼저 확인하세요.");
+        return;
+      }
+
+      if (isEducationForm && selectedEducationStudent && selectedAircraftForSave && educationAssignedAircraft.length > 0) {
+        const allowed = educationAssignedAircraft.some((item) => formValue(item.aircraftId) === formValue(selectedAircraftForSave.aircraftId));
+        if (!allowed) {
+          alert("선택한 항공기는 이 교육생에게 배정된 항공기가 아닙니다.");
+          return;
+        }
+      }
 
       if (selectedAircraftForSave && !isAircraftOperational(selectedAircraftForSave)) {
         alert(`${aircraftDisplay(selectedAircraftForSave)} 항공기는 현재 ${aircraftStatusLabel(selectedAircraftForSave)} 상태라 예약할 수 없습니다.`);
@@ -3689,10 +3719,6 @@ export default function BookingsPage() {
                           data-calendar-timeline="true"
                           className="relative min-w-[980px] min-h-[86px] border-l border-[#dce7f3]"
                           onMouseMove={(event) => {
-                            if ((calendarMoveDrag || calendarResizeDrag) && event.buttons !== 1) {
-                              cancelActiveCalendarBlockDrag();
-                              return;
-                            }
                             updateCalendarMoveDrag(event);
                             updateCalendarResizeDrag(event);
                           }}
@@ -4170,7 +4196,7 @@ export default function BookingsPage() {
                 <Field label="렌탈 기장" required>
                   <select value={form.rentalPilotId || form.userId || ""} onChange={(event) => handleRentalPilotChange(event.target.value)} className="input-base compact-input">
                     <option value="">렌탈 기장 선택</option>
-                    {allActiveRentalPilots.map((item, index) => {
+                    {rentalPilotOptionsForForm.map((item, index) => {
                       const pilotId = text(item.pilotId || item.userId, "");
                       return <option key={`${pilotId}-${index}`} value={pilotId}>{text(item.name, "")} / {pilotId}</option>;
                     })}
@@ -4222,9 +4248,9 @@ export default function BookingsPage() {
                 </Field>
               )}
 
-              <Field label="항공기" required={isRentalForm || isExperienceForm} auto={isEducationForm && !!form.aircraftId}>
-                <select value={form.aircraftId} onChange={(event) => selectAircraft(event.target.value)} className="input-base compact-input" disabled={isEducationForm && !!form.aircraftId}>
-                  <option value="">{isEducationForm ? "자동 배정" : "항공기 선택"}</option>
+              <Field label="항공기" required={isRentalForm || isExperienceForm || isEducationForm} auto={isEducationForm && educationAssignedAircraft.length === 1 && !!form.aircraftId}>
+                <select value={form.aircraftId} onChange={(event) => selectAircraft(event.target.value)} className="input-base compact-input" disabled={isEducationForm && educationAssignedAircraft.length <= 1 && !!form.aircraftId}>
+                  <option value="">{isEducationForm ? "배정 항공기 선택" : "항공기 선택"}</option>
                   {selectableAircraftForForm.map((item, index) => {
                     const aircraftId = text(item.aircraftId, "");
                     const disabled = !isAircraftOperational(item);
@@ -4266,10 +4292,9 @@ export default function BookingsPage() {
               </Field>
             </FormGroup>
 
-            {(requiredFieldWarnings.length > 0 && (isEducationForm || isRentalForm)) ? (
-              <div className="min-w-0 rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
-                <span className="font-semibold">{isEducationForm ? "교육생 확인" : "렌탈 기장 확인"}</span>
-                <span className="ml-2">{requiredFieldWarnings.slice(0, 2).join(" · ")}{requiredFieldWarnings.length > 2 ? ` 외 ${requiredFieldWarnings.length - 2}건` : ""}</span>
+            {bookingTypeGuideMessage() ? (
+              <div className="min-w-0 rounded-[14px] border border-blue-100 bg-blue-50/70 px-3 py-2 text-[13px] font-medium text-blue-800">
+                {bookingTypeGuideMessage()}
               </div>
             ) : null}
 
@@ -4285,30 +4310,18 @@ export default function BookingsPage() {
                 </div>
                 <div>
                   <span className="text-[#6b7f99]">배정 항공기</span>
-                  <p className="mt-0.5 font-medium text-[#0f315f]">{form.aircraftName || form.aircraftId || "미배정"}</p>
+                  <p className="mt-0.5 font-medium text-[#0f315f]">{assignedAircraftText(educationAssignedAircraft) || form.aircraftName || form.aircraftId || "미배정"}</p>
                 </div>
               </div>
             ) : null}
 
-            {isRentalForm ? (
-              <div className={`rounded-[14px] border px-3 py-2 text-[13px] font-medium ${selectedRentalPilot && selectableAircraftForForm.length === 0 ? "border-rose-200 bg-rose-50 text-rose-800" : "border-orange-100 bg-orange-50 text-orange-800"}`}>
-                렌탈기장 배정 항공기: {selectedRentalPilot ? `${selectableAircraftForForm.length}대 선택 가능` : "렌탈 기장을 먼저 선택하세요."}
-                {selectedRentalPilot && selectableAircraftForForm.length === 0 ? " · 배정 항공기가 없습니다." : ""}
+            {isRentalForm && selectedRentalPilot ? (
+              <div className={`rounded-[14px] border px-3 py-2 text-[13px] font-medium ${selectableAircraftForForm.length === 0 ? "border-rose-200 bg-rose-50 text-rose-800" : "border-orange-100 bg-orange-50 text-orange-800"}`}>
+                배정 항공기 {selectableAircraftForForm.length}대{selectableAircraftForForm.length > 0 ? `: ${assignedAircraftText(selectableAircraftForForm)}` : "가 없습니다."}
               </div>
             ) : null}
 
-            {isExperienceForm ? (
-              <div className="min-w-0 rounded-[14px] border border-emerald-100 bg-emerald-50 px-3 py-2 text-[13px] font-medium text-emerald-800">
-                체험비행은 코스 선택 시 예약 점유시간 30분으로 자동 정리됩니다.
-              </div>
-            ) : null}
-
-            {requiredFieldWarnings.length > 0 ? (
-              <div className="min-w-0 rounded-[14px] border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] font-medium text-amber-800">
-                <span className="font-semibold">저장 전 확인</span>
-                <span className="ml-2">{requiredFieldWarnings.slice(0, 3).join(" · ")}{requiredFieldWarnings.length > 3 ? ` 외 ${requiredFieldWarnings.length - 3}건` : ""}</span>
-              </div>
-            ) : conflictWarnings.length > 0 ? (
+            {conflictWarnings.length > 0 ? (
               <div className={`rounded-[14px] border px-3 py-2 text-[13px] font-medium ${hasAircraftConflict ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
                 <div className="font-semibold">
                   {hasAircraftConflict ? "일정 중복 확인" : "교관 일정 중복 확인"}
