@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import ContentCard from "@/components/ContentCard";
 import PageContainer from "@/components/PageContainer";
 import { DashboardWeatherDetailClient, DashboardWeatherSummaryClient } from "@/components/DashboardWeatherClient";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { formatBookingDate as sharedFormatBookingDate, formatBookingTime as sharedFormatBookingTime } from "@/lib/formatDateTime";
 
 type Row = Record<string, unknown>;
@@ -332,120 +331,6 @@ function normalizeRows(value: unknown): Row[] {
   return Array.isArray(value) ? value as Row[] : [];
 }
 
-function normalizeSupabaseCamelKey(key: string) {
-  return key.replace(/_([a-z0-9])/g, (_, char: string) => char.toUpperCase());
-}
-
-function normalizeSupabaseRow(row: Row) {
-  const result: Row = {};
-
-  Object.entries(row || {}).forEach(([key, value]) => {
-    result[normalizeSupabaseCamelKey(key)] = value ?? "";
-  });
-
-  return result;
-}
-
-function normalizeSupabaseRows(rows: Row[] | null | undefined, options?: { bookingAlias?: boolean }) {
-  return (rows || []).map((row) => {
-    const next = normalizeSupabaseRow(row);
-
-    if (options?.bookingAlias) {
-      if (next.aircraftName && !next.aircraft) next.aircraft = next.aircraftName;
-      if (next.userName && !next.name) next.name = next.userName;
-      if (next.instructorName && !next.instructor) next.instructor = next.instructorName;
-      if (next.bookingId && !next.id) next.id = next.bookingId;
-    }
-
-    return next;
-  });
-}
-
-async function selectDashboardSupabaseRows(table: string, options?: {
-  orderColumn?: string;
-  ascending?: boolean;
-  limit?: number;
-}) {
-  const supabase = getSupabaseServerClient();
-  let query = supabase.from(table).select("*");
-
-  if (options?.orderColumn) {
-    query = query.order(options.orderColumn, { ascending: options.ascending ?? true });
-  }
-
-  if (options?.limit) query = query.limit(options.limit);
-
-  const { data, error } = await query;
-  if (error) throw new Error(`${table} 직접 조회 실패: ${error.message}`);
-
-  return normalizeSupabaseRows(data as Row[]);
-}
-
-async function safeGetDashboardDataDirect(): Promise<Required<DashboardApiResponse>> {
-  const today = todayText();
-  const fromDate = addDays(today, -2);
-  const toDate = addDays(today, 30);
-  const supabase = getSupabaseServerClient();
-
-  const [
-    bookingResult,
-    userResult,
-    aircraft,
-    instructors,
-    instructorSchedules,
-    notifications,
-    logs,
-    trainingCharges,
-  ] = await Promise.all([
-    supabase
-      .from("bookings")
-      .select("*")
-      .gte("booking_date", fromDate)
-      .lte("booking_date", toDate)
-      .order("booking_date", { ascending: true })
-      .order("start_time", { ascending: true }),
-    supabase
-      .from("users")
-      .select("*")
-      .in("status", ["승인대기", "요청", "대기", "pending"])
-      .order("created_at", { ascending: false })
-      .limit(20),
-    selectDashboardSupabaseRows("aircraft", { orderColumn: "aircraft_id", ascending: true }),
-    selectDashboardSupabaseRows("instructors", { orderColumn: "instructor_id", ascending: true }),
-    selectDashboardSupabaseRows("instructor_schedules", { orderColumn: "instructor_name", ascending: true, limit: 80 }),
-    selectDashboardSupabaseRows("notifications", { orderColumn: "created_at", ascending: false, limit: 8 }),
-    selectDashboardSupabaseRows("logs", { orderColumn: "created_at", ascending: false, limit: 20 }),
-    selectDashboardSupabaseRows("training_charges", { orderColumn: "charge_date", ascending: false, limit: 12 }),
-  ]);
-
-  if (bookingResult.error) throw new Error(`bookings 직접 조회 실패: ${bookingResult.error.message}`);
-  if (userResult.error) throw new Error(`users 직접 조회 실패: ${userResult.error.message}`);
-
-  return {
-    bookings: normalizeSupabaseRows(bookingResult.data as Row[], { bookingAlias: true }),
-    users: normalizeSupabaseRows(userResult.data as Row[]),
-    aircraft,
-    instructors,
-    students: [],
-    notifications,
-    instructorSchedules,
-    trainingCharges,
-    logs,
-  };
-}
-
-function hasAnyDashboardData(data: Required<DashboardApiResponse>) {
-  return (
-    data.bookings.length > 0 ||
-    data.users.length > 0 ||
-    data.aircraft.length > 0 ||
-    data.instructors.length > 0 ||
-    data.notifications.length > 0 ||
-    data.logs.length > 0
-  );
-}
-
-
 async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
   const emptyData: Required<DashboardApiResponse> = {
     bookings: [],
@@ -460,51 +345,63 @@ async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
   };
 
   try {
-    const baseUrl = getAppBaseUrl();
-    const response = await fetch(`${baseUrl}/api/dashboard`, {
-      cache: "no-store",
-      headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
-      },
-    });
+    const directData = await safeFetchAppsScriptDashboardData();
 
-    if (!response.ok) {
-      throw new Error(`대시보드 API 오류: ${response.status}`);
+    if (normalizeRows(directData.bookings).length > 0 || normalizeRows(directData.aircraft).length > 0) {
+      return {
+        bookings: normalizeRows(directData.bookings),
+        users: normalizeRows(directData.users),
+        aircraft: normalizeRows(directData.aircraft),
+        instructors: normalizeRows(directData.instructors),
+        students: normalizeRows(directData.students),
+        notifications: normalizeRows(directData.notifications),
+        instructorSchedules: normalizeRows(directData.instructorSchedules),
+        trainingCharges: normalizeRows(directData.trainingCharges),
+        logs: normalizeRows(directData.logs),
+      };
     }
 
-    const raw = (await response.json()) as DashboardApiResponse & { data?: DashboardApiResponse };
-    const dashboardData = raw.data && typeof raw.data === "object" ? raw.data : raw;
+    const baseUrl = getAppBaseUrl();
 
-    const normalizedData = {
-      bookings: normalizeRows(dashboardData.bookings),
+    const [dashboardResult, bookingsResult] = await Promise.allSettled([
+      fetch(`${baseUrl}/api/dashboard?_ts=${Date.now()}`, { cache: "no-store" }),
+      fetch(`${baseUrl}/api/bookings?_ts=${Date.now()}`, { cache: "no-store" }),
+    ]);
+
+    let dashboardData: DashboardApiResponse = {};
+    let bookingCalendarData: BookingsApiResponse = {};
+
+    if (dashboardResult.status === "fulfilled" && dashboardResult.value.ok) {
+      dashboardData = (await dashboardResult.value.json()) as DashboardApiResponse;
+    }
+
+    if (bookingsResult.status === "fulfilled" && bookingsResult.value.ok) {
+      bookingCalendarData = (await bookingsResult.value.json()) as BookingsApiResponse;
+    }
+
+    return {
+      bookings: normalizeRows(bookingCalendarData.bookings).length > 0
+        ? normalizeRows(bookingCalendarData.bookings)
+        : normalizeRows(dashboardData.bookings),
       users: normalizeRows(dashboardData.users),
-      aircraft: normalizeRows(dashboardData.aircraft),
-      instructors: normalizeRows(dashboardData.instructors),
+      aircraft: normalizeRows(bookingCalendarData.aircraft).length > 0
+        ? normalizeRows(bookingCalendarData.aircraft)
+        : normalizeRows(dashboardData.aircraft),
+      instructors: normalizeRows(bookingCalendarData.instructors).length > 0
+        ? normalizeRows(bookingCalendarData.instructors)
+        : normalizeRows(dashboardData.instructors),
       students: normalizeRows(dashboardData.students),
       notifications: normalizeRows(dashboardData.notifications),
       instructorSchedules: normalizeRows(dashboardData.instructorSchedules),
       trainingCharges: normalizeRows(dashboardData.trainingCharges),
       logs: normalizeRows(dashboardData.logs),
     };
-
-    // Vercel 서버 컴포넌트에서 자기 자신 API를 fetch하지 못하거나
-    // BASE_URL 설정이 엇갈리는 경우 화면이 빈 대시보드로 렌더링되는 것을 방지합니다.
-    if (!hasAnyDashboardData(normalizedData)) {
-      return await safeGetDashboardDataDirect();
-    }
-
-    return normalizedData;
   } catch (error) {
-    console.error("대시보드 API 호출 실패, Supabase 직접 조회로 전환합니다.", error);
-
-    try {
-      return await safeGetDashboardDataDirect();
-    } catch (directError) {
-      console.error("Supabase 직접 대시보드 조회도 실패했습니다.", directError);
-      return emptyData;
-    }
+    console.error("대시보드 데이터를 불러오지 못했습니다.", error);
+    return emptyData;
   }
 }
+
 
 async function safeGetWeatherData(): Promise<WeatherData> {
   try {
@@ -1614,32 +1511,132 @@ function aircraftStatusClass(row: Row) {
   return "border-slate-100 bg-slate-50 text-slate-600";
 }
 
+function activityToneFromTitle(title: string) {
+  const value = title.replace(/\s/g, "");
+
+  if (value.includes("취소") || value.includes("반려") || value.includes("노쇼")) return "rose";
+  if (value.includes("확정") || value.includes("승인") || value.includes("완료")) return "emerald";
+  if (value.includes("수정") || value.includes("변경") || value.includes("이동")) return "violet";
+  if (value.includes("등록") || value.includes("생성") || value.includes("요청")) return "blue";
+  if (value.includes("알림")) return "sky";
+
+  return "slate";
+}
+
+function cleanActivityText(value: unknown) {
+  return text(value, "")
+    .replace(/^bookings$/i, "")
+    .replace(/^users$/i, "")
+    .replace(/^students$/i, "")
+    .replace(/^notifications$/i, "")
+    .replace(/^logs$/i, "")
+    .trim();
+}
+
+function parseActivityFromDetail(defaultTitle: string, detailValue: unknown, fallbackSubject?: unknown) {
+  const rawDetail = cleanActivityText(detailValue);
+  const fallback = cleanActivityText(fallbackSubject);
+  const slashParts = rawDetail
+    .split("/")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  let title = defaultTitle;
+  let detailParts = slashParts;
+
+  if (slashParts.length > 0) {
+    const first = slashParts[0];
+    const dotParts = first.split("·").map((item) => item.trim()).filter(Boolean);
+
+    if (dotParts.length >= 2) {
+      const kind = dotParts[0];
+      const subject = dotParts.slice(1).join(" · ");
+      title = `${kind || defaultTitle} · ${subject}`;
+      detailParts = slashParts.slice(1);
+    } else if (fallback) {
+      title = `${defaultTitle} · ${fallback}`;
+    }
+  } else if (fallback) {
+    title = `${defaultTitle} · ${fallback}`;
+  }
+
+  const detail = detailParts
+    .map((item) => item.replace(/\s+/g, " ").trim())
+    .filter((item) => item && item !== title)
+    .join(" · ");
+
+  return {
+    title,
+    detail: detail || rawDetail,
+  };
+}
+
+function bookingActivityDetail(booking: Row) {
+  const date = normalizeDate(getBookingDateValue(booking));
+  const start = normalizeTime(getBookingStartValue(booking));
+  const end = normalizeTime(getBookingEndValue(booking));
+  const type = getBookingType(booking);
+  const aircraftName = text(booking.aircraftName || booking.aircraft || booking.registrationNo || booking.aircraftId, "");
+  const instructorName = text(booking.instructorName || booking.instructor || booking.supervisorName || booking.supervisor || "");
+
+  return [
+    [date, start && end ? `${start}~${end}` : start].filter(Boolean).join(" "),
+    type,
+    aircraftName,
+    instructorName ? `교관 ${instructorName}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function buildRecentActivities(logs: Row[], notifications: Row[], bookings: Row[]) {
-  const logItems = normalizeDashboardLogs(logs as Record<string, unknown>[]).map((log) => ({
-    time: text(log.createdAt || log.timestamp || log.updatedAt),
-    title: text(log.action || log.message || log.title, "운영 기록"),
-    detail: text(log.targetSheet || log.targetId || log.userName || log.status, ""),
-    tone: "blue",
-  }));
+  const logItems = normalizeDashboardLogs(logs as Record<string, unknown>[]).map((log) => {
+    const defaultTitle = dashboardLogTitle(log);
+    const parsed = parseActivityFromDetail(defaultTitle, dashboardLogDetail(log), log.userName || log.targetName || log.targetId);
 
-  const notificationItems = notifications.map((notification) => ({
-    time: text(notification.createdAt || notification.sentAt || notification.updatedAt),
-    title: text(notification.title || notification.message || notification.type, "알림 기록"),
-    detail: text(notification.status || notification.targetName || notification.targetType, ""),
-    tone: "sky",
-  }));
+    return {
+      time: text(log.createdAt || log.timestamp || log.updatedAt),
+      title: parsed.title,
+      detail: parsed.detail,
+      tone: activityToneFromTitle(parsed.title),
+    };
+  });
 
-  const bookingItems = bookings.map((booking) => ({
-    time: text(booking.updatedAt || booking.createdAt || `${normalizeDate(getBookingDateValue(booking))} ${normalizeTime(getBookingStartValue(booking))}`),
-    title: `예약 ${text(getBookingStatus(booking), "변경")} · ${text(booking.userName || booking.name, "예약자 미입력")}`,
-    detail: `${normalizeDate(getBookingDateValue(booking))} ${normalizeTime(getBookingStartValue(booking))} ${getBookingType(booking)}`,
-    tone: text(getBookingStatus(booking)).includes("취소") ? "rose" : "emerald",
-  }));
+  const notificationItems = notifications.map((notification) => {
+    const title = cleanActivityText(notification.title || notification.message || notification.type) || "알림 기록";
+    const detail = [
+      cleanActivityText(notification.body || notification.memo),
+      cleanActivityText(notification.targetUserName || notification.targetName),
+      cleanActivityText(notification.status),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    return {
+      time: text(notification.createdAt || notification.sentAt || notification.updatedAt),
+      title,
+      detail,
+      tone: activityToneFromTitle(title || "알림"),
+    };
+  });
+
+  const bookingItems = bookings.map((booking) => {
+    const status = text(getBookingStatus(booking), "변경");
+    const userName = text(booking.userName || booking.name || booking.customerName || booking.memberName, "예약자 미입력");
+    const title = `예약 ${status} · ${userName}`;
+
+    return {
+      time: text(booking.updatedAt || booking.createdAt || `${normalizeDate(getBookingDateValue(booking))} ${normalizeTime(getBookingStartValue(booking))}`),
+      title,
+      detail: bookingActivityDetail(booking),
+      tone: activityToneFromTitle(title),
+    };
+  });
 
   return [...logItems, ...notificationItems, ...bookingItems]
     .filter((item) => item.time || item.title)
     .sort((a, b) => b.time.localeCompare(a.time))
-    .slice(0, 6);
+    .slice(0, 8);
 }
 
 function shortActivityTime(value: string) {
@@ -2850,6 +2847,9 @@ function RecentActivityPanel({
     sky: "bg-sky-500",
     emerald: "bg-emerald-500",
     rose: "bg-rose-500",
+    violet: "bg-violet-500",
+    amber: "bg-amber-500",
+    slate: "bg-slate-400",
   };
 
   return (
@@ -2869,14 +2869,18 @@ function RecentActivityPanel({
       ) : (
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {activities.map((activity, index) => (
-            <div key={`${activity.time}-${activity.title}-${index}`} className="flex gap-3 rounded-xl border border-[#edf2f7] bg-white px-3 py-2">
+            <div key={`${activity.time}-${activity.title}-${index}`} className="flex gap-3 rounded-xl border border-[#edf2f7] bg-white px-3 py-2.5">
               <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${dotClass[activity.tone] || "bg-slate-400"}`} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="truncate text-sm font-semibold text-[#10213f]">{activity.title}</p>
-                  <span className="shrink-0 text-[11px] font-medium text-[#8a9ab0]">{shortActivityTime(activity.time)}</span>
+                  <p className="min-w-0 truncate text-sm font-bold text-[#10213f]" title={activity.title}>{activity.title}</p>
+                  <span className="shrink-0 text-[11px] font-semibold text-[#8a9ab0]">{shortActivityTime(activity.time)}</span>
                 </div>
-                {activity.detail ? <p className="mt-0.5 truncate text-xs font-medium text-[#61758f]">{activity.detail}</p> : null}
+                {activity.detail ? (
+                  <p className="mt-1 text-[12px] font-medium leading-snug text-[#61758f]" title={activity.detail}>
+                    {activity.detail}
+                  </p>
+                ) : null}
               </div>
             </div>
           ))}
