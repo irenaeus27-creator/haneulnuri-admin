@@ -1,9 +1,8 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import type { ReactNode } from "react";
 import ContentCard from "@/components/ContentCard";
 import PageContainer from "@/components/PageContainer";
-import { DashboardWeatherDetailClient, DashboardWeatherSummaryClient } from "@/components/DashboardWeatherClient";
 import { formatBookingDate as sharedFormatBookingDate, formatBookingTime as sharedFormatBookingTime } from "@/lib/formatDateTime";
 
 type Row = Record<string, unknown>;
@@ -2235,7 +2234,7 @@ function ScheduleGraph({
   const currentTimeLeft = ((currentTimeMinutes - SCHEDULE_START_MIN) / SCHEDULE_TOTAL_MIN) * 100;
 
   return (
-    <ContentCard className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
+    <ContentCard className="flex h-full min-h-[360px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="flex flex-col gap-2.5 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-[-0.02em] text-[#10213f]">운항 일정</h2>
@@ -2511,7 +2510,7 @@ function OperationChecklist({
     <ContentCard className="rounded-[22px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-[16px] font-semibold leading-tight text-[#10213f]">오늘 처리할 일</h3>
+          <span className="block text-[14px] font-medium leading-none tracking-[-0.01em] text-[#10213f]">오늘 처리할 일</span>
           <p className="mt-1 text-xs font-semibold text-[#6f8199]">승인·취소·운항 전 확인 항목</p>
         </div>
         <span className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-semibold text-[#526a89]">
@@ -2551,7 +2550,7 @@ function WeatherSummaryCard({ weather }: { weather: WeatherData }) {
     <ContentCard className="overflow-hidden p-0">
       <div className="flex items-start justify-between px-5 py-3.5">
         <div>
-          <h3 className="text-[16px] font-semibold leading-tight text-[#10213f]">오늘 기상 요약</h3>
+          <span className="block text-[14px] font-medium leading-none tracking-[-0.01em] text-[#10213f]">오늘 기상 요약</span>
           <p className="mt-1 text-[11px] font-medium text-[#61758f]">
             Open-Meteo · 좌표 37.106759, 126.765010
           </p>
@@ -2872,7 +2871,7 @@ function WeatherDetailPanel({ weather }: { weather: WeatherData }) {
   const hasWeatherRows = sourceRows.some((item) => !item.missing);
 
   return (
-    <ContentCard className="flex h-full min-h-[430px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
+    <ContentCard className="flex h-full min-h-[360px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className={DASHBOARD_PANEL_HEADER_CLASS}>
         <div className="min-w-0">
           <h3 className={DASHBOARD_PANEL_TITLE_CLASS}>시간별 기상 그래프</h3>
@@ -2936,7 +2935,7 @@ function RecentActivityPanel({
     <ContentCard className={`flex min-h-0 flex-col p-3 ${className}`}>
       <div className="mb-3 flex shrink-0 items-center justify-between">
         <div>
-          <h3 className="text-[16px] font-semibold leading-tight text-[#10213f]">최근 작업 내역</h3>
+          <span className="block text-[14px] font-medium leading-none tracking-[-0.01em] text-[#10213f]">최근 작업 내역</span>
           <p className="mt-1 text-[11px] font-medium text-[#61758f]">예약·회원·교육생 기준 최근 작업</p>
         </div>
         <Link href="/logs" className="text-xs font-medium text-[#1264f4]">로그 보기 ›</Link>
@@ -3002,27 +3001,37 @@ function InstructorAssignmentSummaryPanel({
 }) {
   const totalAssigned = items.reduce((sum, item) => sum + item.count, 0);
 
+  const formatAssignedMinutes = (minutes: number) => {
+    if (!minutes) return "0분";
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    if (hours && rest) return `${hours}시간 ${rest}분`;
+    if (hours) return `${hours}시간`;
+    return `${rest}분`;
+  };
+
   return (
-    <ContentCard className={`flex flex-col overflow-hidden p-0 ${className}`}>
+    <ContentCard className={`flex min-h-0 flex-col overflow-hidden p-0 ${className}`}>
       <div className={DASHBOARD_PANEL_HEADER_CLASS}>
         <div className="min-w-0">
           <h3 className={DASHBOARD_PANEL_TITLE_CLASS}>교관별 오늘 배정</h3>
-          <p className={DASHBOARD_PANEL_DESC_CLASS}>상태·일정·휴무 여부</p>
+          <p className={DASHBOARD_PANEL_DESC_CLASS}>교관별 근무 상태·다음 일정·배정 요약</p>
         </div>
         <span className={`${DASHBOARD_PANEL_BADGE_CLASS} bg-blue-50 text-blue-700`}>총 {totalAssigned}건</span>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-1.5 overflow-y-auto px-4 pb-4 sm:grid-cols-2 xl:grid-cols-1">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto px-4 pb-3 lg:grid-cols-2">
         {items.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#dbe5f1] bg-[#f8fbff] p-3 text-center text-sm font-medium text-[#6f8199]">
+          <div className="rounded-2xl border border-dashed border-[#dbe5f1] bg-[#f8fbff] p-3 text-center text-sm font-medium text-[#6f8199] lg:col-span-2">
             배정된 교관 일정이 없습니다.
           </div>
         ) : (
-          items.slice(0, 7).map((item) => {
+          items.slice(0, 8).map((item) => {
             const preview = item.items[0];
+            const second = item.items[1];
             const compactStatus =
               item.workLabel === "휴무"
-                ? "휴무"
+                ? "오늘 휴무"
                 : item.workLabel === "비활성"
                   ? "비활성"
                   : item.nextLabel === "대기"
@@ -3034,41 +3043,66 @@ function InstructorAssignmentSummaryPanel({
             return (
               <div
                 key={item.id}
-                className="rounded-2xl border border-[#e7eef7] bg-white px-3 py-2"
+                className="rounded-2xl border border-[#e7eef7] bg-white px-3 py-2 shadow-[0_8px_18px_rgba(20,46,80,0.035)]"
               >
-                <div className="grid grid-cols-[minmax(54px,auto)_1fr_auto] items-center gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="truncate text-[13px] font-semibold text-[#10213f]">{item.name}</p>
-                      <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${instructorStatusBadgeClass(item.workTone)}`}>
-                        {item.workLabel}
-                      </span>
-                    </div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex items-center gap-1.5">
+                    <p className="truncate text-[13px] font-semibold text-[#10213f]">{item.name}</p>
+                    <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${instructorStatusBadgeClass(item.workTone)}`}>
+                      {item.workLabel}
+                    </span>
                   </div>
-
-                  <p className={`min-w-0 truncate text-center text-[11px] font-semibold ${instructorStatusBadgeClass(item.statusTone).split(" ").slice(-1)[0]}`}>
-                    {compactStatus}
-                  </p>
-
                   <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${item.count ? "bg-blue-50 text-blue-700" : "bg-slate-50 text-slate-500"}`}>
                     {item.count}건
                   </span>
                 </div>
 
-                <div className="mt-1.5 rounded-xl bg-[#f8fbff] px-3 py-1.5">
+                <div className="mt-1 grid grid-cols-[58px_1fr] items-center gap-2 rounded-xl bg-[#f8fbff] px-2.5 py-1.5">
+                  <span className="text-[10.5px] font-semibold text-[#7a8ca3]">다음 일정</span>
                   {preview ? (
-                    <div className="grid grid-cols-[44px_1fr_64px] items-center gap-2 text-[10.5px]">
-                      <span className="font-extrabold text-[#10213f]">{preview.startTime}</span>
-                      <span className="min-w-0 truncate font-semibold text-[#405875]">
-                        {preview.userName} · {preview.bookingType.replace("비행", "")}
-                      </span>
-                      <span className="truncate text-right font-semibold text-[#7b8da5]">{preview.aircraftName}</span>
+                    <p className="min-w-0 truncate text-[11.5px] font-semibold text-[#10213f]">
+                      {preview.startTime}~{preview.endTime} · {preview.userName} · {preview.aircraftName}
+                    </p>
+                  ) : (
+                    <p className="min-w-0 truncate text-[11.5px] font-semibold text-[#10213f]">
+                      {compactStatus}
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-1.5 rounded-xl border border-[#edf2f7] bg-white px-2.5 py-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10.5px] font-semibold text-[#61758f]">
+                      오늘 배정 {item.count}건 · {formatAssignedMinutes(item.totalMinutes)}
+                    </span>
+                    {item.count > 2 ? (
+                      <span className="text-[10.5px] font-semibold text-[#1264f4]">외 {item.count - 2}건</span>
+                    ) : null}
+                  </div>
+
+                  {preview ? (
+                    <div className="mt-1 space-y-0.5 text-[10.5px]">
+                      <div className="grid grid-cols-[70px_1fr_58px] gap-2">
+                        <span className="font-semibold text-[#10213f]">{preview.startTime}~{preview.endTime}</span>
+                        <span className="min-w-0 truncate font-medium text-[#405875]">
+                          {preview.userName} · {preview.bookingType.replace("비행", "")}
+                        </span>
+                        <span className="truncate text-right font-semibold text-[#7b8da5]">{preview.aircraftName}</span>
+                      </div>
+                      {second ? (
+                        <div className="grid grid-cols-[70px_1fr_58px] gap-2">
+                          <span className="font-semibold text-[#10213f]">{second.startTime}~{second.endTime}</span>
+                          <span className="min-w-0 truncate font-medium text-[#405875]">
+                            {second.userName} · {second.bookingType.replace("비행", "")}
+                          </span>
+                          <span className="truncate text-right font-semibold text-[#7b8da5]">{second.aircraftName}</span>
+                        </div>
+                      ) : null}
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between text-[10.5px]">
-                      <span className="font-bold text-[#61758f]">{item.workLabel === "휴무" ? "예약 배정 없음" : "대기 가능"}</span>
-                      <span className="font-extrabold text-[#10213f]">{item.workLabel === "휴무" ? "오늘 휴무" : "오늘 배정 없음"}</span>
-                    </div>
+                    <p className="mt-1 truncate text-[10.5px] font-medium text-[#7a8ca3]">
+                      {item.workLabel === "휴무" ? "오늘 휴무로 배정된 예약이 없습니다." : "오늘 배정된 예약이 없습니다."}
+                    </p>
                   )}
                 </div>
               </div>
@@ -3135,13 +3169,11 @@ function DashboardSidePanel({
   cancelRequests,
   pendingUsers,
   todayBookings,
-  weather,
 }: {
   pendingRequests: number;
   cancelRequests: number;
   pendingUsers: number;
   todayBookings: number;
-  weather: WeatherData;
 }) {
   return (
     <div className="grid gap-2.5">
@@ -3151,7 +3183,6 @@ function DashboardSidePanel({
         pendingUsers={pendingUsers}
         todayBookings={todayBookings}
       />
-      <DashboardWeatherSummaryClient initialWeather={weather} />
     </div>
   );
 }
@@ -3231,8 +3262,8 @@ export default async function DashboardPage({
             currentTimeMinutes={currentKstMinutes()}
           />
 
-          <div className="grid min-h-0 items-stretch gap-2.5 grid-cols-[520px_430px_328px]">
-            <MiniTable title="다가오는 예약" href="/bookings" headers={["예약자", "시간", "유형", "항공기", "교관", "상태"]} className="h-full min-h-[430px]">
+          <div className="grid min-h-0 items-stretch gap-2.5 grid-cols-[520px_778px]">
+            <MiniTable title="다가오는 예약" href="/bookings" headers={["예약자", "시간", "유형", "항공기", "교관", "상태"]} className="h-full min-h-[360px]">
             {upcomingBookings.length === 0 ? (
             <tr><td colSpan={6} className="text-center text-[#6f8199]">다가오는 예약이 없습니다.</td></tr>
             ) : (
@@ -3281,9 +3312,7 @@ export default async function DashboardPage({
             )}
             </MiniTable>
 
-            <DashboardWeatherDetailClient initialWeather={weather} />
-
-            <InstructorAssignmentSummaryPanel items={instructorAssignmentSummary} className="h-full min-h-[430px]" />
+            <InstructorAssignmentSummaryPanel items={instructorAssignmentSummary} className="h-full min-h-[360px]" />
           </div>
         </div>
 
@@ -3293,12 +3322,13 @@ export default async function DashboardPage({
             cancelRequests={cancelRequestBookings.length}
             pendingUsers={pendingUsers.length}
             todayBookings={todayBookings.filter((booking) => getDisplayBookingStatus(booking) === "확정").length}
-            weather={weather}
           />
-          <RecentActivityPanel activities={recentActivities} className="h-full min-h-[430px]" />
+          <RecentActivityPanel activities={recentActivities} className="h-full min-h-[360px]" />
         </div>
       </div>
       </div>
     </PageContainer>
   );
 }
+
+

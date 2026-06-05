@@ -1,4 +1,6 @@
-"use client";
+﻿"use client";
+
+
 
 import { useEffect, useMemo, useState } from "react";
 import ContentCard from "@/components/ContentCard";
@@ -143,7 +145,7 @@ export function DashboardWeatherSummaryClient({ initialWeather }: { initialWeath
     <ContentCard className="overflow-hidden p-0">
       <div className="flex items-start justify-between px-5 py-3.5">
         <div>
-          <h3 className="text-lg font-bold text-[#10213f]">오늘 기상 요약</h3>
+          <span className="block text-[14px] font-medium leading-none tracking-[-0.01em] text-[#10213f]">오늘 기상 요약</span>
           <p className="mt-1 text-xs font-medium text-[#61758f]">Open-Meteo · 좌표 37.106759, 126.765010</p>
         </div>
         <span className={`rounded-full border px-3 py-1 text-xs font-bold ${weatherToneClass(decision?.tone)}`}>
@@ -238,7 +240,7 @@ function WeatherChart({ title, unit, rows, series }: {
   return (
     <div className="rounded-[22px] border border-[#dfe8f5] bg-white px-4 py-4 shadow-[0_10px_30px_rgba(20,46,80,0.05)]">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-[18px] font-bold text-[#10213f]">{title}</p>
+        <p className="text-[11px] font-medium leading-none text-[#243b63]">{title}</p>
         <div className="flex items-center gap-2">
           {series.map((item) => (
             <span key={item.key} className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[14px] font-bold text-[#31455f] shadow-sm">
@@ -306,10 +308,10 @@ export function DashboardWeatherDetailClient({ initialWeather }: { initialWeathe
     <ContentCard className="flex h-full min-h-[520px] flex-col overflow-hidden rounded-[24px] border border-[#d9e6f5] bg-white/95 p-0 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
       <div className="flex shrink-0 items-center justify-between px-5 py-3.5">
         <div>
-          <h3 className="text-[18px] font-bold text-[#10213f]">시간별 기상 그래프</h3>
-          <p className="mt-0.5 text-[13px] font-medium text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
+          <span className="block text-[14px] font-medium leading-none tracking-[-0.01em] text-[#10213f]">시간별 기상 그래프</span>
+          <p className="text-[11px] font-medium leading-none text-[#61758f]">07:00~20:00 전체 시간대 표시</p>
         </div>
-        <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">Open-Meteo</span>
+        <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">Open-Meteo</span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden px-4 pb-4">
@@ -342,3 +344,10 @@ export function DashboardWeatherDetailClient({ initialWeather }: { initialWeathe
     </ContentCard>
   );
 }
+
+
+
+
+
+
+
