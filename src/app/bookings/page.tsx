@@ -3607,16 +3607,20 @@ export default function BookingsPage() {
           </div>
         </section>
 
-        {(saving || movingBookingId || operationMessage) ? (
-          <section className="min-w-0 rounded-[18px] border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-semibold text-blue-700 shadow-sm">
-            {operationMessage || (movingBookingId ? "예약 시간 변경을 저장하는 중입니다..." : "변경사항을 저장하는 중입니다...")}
-          </section>
-        ) : null}
-
         <section ref={calendarSectionRef} className="min-w-0 rounded-[24px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_12px_34px_rgba(20,46,80,0.065)]">
           <div className="mb-2 flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <h2 className="text-[15px] font-semibold tracking-[-0.02em] text-[#10213f]">예약 캘린더</h2>
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <h2 className="shrink-0 text-[15px] font-semibold tracking-[-0.02em] text-[#10213f]">예약 캘린더</h2>
+                {(saving || movingBookingId || operationMessage) ? (
+                  <span
+                    title={operationMessage || (movingBookingId ? "예약 시간 변경을 저장하는 중입니다..." : "변경사항을 저장하는 중입니다...")}
+                    className="inline-flex h-7 max-w-[420px] items-center truncate rounded-full border border-blue-200 bg-blue-50 px-3 text-[13px] font-semibold text-blue-700"
+                  >
+                    {operationMessage || (movingBookingId ? "예약 시간 변경을 저장하는 중입니다..." : "변경사항을 저장하는 중입니다...")}
+                  </span>
+                ) : null}
+              </div>
               <p className="mt-0.5 text-[13px] font-normal text-[#6d7f96]">
                 대시보드와 같은 형태로 PFI와 예약을 함께 보면서 30분 단위로 예약을 지정합니다.
               </p>
