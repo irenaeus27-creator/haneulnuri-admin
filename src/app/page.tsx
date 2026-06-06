@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import type { ReactNode } from "react";
 import ContentCard from "@/components/ContentCard";
@@ -1264,67 +1264,71 @@ function badgeClass(value: unknown) {
   return "border-slate-200 bg-slate-100 text-slate-600";
 }
 
-function buildScheduleItems(bookings: Row[], aircraftResources: Row[], selectedDate: string): ScheduleItem[] {
+function buildScheduleItems(bookings: Row[], aircraftResources: Row[], selectedDate: string, aircraftLookup: Map<string, string>): ScheduleItem[] {
   const visibleBookings = bookings
     .filter((row) => normalizeDate(getBookingDateValue(row)) === selectedDate)
     .filter((row) => !isCancelledStatus(getBookingStatus(row)));
 
   const items: ScheduleItem[] = [];
+  const seen = new Set<string>();
 
-  aircraftResources.forEach((resource) => {
-    const aircraftName = aircraftDisplay(resource);
+  visibleBookings.forEach((row, index) => {
+    const bookingType = getBookingType(row);
+    const matchedResource = aircraftResources.find((resource) => bookingMatchesAircraftResource(row, resource));
+    const aircraftName = matchedResource ? aircraftDisplay(matchedResource) : getBookingAircraftName(row, aircraftLookup);
+    const date = normalizeDate(getBookingDateValue(row));
+    const startTime = normalizeTime(getBookingStartValue(row));
+    const endTime = normalizeTime(getBookingEndValue(row));
+    const bookingId = text(
+      row.bookingId || row.booking_id || row.id,
+      `${aircraftName}-${date}-${startTime}-${endTime}-${index}`,
+    );
 
-    visibleBookings
-      .filter((row) => bookingMatchesAircraftResource(row, resource))
-      .forEach((row, index) => {
-        const bookingType = getBookingType(row);
-        const bookingId = text(
-          row.bookingId,
-          `${aircraftName}-${normalizeDate(getBookingDateValue(row))}-${normalizeTime(getBookingStartValue(row))}-${index}`,
-        );
-        const startTime = normalizeTime(getBookingStartValue(row));
-        const endTime = normalizeTime(getBookingEndValue(row));
+    const pushItem = (item: ScheduleItem) => {
+      if (seen.has(item.id)) return;
+      seen.add(item.id);
+      items.push(item);
+    };
 
-        if (requiresPfi(row)) {
-          const startMinutes = timeToMinutes(startTime);
-          const pfiStart = Math.max(0, startMinutes - 30);
-          const pfiEnd = startMinutes;
+    if (requiresPfi(row)) {
+      const startMinutes = timeToMinutes(startTime);
+      const pfiStart = Math.max(0, startMinutes - 30);
+      const pfiEnd = startMinutes;
 
-          if (pfiEnd > pfiStart) {
-            items.push({
-              id: `pfi-${bookingId}`,
-              date: normalizeDate(getBookingDateValue(row)),
-              aircraftKey: aircraftName,
-              aircraftName,
-              bookingType: "PFI",
-              courseName: "PFI",
-              userName: "PFI",
-              instructorKey: "",
-              instructorName: "PFI",
-              startTime: minutesToTime(pfiStart),
-              endTime: minutesToTime(pfiEnd),
-              status: "PFI",
-              rawBooking: row,
-            });
-          }
-        }
-
-        items.push({
-          id: bookingId,
-          date: normalizeDate(getBookingDateValue(row)),
+      if (pfiEnd > pfiStart) {
+        pushItem({
+          id: `pfi-${bookingId}`,
+          date,
           aircraftKey: aircraftName,
           aircraftName,
-          bookingType,
-          courseName: text(row.courseName || row.course || bookingType),
-          userName: calendarPersonLabel(row),
-          instructorKey: text(getBookingInstructorId(row), "미배정"),
-          instructorName: calendarInstructorLabel(row),
-          startTime,
-          endTime,
-          status: getBookingStatus(row),
+          bookingType: "PFI",
+          courseName: "PFI",
+          userName: "PFI",
+          instructorKey: "",
+          instructorName: "PFI",
+          startTime: minutesToTime(pfiStart),
+          endTime: minutesToTime(pfiEnd),
+          status: "PFI",
           rawBooking: row,
         });
-      });
+      }
+    }
+
+    pushItem({
+      id: bookingId,
+      date,
+      aircraftKey: aircraftName,
+      aircraftName,
+      bookingType,
+      courseName: text(row.courseName || row.course || bookingType),
+      userName: calendarPersonLabel(row),
+      instructorKey: text(getBookingInstructorId(row), "미배정"),
+      instructorName: calendarInstructorLabel(row),
+      startTime,
+      endTime,
+      status: getBookingStatus(row),
+      rawBooking: row,
+    });
   });
 
   return items.sort((a, b) => `${a.aircraftName}${a.startTime}${a.bookingType}`.localeCompare(`${b.aircraftName}${b.startTime}${b.bookingType}`, "ko"));
@@ -3195,7 +3199,7 @@ export default async function DashboardPage({
   const selectedInstructor = firstParam(params.instructor) || "all";
   const aircraftLookup = createAircraftLookup(aircraft);
   const visibleDashboardAircraft = buildDashboardAircraftResources(aircraft, bookings, aircraftLookup);
-  const scheduleItems = buildScheduleItems(bookings, visibleDashboardAircraft, selectedDate);
+  const scheduleItems = buildScheduleItems(bookings, visibleDashboardAircraft, selectedDate, aircraftLookup);
   const filteredScheduleItems = selectedInstructor === "all"
     ? scheduleItems
     : scheduleItems.filter((item) => item.instructorKey === selectedInstructor || item.instructorName.includes(selectedInstructor));
