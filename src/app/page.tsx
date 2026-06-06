@@ -3217,7 +3217,7 @@ export default async function DashboardPage({
   ];
 
   const todayBookings = bookings.filter((booking) => normalizeDate(getBookingDateValue(booking)) === today);
-  const todayScheduleItems = buildScheduleItems(bookings, visibleDashboardAircraft, today);
+  const todayScheduleItems = buildScheduleItems(bookings, visibleDashboardAircraft, today, aircraftLookup);
   const instructorTodaySchedules = buildInstructorScheduleSummary(todayScheduleItems);
   const pendingRequestBookings = bookings.filter((booking) => getBookingStatus(booking).replace(/\s/g, "") === "요청");
   const cancelRequestBookings = bookings.filter((booking) => getBookingStatus(booking).replace(/\s/g, "") === "취소요청");
