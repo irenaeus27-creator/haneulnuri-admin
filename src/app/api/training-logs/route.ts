@@ -112,7 +112,7 @@ function requiresInstructorType(value: unknown) {
   return type === "교육비행" || type === "체험비행" || type === "동승비행";
 }
 
-async function buildSafeTrainingLogInput(input: JsonRecord) {
+async function buildSafeTrainingLogInput(input: JsonRecord): Promise<JsonRecord> {
   const trainingType = normalizeTrainingType(input.trainingType || input.training_type || "교육비행");
   input.trainingType = trainingType;
   input.training_type = trainingType;
@@ -403,7 +403,7 @@ async function handlePost(body: JsonRecord) {
   const data = (body.data || body) as JsonRecord;
 
   if (action === "addTrainingLog" || action === "addRow") {
-    const safeData = await buildSafeTrainingLogInput(data);
+    const safeData: JsonRecord = await buildSafeTrainingLogInput(data);
     const explicitId = text(safeData.trainingLogId || safeData.training_log_id);
 
     if (explicitId) {
@@ -474,7 +474,7 @@ async function handlePost(body: JsonRecord) {
   }
 
   if (action === "updateTrainingLog" || action === "updateRow") {
-    const safeData = await buildSafeTrainingLogInput(data);
+    const safeData: JsonRecord = await buildSafeTrainingLogInput(data);
     const row = normalizeTrainingLog(safeData, false);
     const id = text(
       safeData.trainingLogId || safeData.training_log_id || row.training_log_id,
