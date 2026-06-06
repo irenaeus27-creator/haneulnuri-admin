@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import ContentCard from "@/components/ContentCard";
 import PageContainer from "@/components/PageContainer";
 import { formatBookingDate as sharedFormatBookingDate, formatBookingTime as sharedFormatBookingTime } from "@/lib/formatDateTime";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 type Row = Record<string, unknown>;
 
@@ -263,6 +264,26 @@ function getAppBaseUrl() {
   return "http://localhost:3000";
 }
 
+async function fetchJsonWithTimeout(url: string, timeoutMs = 9000): Promise<unknown | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) return null;
+    return await response.json();
+  } catch (error) {
+    console.warn("대시보드 API 호출 실패", error);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function extractDashboardRows(data: unknown, sheetName: string) {
   if (!data || typeof data !== "object") return [];
 
@@ -340,24 +361,201 @@ function normalizeRows(value: unknown): Row[] {
   return Array.isArray(value) ? value as Row[] : [];
 }
 
-async function fetchJsonWithTimeout(url: string, timeoutMs = 4500) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+function toCamelKey(key: string) {
+  return key.replace(/_([a-z0-9])/g, (_, char: string) => char.toUpperCase());
+}
 
+function toCamelDashboardRow(row: Row) {
+  const result: Row = {};
+
+  Object.entries(row || {}).forEach(([key, value]) => {
+    result[toCamelKey(key)] = value ?? "";
+  });
+
+  return result;
+}
+
+function withDashboardBookingAliases(row: Row) {
+  const next = { ...row };
+
+  if (next.aircraftName && !next.aircraft) next.aircraft = next.aircraftName;
+  if (next.userName && !next.name) next.name = next.userName;
+  if (next.instructorName && !next.instructor) next.instructor = next.instructorName;
+  if (next.bookingId && !next.id) next.id = next.bookingId;
+
+  return next;
+}
+
+function mapDashboardRows(rows: Row[] | null | undefined, options?: { bookingAlias?: boolean }) {
+  return (rows || []).map((row) => {
+    const camel = toCamelDashboardRow(row);
+    return options?.bookingAlias ? withDashboardBookingAliases(camel) : camel;
+  });
+}
+
+async function selectDashboardTable(
+  table: string,
+  options?: {
+    orderColumn?: string;
+    ascending?: boolean;
+    limit?: number;
+  },
+) {
   try {
-    const response = await fetch(url, {
-      cache: "no-store",
-      signal: controller.signal,
-    });
+    const supabase = getSupabaseServerClient();
+    let query = supabase.from(table).select("*");
 
-    if (!response.ok) return null;
-    return await response.json() as unknown;
+    if (options?.orderColumn) {
+      query = query.order(options.orderColumn, { ascending: options.ascending ?? true });
+    }
+
+    if (options?.limit) {
+      query = query.limit(options.limit);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.warn(`대시보드 ${table} 조회 실패`, error.message);
+      return [];
+    }
+
+    return mapDashboardRows(data as Row[]);
   } catch (error) {
-    console.warn("대시보드 API 호출 지연 또는 실패", error);
-    return null;
-  } finally {
-    clearTimeout(timeout);
+    console.warn(`대시보드 ${table} 조회 실패`, error);
+    return [];
   }
+}
+
+async function selectDashboardBookings(fromDate: string, toDate: string) {
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("bookings")
+      .select("*")
+      .gte("booking_date", fromDate)
+      .lte("booking_date", toDate)
+      .order("booking_date", { ascending: true })
+      .order("start_time", { ascending: true });
+
+    if (error) {
+      console.warn("대시보드 bookings 조회 실패", error.message);
+      return [];
+    }
+
+    return mapDashboardRows(data as Row[], { bookingAlias: true }).map((row) => ({
+      ...row,
+      bookingDate: normalizeDate(getBookingDateValue(row)),
+      requestDate: normalizeDate(row.requestDate),
+      startTime: normalizeTime(getBookingStartValue(row)),
+      endTime: normalizeTime(getBookingEndValue(row)),
+      bufferEndTime: normalizeTime(row.bufferEndTime),
+    }));
+  } catch (error) {
+    console.warn("대시보드 bookings 조회 실패", error);
+    return [];
+  }
+}
+
+async function selectDashboardPendingUsers() {
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .or("status.eq.승인대기,status.eq.요청,status.eq.대기,status.eq.pending")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    if (error) {
+      console.warn("대시보드 users 조회 실패", error.message);
+      return [];
+    }
+
+    return mapDashboardRows(data as Row[]);
+  } catch (error) {
+    console.warn("대시보드 users 조회 실패", error);
+    return [];
+  }
+}
+
+async function selectDashboardInstructorSchedules(today: string) {
+  try {
+    const supabase = getSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("instructor_schedules")
+      .select("*")
+      .or(`schedule_date.is.null,schedule_date.eq.${today}`)
+      .order("instructor_name", { ascending: true })
+      .limit(80);
+
+    if (error) {
+      console.warn("대시보드 instructor_schedules 조회 실패", error.message);
+      return [];
+    }
+
+    return mapDashboardRows(data as Row[]);
+  } catch (error) {
+    console.warn("대시보드 instructor_schedules 조회 실패", error);
+    return [];
+  }
+}
+
+async function fetchDashboardDataDirect(): Promise<Required<DashboardApiResponse>> {
+  const today = todayText();
+  const fromDate = addDays(today, -2);
+  const toDate = addDays(today, 30);
+
+  const [
+    bookings,
+    users,
+    aircraft,
+    instructors,
+    instructorSchedules,
+    notifications,
+    logs,
+    trainingCharges,
+  ] = await Promise.all([
+    selectDashboardBookings(fromDate, toDate),
+    selectDashboardPendingUsers(),
+    selectDashboardTable("aircraft", { orderColumn: "aircraft_id", ascending: true }),
+    selectDashboardTable("instructors", { orderColumn: "instructor_id", ascending: true }),
+    selectDashboardInstructorSchedules(today),
+    selectDashboardTable("notifications", { orderColumn: "created_at", ascending: false, limit: 8 }),
+    selectDashboardTable("logs", { orderColumn: "created_at", ascending: false, limit: 20 }),
+    selectDashboardTable("training_charges", { orderColumn: "charge_date", ascending: false, limit: 12 }),
+  ]);
+
+  return {
+    bookings,
+    users,
+    aircraft,
+    instructors,
+    students: [],
+    notifications,
+    instructorSchedules,
+    trainingCharges,
+    logs,
+  };
+}
+
+async function fetchDashboardDataFromApi(): Promise<Required<DashboardApiResponse> | null> {
+  const baseUrl = getAppBaseUrl();
+  const dashboardData = await fetchJsonWithTimeout(`${baseUrl}/api/dashboard?_ts=${Date.now()}`, 9000) as DashboardApiResponse | null;
+
+  if (!dashboardData) return null;
+
+  return {
+    bookings: normalizeRows(dashboardData.bookings),
+    users: normalizeRows(dashboardData.users),
+    aircraft: normalizeRows(dashboardData.aircraft),
+    instructors: normalizeRows(dashboardData.instructors),
+    students: normalizeRows(dashboardData.students),
+    notifications: normalizeRows(dashboardData.notifications),
+    instructorSchedules: normalizeRows(dashboardData.instructorSchedules),
+    trainingCharges: normalizeRows(dashboardData.trainingCharges),
+    logs: normalizeRows(dashboardData.logs),
+  };
 }
 
 async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
@@ -374,25 +572,22 @@ async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
   };
 
   try {
-    const baseUrl = getAppBaseUrl();
-    const dashboardData = await fetchJsonWithTimeout(`${baseUrl}/api/dashboard?_ts=${Date.now()}`) as DashboardApiResponse | null;
+    const directData = await fetchDashboardDataDirect();
 
-    if (!dashboardData) return emptyData;
+    if (directData.bookings.length > 0 || directData.aircraft.length > 0 || directData.instructors.length > 0) {
+      return directData;
+    }
 
-    return {
-      bookings: normalizeRows(dashboardData.bookings),
-      users: normalizeRows(dashboardData.users),
-      aircraft: normalizeRows(dashboardData.aircraft),
-      instructors: normalizeRows(dashboardData.instructors),
-      students: normalizeRows(dashboardData.students),
-      notifications: normalizeRows(dashboardData.notifications),
-      instructorSchedules: normalizeRows(dashboardData.instructorSchedules),
-      trainingCharges: normalizeRows(dashboardData.trainingCharges),
-      logs: normalizeRows(dashboardData.logs),
-    };
+    return await fetchDashboardDataFromApi() || emptyData;
   } catch (error) {
-    console.error("대시보드 데이터를 불러오지 못했습니다.", error);
-    return emptyData;
+    console.error("대시보드 데이터를 직접 불러오지 못했습니다.", error);
+
+    try {
+      return await fetchDashboardDataFromApi() || emptyData;
+    } catch (apiError) {
+      console.error("대시보드 API fallback도 실패했습니다.", apiError);
+      return emptyData;
+    }
   }
 }
 
