@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePendingApprovals } from "@/components/TopAlertBell";
@@ -9,6 +10,8 @@ type MenuItem = {
   href: string;
   icon: IconName;
 };
+
+type AircraftWarningLevel = "none" | "soon" | "urgent" | "overdue";
 
 type MenuGroup = {
   title: string;
@@ -47,15 +50,15 @@ const menuGroups: MenuGroup[] = [
     title: "교육 운영",
     items: [
       { label: "교육생관리", href: "/students", icon: "students" },
-      { label: "교육일지", href: "/training-logs", icon: "document" },
+      { label: "비행기록", href: "/training-logs", icon: "document" },
     ],
   },
   {
     title: "운항 자원",
     items: [
       { label: "항공기관리", href: "/aircraft", icon: "aircraft" },
+      { label: "항공기 정비관리", href: "/aircraft-maintenance", icon: "wrench" },
       { label: "교관관리", href: "/instructors", icon: "instructor" },
-      { label: "교관 스케줄", href: "/instructor-schedules", icon: "schedule" },
       { label: "렌탈기장관리", href: "/rental-pilots", icon: "pilot" },
     ],
   },
@@ -235,6 +238,58 @@ function SidebarIcon({ name, active = false }: { name: IconName; active?: boolea
   );
 }
 
+function text(value: unknown, fallback = "") {
+  const raw = String(value ?? "").trim();
+  return raw || fallback;
+}
+
+function todayText() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateDiffDays(value: unknown) {
+  const raw = text(value);
+  if (!raw) return null;
+  const dateText = raw.includes("T") ? raw.slice(0, 10) : raw.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) return null;
+  const today = new Date(`${todayText()}T00:00:00`);
+  const due = new Date(`${dateText}T00:00:00`);
+  if (Number.isNaN(due.getTime())) return null;
+  return Math.ceil((due.getTime() - today.getTime()) / 86400000);
+}
+
+function aircraftWarningLevel(rows: Array<Record<string, unknown>>): AircraftWarningLevel {
+  let level: AircraftWarningLevel = "none";
+  rows.forEach((row) => {
+    const activeRaw = text(row.active).toLowerCase();
+    const active = row.active === true || activeRaw === "" || activeRaw === "y" || activeRaw === "yes" || activeRaw === "true" || activeRaw === "사용" || activeRaw === "활성";
+    if (!active) return;
+    const days = dateDiffDays(row.nextInspectionDate || row.next_inspection_date);
+    if (days === null || days > 30) return;
+    if (days < 0) {
+      level = "overdue";
+      return;
+    }
+    if (days <= 7 && level !== "overdue") {
+      level = "urgent";
+      return;
+    }
+    if (level === "none") level = "soon";
+  });
+  return level;
+}
+
+function aircraftWarningClass(level: AircraftWarningLevel) {
+  if (level === "overdue") return "bg-rose-500 shadow-[0_0_0_3px_rgba(244,63,94,0.14)]";
+  if (level === "urgent") return "bg-orange-400 shadow-[0_0_0_3px_rgba(251,146,60,0.16)]";
+  if (level === "soon") return "bg-amber-300 shadow-[0_0_0_3px_rgba(252,211,77,0.16)]";
+  return "";
+}
+
 function isSystemNormal() {
   return true;
 }
@@ -243,6 +298,25 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { pendingBookingCount, pendingUserCount } = usePendingApprovals();
   const systemNormal = isSystemNormal();
+  const [aircraftWarning, setAircraftWarning] = useState<AircraftWarningLevel>("none");
+
+  useEffect(() => {
+    let alive = true;
+    async function loadAircraftWarning() {
+      try {
+        const response = await fetch("/api/aircraft", { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        const rows = Array.isArray(data.aircraft) ? data.aircraft : [];
+        if (alive) setAircraftWarning(aircraftWarningLevel(rows));
+      } catch {
+        if (alive) setAircraftWarning("none");
+      }
+    }
+    void loadAircraftWarning();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   function itemBadge(href: string) {
     if (href === "/bookings" && pendingBookingCount > 0) return pendingBookingCount;
@@ -300,13 +374,22 @@ export default function Sidebar() {
                       <span className="truncate">{item.label}</span>
                     </span>
 
-                    {badge > 0 ? (
-                      <span className={`ml-2 min-w-[24px] rounded-full px-2 py-0.5 text-center text-[12px] font-black ${
-                        active ? "bg-blue-600 text-white" : "bg-rose-100 text-rose-700"
-                      }`}>
-                        {badge}
-                      </span>
-                    ) : null}
+                    <span className="ml-2 flex shrink-0 items-center gap-1.5">
+                      {item.href === "/aircraft" && aircraftWarning !== "none" ? (
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${aircraftWarningClass(aircraftWarning)}`}
+                          title="다음 점검 예정일 확인 필요"
+                          aria-label="다음 점검 예정일 확인 필요"
+                        />
+                      ) : null}
+                      {badge > 0 ? (
+                        <span className={`min-w-[24px] rounded-full px-2 py-0.5 text-center text-[12px] font-black ${
+                          active ? "bg-blue-600 text-white" : "bg-rose-100 text-rose-700"
+                        }`}>
+                          {badge}
+                        </span>
+                      ) : null}
+                    </span>
                   </Link>
                 );
               })}

@@ -12,6 +12,11 @@ const SERVICE = "skynuri-supabase-aircraft";
 const ORDER_COLUMN = "aircraft_id";
 const ALLOWED_COLUMNS = ["aircraft_id", "aircraft_name", "model", "registration_no", "status", "next_inspection_date", "active", "photo_url", "memo", "created_at", "updated_at"];
 
+function normalizeDateOrNull(value: unknown) {
+  const raw = text(value);
+  return raw || null;
+}
+
 function normalize(input: JsonRecord, isCreate = false) {
   const now = nowIso();
   const id = text(input.aircraftId || input.aircraft_id) || buildId(PREFIX);
@@ -19,7 +24,8 @@ function normalize(input: JsonRecord, isCreate = false) {
 
   ALLOWED_COLUMNS.forEach((column) => {
     const camel = column.replace(/_([a-z0-9])/g, (_: string, char: string) => char.toUpperCase());
-    const value = input[camel] ?? input[column];
+    let value = input[camel] ?? input[column];
+    if (column === "next_inspection_date" && value !== undefined) value = normalizeDateOrNull(value);
     if (value !== undefined) row[column] = value;
   });
 

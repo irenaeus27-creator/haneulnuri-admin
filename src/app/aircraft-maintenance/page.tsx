@@ -1,781 +1,599 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import PageContainer from "@/components/PageContainer";
+import ContentCard from "@/components/ContentCard";
+import { formatKstDate as sharedFormatKstDate } from "@/lib/formatDateTime";
 
-type MaintenanceRow = {
-  maintenanceId?: string;
-  aircraftId?: string;
-  aircraftName?: string;
-  registrationNo?: string;
-  inspectionDate?: string;
-  maintenanceType?: string;
-  status?: string;
-  nextInspectionDate?: string;
-  mechanic?: string;
-  cost?: string | number;
-  memo?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  [key: string]: unknown;
-};
-
-type AircraftRow = {
-  aircraftId?: string;
-  aircraftName?: string;
-  registrationNo?: string;
-  model?: string;
-  status?: string;
-  active?: string | boolean;
-  [key: string]: unknown;
-};
+type Row = Record<string, unknown>;
+type RecordKind = "정기 정비/점검" | "일상 점검" | "결함/Squawk";
 
 type MaintenanceForm = {
   maintenanceId: string;
+  recordKind: RecordKind;
   aircraftId: string;
-  aircraftName: string;
   registrationNo: string;
   inspectionDate: string;
   maintenanceType: string;
   status: string;
-  nextInspectionDate: string;
+  currentAirframeTime: string;
+  currentEngineTime: string;
   mechanic: string;
-  cost: string;
+  provider: string;
+  nextInspectionDate: string;
+  nextDueBasis: string;
+  nextDueHours: string;
+  content: string;
+  defect: string;
+  actionTaken: string;
+  checkStage: string;
+  flightAvailable: string;
+  oilStatus: string;
+  oilAddedAmount: string;
+  fuelStatus: string;
+  tireStatus: string;
+  brakeStatus: string;
+  propellerStatus: string;
+  pitotStatus: string;
+  controlSurfaceStatus: string;
+  exteriorDamage: string;
+  riskLevel: string;
+  operationDecision: string;
+  closeYn: string;
+  attachmentUrl: string;
   memo: string;
+};
+
+const today = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 };
 
 const emptyForm: MaintenanceForm = {
   maintenanceId: "",
+  recordKind: "정기 정비/점검",
   aircraftId: "",
-  aircraftName: "",
   registrationNo: "",
-  inspectionDate: "",
-  maintenanceType: "정기점검",
-  status: "예정",
-  nextInspectionDate: "",
+  inspectionDate: today(),
+  maintenanceType: "연간점검",
+  status: "완료",
+  currentAirframeTime: "",
+  currentEngineTime: "",
   mechanic: "",
-  cost: "",
+  provider: "",
+  nextInspectionDate: "",
+  nextDueBasis: "날짜",
+  nextDueHours: "",
+  content: "",
+  defect: "",
+  actionTaken: "",
+  checkStage: "비행 전",
+  flightAvailable: "가능",
+  oilStatus: "정상",
+  oilAddedAmount: "",
+  fuelStatus: "정상",
+  tireStatus: "정상",
+  brakeStatus: "정상",
+  propellerStatus: "정상",
+  pitotStatus: "정상",
+  controlSurfaceStatus: "정상",
+  exteriorDamage: "없음",
+  riskLevel: "낮음",
+  operationDecision: "운항 가능",
+  closeYn: "N",
+  attachmentUrl: "",
   memo: "",
 };
 
-const maintenanceTypes = [
-  "정기점검",
-  "100시간점검",
-  "연간점검",
-  "오일교환",
-  "수리",
-  "기타",
-];
+const periodicTypes = ["연간점검", "25시간 점검", "50시간 점검", "100시간 점검", "엔진오일 교환", "오일필터 교환", "점화플러그 교환", "연료필터 교환", "브레이크 패드 교환", "타이어 교체", "배터리 교체", "프로펠러 점검", "기타"];
+const dailyTypes = ["비행 전 점검", "비행 후 점검", "일상 확인", "엔진오일량 확인", "연료 확인", "기타 일상점검"];
+const squawkTypes = ["결함/Squawk", "비행 전 결함", "비행 중 결함", "비행 후 결함", "운용 제한", "기타 결함"];
+const periodicStatuses = ["예정", "진행중", "완료", "보류", "취소"];
+const dailyStatuses = ["정상", "보충", "이상 발견", "조치 필요", "운항 불가"];
+const squawkStatuses = ["미해결", "조치중", "완료", "보류"];
+const riskLevels = ["낮음", "중간", "높음", "긴급"];
+const operationDecisions = ["운항 가능", "운항 제한", "운항 불가"];
+const checkValues = ["정상", "주의", "보충", "조치 필요", "해당 없음"];
 
-const maintenanceStatuses = ["예정", "진행중", "완료", "보류", "취소"];
-
-function text(value: unknown, fallback = "-") {
-  if (value === null || value === undefined || value === "") {
-    return fallback;
-  }
-
-  return String(value);
+function text(value: unknown, fallback = "") {
+  const raw = String(value ?? "").trim();
+  return raw || fallback;
 }
 
-function formValue(value: unknown) {
-  if (value === null || value === undefined) {
-    return "";
-  }
-
-  return String(value);
+function normalizeDate(value: unknown) {
+  const formatted = sharedFormatKstDate(value);
+  return formatted === "-" ? "" : formatted;
 }
 
-function numberValue(value: unknown) {
-  const number = Number(String(value || "0").replace(/,/g, ""));
-
-  if (Number.isNaN(number)) {
-    return 0;
-  }
-
-  return number;
+function aircraftRegistration(row: Row) {
+  return text(row.registrationNo || row.registration_no || row.aircraftName || row.aircraft_name || row.aircraftId || row.aircraft_id, "-");
 }
 
-function formatMoney(value: unknown) {
-  const number = numberValue(value);
-
-  if (number <= 0) {
-    return "-";
-  }
-
-  return new Intl.NumberFormat("ko-KR").format(number);
+function memoValue(memo: unknown, label: string) {
+  const raw = text(memo);
+  const line = raw.split(/\r?\n/).find((item) => item.startsWith(`${label}:`));
+  return line ? line.replace(`${label}:`, "").trim() : "";
 }
 
-function isDueSoon(dateText: unknown) {
-  const raw = text(dateText, "");
-
-  if (!raw) {
-    return false;
-  }
-
-  const target = new Date(`${raw.substring(0, 10)}T00:00:00`);
-
-  if (Number.isNaN(target.getTime())) {
-    return false;
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const diffDays = Math.ceil(
-    (target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  return diffDays >= 0 && diffDays <= 30;
+function recordKindOf(row: Row): RecordKind {
+  const memoKind = memoValue(row.memo, "기록구분");
+  const type = text(row.maintenanceType || row.maintenance_type);
+  if (memoKind.includes("일상") || type.includes("비행 전") || type.includes("비행 후") || type.includes("일상") || type.includes("엔진오일량")) return "일상 점검";
+  if (memoKind.includes("결함") || type.includes("결함") || type.includes("Squawk")) return "결함/Squawk";
+  return "정기 정비/점검";
 }
 
-function isOverdue(dateText: unknown) {
-  const raw = text(dateText, "");
-
-  if (!raw) {
-    return false;
-  }
-
-  const target = new Date(`${raw.substring(0, 10)}T00:00:00`);
-
-  if (Number.isNaN(target.getTime())) {
-    return false;
-  }
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  return target.getTime() < today.getTime();
+function statusClass(row: Row) {
+  const status = text(row.status);
+  if (["완료", "정상"].includes(status)) return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  if (["진행중", "조치중", "보충"].includes(status)) return "bg-blue-50 text-blue-700 border-blue-200";
+  if (["미해결", "예정", "주의", "이상 발견", "조치 필요"].includes(status)) return "bg-amber-50 text-amber-700 border-amber-200";
+  if (["운항 불가", "긴급"].includes(status)) return "bg-rose-50 text-rose-700 border-rose-200";
+  return "bg-slate-50 text-slate-600 border-slate-200";
 }
 
-function toForm(row: MaintenanceRow): MaintenanceForm {
+function kindBadgeClass(kind: RecordKind) {
+  if (kind === "정기 정비/점검") return "bg-blue-50 text-blue-700 border-blue-200";
+  if (kind === "일상 점검") return "bg-sky-50 text-sky-700 border-sky-200";
+  return "bg-rose-50 text-rose-700 border-rose-200";
+}
+
+function riskClass(value: unknown) {
+  const risk = text(value);
+  if (risk === "긴급" || risk === "높음") return "bg-rose-50 text-rose-700 border-rose-200";
+  if (risk === "중간") return "bg-amber-50 text-amber-700 border-amber-200";
+  return "bg-emerald-50 text-emerald-700 border-emerald-200";
+}
+
+function daysUntil(value: unknown) {
+  const date = normalizeDate(value);
+  if (!date) return null;
+  const now = new Date();
+  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const target = new Date(`${date}T00:00:00`).getTime();
+  if (Number.isNaN(target)) return null;
+  return Math.ceil((target - base) / 86400000);
+}
+
+function dDayText(value: unknown) {
+  const days = daysUntil(value);
+  if (days === null) return "-";
+  if (days < 0) return `D+${Math.abs(days)}`;
+  if (days === 0) return "D-Day";
+  return `D-${days}`;
+}
+
+async function fetchJson(url: string) {
+  const response = await fetch(url, { cache: "no-store" });
+  const raw = await response.text();
+  if (!raw.trim()) return {};
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+function statusDefault(kind: RecordKind) {
+  if (kind === "정기 정비/점검") return "완료";
+  if (kind === "일상 점검") return "정상";
+  return "미해결";
+}
+
+function typeDefault(kind: RecordKind) {
+  if (kind === "정기 정비/점검") return "연간점검";
+  if (kind === "일상 점검") return "비행 전 점검";
+  return "결함/Squawk";
+}
+
+function toForm(row: Row): MaintenanceForm {
+  const kind = recordKindOf(row);
   return {
-    maintenanceId: formValue(row.maintenanceId),
-    aircraftId: formValue(row.aircraftId),
-    aircraftName: formValue(row.aircraftName),
-    registrationNo: formValue(row.registrationNo),
-    inspectionDate: formValue(row.inspectionDate),
-    maintenanceType: formValue(row.maintenanceType || "정기점검"),
-    status: formValue(row.status || "예정"),
-    nextInspectionDate: formValue(row.nextInspectionDate),
-    mechanic: formValue(row.mechanic),
-    cost: formValue(row.cost),
-    memo: formValue(row.memo),
+    maintenanceId: text(row.maintenanceId || row.maintenance_id),
+    recordKind: kind,
+    aircraftId: text(row.aircraftId || row.aircraft_id),
+    registrationNo: aircraftRegistration(row) === "-" ? "" : aircraftRegistration(row),
+    inspectionDate: normalizeDate(row.inspectionDate || row.inspection_date) || today(),
+    maintenanceType: text(row.maintenanceType || row.maintenance_type, typeDefault(kind)),
+    status: text(row.status, statusDefault(kind)),
+    currentAirframeTime: memoValue(row.memo, "현재 기체시간"),
+    currentEngineTime: memoValue(row.memo, "현재 엔진시간"),
+    mechanic: text(row.mechanic),
+    provider: memoValue(row.memo, "정비업체"),
+    nextInspectionDate: normalizeDate(row.nextInspectionDate || row.next_inspection_date),
+    nextDueBasis: memoValue(row.memo, "다음 예정 기준") || "날짜",
+    nextDueHours: memoValue(row.memo, "다음 예정 시간"),
+    content: memoValue(row.memo, "정비/점검 내용"),
+    defect: memoValue(row.memo, "발견 결함"),
+    actionTaken: memoValue(row.memo, "조치 내용"),
+    checkStage: memoValue(row.memo, "점검 단계") || "비행 전",
+    flightAvailable: memoValue(row.memo, "다음 비행 가능 여부") || "가능",
+    oilStatus: memoValue(row.memo, "엔진오일량") || "정상",
+    oilAddedAmount: memoValue(row.memo, "오일 보충량"),
+    fuelStatus: memoValue(row.memo, "연료 상태") || "정상",
+    tireStatus: memoValue(row.memo, "타이어 상태") || "정상",
+    brakeStatus: memoValue(row.memo, "브레이크 상태") || "정상",
+    propellerStatus: memoValue(row.memo, "프로펠러 상태") || "정상",
+    pitotStatus: memoValue(row.memo, "피토관 상태") || "정상",
+    controlSurfaceStatus: memoValue(row.memo, "조종면 상태") || "정상",
+    exteriorDamage: memoValue(row.memo, "외부 손상") || "없음",
+    riskLevel: memoValue(row.memo, "위험도") || "낮음",
+    operationDecision: memoValue(row.memo, "운항판단") || "운항 가능",
+    closeYn: memoValue(row.memo, "Close 여부") || "N",
+    attachmentUrl: memoValue(row.memo, "첨부"),
+    memo: memoValue(row.memo, "메모"),
   };
 }
 
-function getStatusBadgeClass(status: unknown) {
-  const value = text(status, "");
-
-  if (value === "완료") {
-    return "bg-emerald-50 text-emerald-700 ring-emerald-200";
-  }
-
-  if (value === "진행중") {
-    return "bg-blue-50 text-blue-700 ring-blue-200";
-  }
-
-  if (value === "예정") {
-    return "bg-slate-50 text-slate-700 ring-slate-200";
-  }
-
-  if (value === "보류") {
-    return "bg-amber-50 text-amber-700 ring-amber-200";
-  }
-
-  if (value === "취소") {
-    return "bg-rose-50 text-rose-700 ring-rose-200";
-  }
-
-  return "bg-slate-50 text-slate-700 ring-slate-200";
-}
-
 export default function AircraftMaintenancePage() {
-  const [maintenanceRows, setMaintenanceRows] = useState<MaintenanceRow[]>([]);
-  const [aircraft, setAircraft] = useState<AircraftRow[]>([]);
+  const [aircraft, setAircraft] = useState<Row[]>([]);
+  const [records, setRecords] = useState<Row[]>([]);
+  const [form, setForm] = useState<MaintenanceForm>(emptyForm);
+  const [kindFilter, setKindFilter] = useState("전체");
+  const [aircraftFilter, setAircraftFilter] = useState("전체");
+  const [statusFilter, setStatusFilter] = useState("전체");
+  const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [keyword, setKeyword] = useState("");
-  const [statusFilter, setStatusFilter] = useState("전체");
-  const [typeFilter, setTypeFilter] = useState("전체");
-  const [error, setError] = useState("");
+  const isEdit = Boolean(form.maintenanceId);
+  const isPeriodicMode = form.recordKind === "정기 정비/점검";
+  const isDailyMode = form.recordKind === "일상 점검";
+  const isSquawkMode = form.recordKind === "결함/Squawk";
 
-  const [form, setForm] = useState<MaintenanceForm>(emptyForm);
-  const [editing, setEditing] = useState(false);
-
-  const loadData = useCallback(async (showLoading = true) => {
-    try {
-      if (showLoading) {
-        setLoading(true);
-      }
-
-      setError("");
-
-      const response = await fetch("/api/aircraft-maintenance", {
-        method: "GET",
-        cache: "no-store",
-      });
-
-      const rawText = await response.text();
-
-      if (!rawText.trim()) {
-        throw new Error("서버 응답이 비어 있습니다.");
-      }
-
-      let data: {
-        ok?: boolean;
-        message?: string;
-        aircraftMaintenance?: MaintenanceRow[];
-        aircraft?: AircraftRow[];
-      };
-
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        throw new Error("서버 응답을 JSON으로 변환하지 못했습니다.");
-      }
-
-      if (!response.ok || !data.ok) {
-        throw new Error(
-          data.message || "항공기 점검/정비 데이터를 불러오지 못했습니다."
-        );
-      }
-
-      setMaintenanceRows(
-        Array.isArray(data.aircraftMaintenance) ? data.aircraftMaintenance : []
-      );
-      setAircraft(Array.isArray(data.aircraft) ? data.aircraft : []);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "항공기 점검/정비 데이터를 불러오지 못했습니다."
-      );
-      setMaintenanceRows([]);
-      setAircraft([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  async function load() {
+    setLoading(true);
+    const data = await fetchJson("/api/aircraft-maintenance");
+    setAircraft(Array.isArray(data.aircraft) ? (data.aircraft as Row[]) : []);
+    setRecords(Array.isArray(data.aircraftMaintenance) ? (data.aircraftMaintenance as Row[]) : []);
+    setLoading(false);
+  }
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadData(false);
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [loadData]);
-
-  const typeOptions = useMemo(() => {
-    const values = maintenanceRows
-      .map((item) => text(item.maintenanceType, ""))
-      .filter((item) => item !== "");
-
-    return ["전체", ...Array.from(new Set([...maintenanceTypes, ...values]))];
-  }, [maintenanceRows]);
-
-  const statusOptions = useMemo(() => {
-    const values = maintenanceRows
-      .map((item) => text(item.status, ""))
-      .filter((item) => item !== "");
-
-    return ["전체", ...Array.from(new Set([...maintenanceStatuses, ...values]))];
-  }, [maintenanceRows]);
-
-  const filteredRows = useMemo(() => {
-    const q = keyword.trim().toLowerCase();
-
-    return maintenanceRows.filter((item) => {
-      if (statusFilter !== "전체" && text(item.status, "") !== statusFilter) {
-        return false;
-      }
-
-      if (
-        typeFilter !== "전체" &&
-        text(item.maintenanceType, "") !== typeFilter
-      ) {
-        return false;
-      }
-
-      if (!q) {
-        return true;
-      }
-
-      const searchText = [
-        item.maintenanceId,
-        item.aircraftId,
-        item.aircraftName,
-        item.registrationNo,
-        item.inspectionDate,
-        item.maintenanceType,
-        item.status,
-        item.nextInspectionDate,
-        item.mechanic,
-        item.cost,
-        item.memo,
-      ]
-        .map((value) => text(value, ""))
-        .join(" ")
-        .toLowerCase();
-
-      return searchText.includes(q);
-    });
-  }, [maintenanceRows, keyword, statusFilter, typeFilter]);
-
-  const stats = useMemo(() => {
-    const total = maintenanceRows.length;
-    const planned = maintenanceRows.filter((item) => item.status === "예정").length;
-    const inProgress = maintenanceRows.filter(
-      (item) => item.status === "진행중"
-    ).length;
-    const dueSoon = maintenanceRows.filter((item) =>
-      isDueSoon(item.nextInspectionDate)
-    ).length;
-
-    return { total, planned, inProgress, dueSoon };
-  }, [maintenanceRows]);
-
-  function resetForm() {
-    setForm(emptyForm);
-    setEditing(false);
-  }
+    void load();
+  }, []);
 
   function selectAircraft(aircraftId: string) {
-    const selected = aircraft.find(
-      (item) => text(item.aircraftId, "") === aircraftId
-    );
-
-    setForm((prev) => ({
-      ...prev,
-      aircraftId,
-      aircraftName: text(selected?.aircraftName, ""),
-      registrationNo: text(selected?.registrationNo, ""),
-    }));
+    const selected = aircraft.find((row) => text(row.aircraftId || row.aircraft_id) === aircraftId);
+    setForm({ ...form, aircraftId, registrationNo: selected ? aircraftRegistration(selected) : "" });
   }
 
-  function startEdit(row: MaintenanceRow) {
-    setForm(toForm(row));
-    setEditing(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  function switchKind(kind: RecordKind) {
+    setForm({
+      ...emptyForm,
+      aircraftId: form.aircraftId,
+      registrationNo: form.registrationNo,
+      inspectionDate: form.inspectionDate || today(),
+      recordKind: kind,
+      maintenanceType: typeDefault(kind),
+      status: statusDefault(kind),
+    });
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const filtered = useMemo(() => {
+    const q = keyword.trim().toLowerCase();
+    return records.filter((row) => {
+      const rowKind = recordKindOf(row);
+      const aircraftId = text(row.aircraftId || row.aircraft_id);
+      if (kindFilter !== "전체" && rowKind !== kindFilter) return false;
+      if (aircraftFilter !== "전체" && aircraftId !== aircraftFilter) return false;
+      if (statusFilter !== "전체" && text(row.status) !== statusFilter) return false;
+      if (!q) return true;
+      return [row.maintenanceId, row.aircraftId, row.aircraftName, row.registrationNo, row.maintenanceType, row.status, row.mechanic, row.memo]
+        .map((value) => text(value).toLowerCase())
+        .join(" ")
+        .includes(q);
+    });
+  }, [aircraftFilter, keyword, kindFilter, records, statusFilter]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     if (!form.aircraftId) {
-      setError("항공기를 선택하세요.");
+      alert("항공기를 선택하세요.");
       return;
     }
-
     if (!form.inspectionDate) {
-      setError("점검일을 입력하세요.");
+      alert("기록일자를 입력하세요.");
       return;
     }
-
-    try {
-      setSaving(true);
-      setError("");
-
-      const response = await fetch("/api/aircraft-maintenance", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          mode: editing ? "update" : "add",
-          data: form,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || !data.ok) {
-        throw new Error(data.message || "저장에 실패했습니다.");
-      }
-
-      resetForm();
-      await loadData(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "저장에 실패했습니다.");
-    } finally {
-      setSaving(false);
+    if (!form.maintenanceType.trim()) {
+      alert("점검종류를 선택하세요.");
+      return;
     }
+    if (!form.status.trim()) {
+      alert("상태를 선택하세요.");
+      return;
+    }
+    setSaving(true);
+    const selected = aircraft.find((row) => text(row.aircraftId || row.aircraft_id) === form.aircraftId);
+    const payload = {
+      ...form,
+      aircraftName: selected ? aircraftRegistration(selected) : form.registrationNo,
+      registrationNo: selected ? aircraftRegistration(selected) : form.registrationNo,
+      maintenanceType: form.maintenanceType || typeDefault(form.recordKind),
+    };
+    const response = await fetch("/api/aircraft-maintenance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: isEdit ? "update" : "add", data: payload }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.ok === false) {
+      alert(String(result.message || "항공기 정비관리 기록 저장에 실패했습니다."));
+      setSaving(false);
+      return;
+    }
+    setForm(emptyForm);
+    await load();
+    setSaving(false);
   }
 
   return (
-    <div className="min-h-screen w-full bg-slate-50">
-      <div className="flex w-full flex-col gap-6 p-6">
-        <section className="flex flex-row items-center justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div>
-            <p className="text-sm font-semibold text-slate-500">관리자 기능</p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
-              항공기 점검/정비관리
-            </h1>
-            <p className="mt-2 text-sm text-slate-500">
-              항공기별 점검일, 정비 유형, 상태, 다음 점검일을 관리합니다.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => void loadData(true)}
-            className="h-11 rounded-xl bg-slate-950 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-            disabled={loading}
-          >
-            {loading ? "불러오는 중" : "새로고침"}
-          </button>
-        </section>
-
-        <section className="grid grid-cols-4 gap-4">
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold text-slate-500">전체 이력</p>
-            <p className="mt-3 text-3xl font-black text-slate-950">{stats.total}</p>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold text-slate-500">예정</p>
-            <p className="mt-3 text-3xl font-black text-slate-950">{stats.planned}</p>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold text-slate-500">진행중</p>
-            <p className="mt-3 text-3xl font-black text-blue-600">{stats.inProgress}</p>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold text-slate-500">30일 내 점검</p>
-            <p className="mt-3 text-3xl font-black text-amber-600">{stats.dueSoon}</p>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-5 flex items-center justify-between">
+    <PageContainer title="항공기 정비관리" description="정기 정비, 일상 점검, 결함/Squawk를 성격에 맞게 분리해 기록합니다.">
+      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <ContentCard className="p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold text-slate-950">
-                {editing ? "점검/정비 수정" : "점검/정비 등록"}
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                aircraftMaintenance 시트에 저장됩니다.
-              </p>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#6f8199]">AIRCRAFT MAINTENANCE</p>
+              <h2 className="mt-1 text-xl font-semibold text-[#10213f]">{isEdit ? "기록 수정" : "정비/점검 기록"}</h2>
+              <p className="mt-2 text-sm text-[#6f8199]">다음 예정일은 정기 정비에서만 관리하고, 일상 점검은 비행 가능 여부만 기록합니다.</p>
+            </div>
+            {isEdit ? <span className="ui-badge bg-blue-50 text-blue-700 border-blue-200">수정 중</span> : null}
+          </div>
+
+          <form onSubmit={submit} className="mt-5 space-y-5">
+            <div className="grid grid-cols-3 gap-2 rounded-2xl bg-[#f4f8fd] p-1">
+              {(["정기 정비/점검", "일상 점검", "결함/Squawk"] as RecordKind[]).map((kind) => (
+                <button key={kind} type="button" onClick={() => switchKind(kind)} className={`rounded-xl px-2 py-2 text-xs font-medium transition md:text-sm ${form.recordKind === kind ? "bg-white text-blue-700 shadow-sm" : "text-[#6f8199]"}`}>
+                  {kind}
+                </button>
+              ))}
             </div>
 
-            {editing && (
-              <button
-                type="button"
-                onClick={resetForm}
-                className="h-10 rounded-xl border border-slate-300 px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-              >
-                새 등록으로 전환
-              </button>
-            )}
-          </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="항공기" required>
+                <select className="ui-input" value={form.aircraftId} onChange={(event) => selectAircraft(event.target.value)}>
+                  <option value="">항공기 선택</option>
+                  {aircraft.map((row, index) => {
+                    const id = text(row.aircraftId || row.aircraft_id);
+                    return <option key={id || index} value={id}>{aircraftRegistration(row)} · {text(row.model, "기종 미입력")}</option>;
+                  })}
+                </select>
+              </Field>
+              <Field label={isSquawkMode ? "발생일" : isDailyMode ? "점검일" : "정비/점검일"} required>
+                <input type="date" className="ui-input" value={form.inspectionDate} onChange={(event) => setForm({ ...form, inspectionDate: event.target.value })} />
+              </Field>
+              <Field label={isSquawkMode ? "결함 구분" : isDailyMode ? "점검 구분" : "정기 정비 구분"} required>
+                <select className="ui-input" value={form.maintenanceType} onChange={(event) => setForm({ ...form, maintenanceType: event.target.value })}>
+                  {(isSquawkMode ? squawkTypes : isDailyMode ? dailyTypes : periodicTypes).map((item) => <option key={item}>{item}</option>)}
+                </select>
+              </Field>
+              <Field label="상태" required>
+                <select className="ui-input" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
+                  {(isSquawkMode ? squawkStatuses : isDailyMode ? dailyStatuses : periodicStatuses).map((item) => <option key={item}>{item}</option>)}
+                </select>
+              </Field>
+              <Field label="현재 기체시간">
+                <input className="ui-input" value={form.currentAirframeTime} onChange={(event) => setForm({ ...form, currentAirframeTime: event.target.value })} placeholder="예: 123.4" />
+              </Field>
+              <Field label="현재 엔진시간">
+                <input className="ui-input" value={form.currentEngineTime} onChange={(event) => setForm({ ...form, currentEngineTime: event.target.value })} placeholder="예: 98.2" />
+              </Field>
+              <Field label={isSquawkMode ? "조치 담당자" : isDailyMode ? "점검자" : "정비자/점검자"}>
+                <input className="ui-input" value={form.mechanic} onChange={(event) => setForm({ ...form, mechanic: event.target.value })} placeholder="이름 입력" />
+              </Field>
+              {isPeriodicMode ? (
+                <Field label="정비업체">
+                  <input className="ui-input" value={form.provider} onChange={(event) => setForm({ ...form, provider: event.target.value })} placeholder="업체명" />
+                </Field>
+              ) : null}
+            </div>
 
-          <form onSubmit={handleSubmit} className="grid grid-cols-4 gap-4">
-            <input type="hidden" value={form.maintenanceId} readOnly />
+            {isPeriodicMode ? (
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-4">
+                <p className="text-sm font-medium text-blue-800">정기 정비/점검 예정 관리</p>
+                <p className="mt-1 text-xs text-blue-700/80">연간점검, 50시간 점검, 100시간 점검처럼 반복 주기가 있는 항목만 다음 예정값을 입력합니다.</p>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <Field label="다음 예정 기준">
+                    <select className="ui-input" value={form.nextDueBasis} onChange={(event) => setForm({ ...form, nextDueBasis: event.target.value })}>
+                      <option>날짜</option>
+                      <option>비행시간</option>
+                      <option>엔진시간</option>
+                      <option>착륙횟수</option>
+                    </select>
+                  </Field>
+                  <Field label="다음 예정일">
+                    <input type="date" className="ui-input" value={form.nextInspectionDate} onChange={(event) => setForm({ ...form, nextInspectionDate: event.target.value })} />
+                  </Field>
+                  <Field label="다음 예정 시간">
+                    <input className="ui-input" value={form.nextDueHours} onChange={(event) => setForm({ ...form, nextDueHours: event.target.value })} placeholder="예: 370.4h" />
+                  </Field>
+                </div>
+              </div>
+            ) : null}
 
-            <label className="flex flex-col gap-2 text-sm font-bold text-slate-700">
-              항공기
-              <select
-                value={form.aircraftId}
-                onChange={(event) => selectAircraft(event.target.value)}
-                className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-              >
-                <option value="">항공기 선택</option>
-                {aircraft.map((item, index) => {
-                  const id = text(item.aircraftId, "");
-                  const name = text(item.aircraftName, "");
-                  const reg = text(item.registrationNo, "");
+            {isDailyMode ? (
+              <div className="rounded-2xl border border-sky-100 bg-sky-50/45 p-4">
+                <p className="text-sm font-medium text-sky-800">일상 점검 결과</p>
+                <p className="mt-1 text-xs text-sky-700/80">엔진오일량 확인/보충처럼 매 비행 전후 확인하는 항목은 다음 예정일 없이 결과만 남깁니다.</p>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <Field label="점검 단계">
+                    <select className="ui-input" value={form.checkStage} onChange={(event) => setForm({ ...form, checkStage: event.target.value })}>
+                      <option>비행 전</option>
+                      <option>비행 후</option>
+                    </select>
+                  </Field>
+                  <Field label="다음 비행 가능 여부">
+                    <select className="ui-input" value={form.flightAvailable} onChange={(event) => setForm({ ...form, flightAvailable: event.target.value })}>
+                      <option>가능</option>
+                      <option>제한</option>
+                      <option>불가</option>
+                    </select>
+                  </Field>
+                  <Field label="엔진오일량">
+                    <select className="ui-input" value={form.oilStatus} onChange={(event) => setForm({ ...form, oilStatus: event.target.value })}>
+                      {checkValues.map((item) => <option key={item}>{item}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="오일 보충량">
+                    <input className="ui-input" value={form.oilAddedAmount} onChange={(event) => setForm({ ...form, oilAddedAmount: event.target.value })} placeholder="예: 0.5L" />
+                  </Field>
+                  <CheckField label="연료 상태" value={form.fuelStatus} onChange={(value) => setForm({ ...form, fuelStatus: value })} />
+                  <CheckField label="타이어 상태" value={form.tireStatus} onChange={(value) => setForm({ ...form, tireStatus: value })} />
+                  <CheckField label="브레이크 상태" value={form.brakeStatus} onChange={(value) => setForm({ ...form, brakeStatus: value })} />
+                  <CheckField label="프로펠러 상태" value={form.propellerStatus} onChange={(value) => setForm({ ...form, propellerStatus: value })} />
+                  <CheckField label="피토관 상태" value={form.pitotStatus} onChange={(value) => setForm({ ...form, pitotStatus: value })} />
+                  <CheckField label="조종면 상태" value={form.controlSurfaceStatus} onChange={(value) => setForm({ ...form, controlSurfaceStatus: value })} />
+                  <Field label="외부 손상">
+                    <select className="ui-input" value={form.exteriorDamage} onChange={(event) => setForm({ ...form, exteriorDamage: event.target.value })}>
+                      <option>없음</option>
+                      <option>주의</option>
+                      <option>손상 발견</option>
+                      <option>조치 필요</option>
+                    </select>
+                  </Field>
+                </div>
+              </div>
+            ) : null}
 
-                  return (
-                    <option key={id || index} value={id}>
-                      {name || id} {reg ? `(${reg})` : ""}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
+            {isSquawkMode ? (
+              <div className="grid gap-4 md:grid-cols-3">
+                <Field label="위험도">
+                  <select className="ui-input" value={form.riskLevel} onChange={(event) => setForm({ ...form, riskLevel: event.target.value })}>
+                    {riskLevels.map((item) => <option key={item}>{item}</option>)}
+                  </select>
+                </Field>
+                <Field label="운항 판단">
+                  <select className="ui-input" value={form.operationDecision} onChange={(event) => setForm({ ...form, operationDecision: event.target.value })}>
+                    {operationDecisions.map((item) => <option key={item}>{item}</option>)}
+                  </select>
+                </Field>
+                <Field label="Close 여부">
+                  <select className="ui-input" value={form.closeYn} onChange={(event) => setForm({ ...form, closeYn: event.target.value })}>
+                    <option value="N">미해결</option>
+                    <option value="Y">Close</option>
+                  </select>
+                </Field>
+              </div>
+            ) : null}
 
-            <label className="flex flex-col gap-2 text-sm font-bold text-slate-700">
-              점검일
-              <input
-                type="date"
-                value={form.inspectionDate}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, inspectionDate: event.target.value }))
-                }
-                className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+            <Field label={isSquawkMode ? "결함 내용" : isDailyMode ? "특이사항" : "정비/점검 내용"}>
+              <textarea
+                className="ui-input min-h-[86px] resize-y"
+                value={isSquawkMode ? form.defect : form.content}
+                onChange={(event) => isSquawkMode ? setForm({ ...form, defect: event.target.value }) : setForm({ ...form, content: event.target.value })}
+                placeholder={isSquawkMode ? "발견된 결함이나 Squawk 내용을 입력하세요." : isDailyMode ? "비행 전후 점검 특이사항을 입력하세요." : "수행한 정기 정비 또는 점검 내용을 입력하세요."}
               />
-            </label>
+            </Field>
+            <Field label="조치 내용">
+              <textarea className="ui-input min-h-[76px] resize-y" value={form.actionTaken} onChange={(event) => setForm({ ...form, actionTaken: event.target.value })} placeholder="보충, 조치 내용, 향후 확인 사항" />
+            </Field>
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="첨부 URL">
+                <input className="ui-input" value={form.attachmentUrl} onChange={(event) => setForm({ ...form, attachmentUrl: event.target.value })} placeholder="사진, 정비기록, 영수증 URL" />
+              </Field>
+              <Field label="관리 메모">
+                <input className="ui-input" value={form.memo} onChange={(event) => setForm({ ...form, memo: event.target.value })} placeholder="관리자 메모" />
+              </Field>
+            </div>
 
-            <label className="flex flex-col gap-2 text-sm font-bold text-slate-700">
-              정비 유형
-              <select
-                value={form.maintenanceType}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, maintenanceType: event.target.value }))
-                }
-                className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-              >
-                {maintenanceTypes.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-[#31435f]">
+              정기 정비의 다음 예정일만 항공기 관리에 반영됩니다. 일상 점검은 비행 가능 여부가 제한/불가일 때만 항공기 상태에 반영됩니다.
+            </div>
 
-            <label className="flex flex-col gap-2 text-sm font-bold text-slate-700">
-              상태
-              <select
-                value={form.status}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, status: event.target.value }))
-                }
-                className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-              >
-                {maintenanceStatuses.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm font-bold text-slate-700">
-              다음 점검일
-              <input
-                type="date"
-                value={form.nextInspectionDate}
-                onChange={(event) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    nextInspectionDate: event.target.value,
-                  }))
-                }
-                className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-              />
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm font-bold text-slate-700">
-              담당자/정비처
-              <input
-                value={form.mechanic}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, mechanic: event.target.value }))
-                }
-                placeholder="예: 내부점검 / 외주정비처"
-                className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium outline-none placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-              />
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm font-bold text-slate-700">
-              비용
-              <input
-                value={form.cost}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, cost: event.target.value }))
-                }
-                placeholder="숫자만 입력"
-                inputMode="numeric"
-                className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium outline-none placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-              />
-            </label>
-
-            <label className="col-span-2 flex flex-col gap-2 text-sm font-bold text-slate-700">
-              메모
-              <input
-                value={form.memo}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, memo: event.target.value }))
-                }
-                placeholder="점검 내용, 교체 부품, 특이사항"
-                className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium outline-none placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-              />
-            </label>
-
-            <div className="col-span-4 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={resetForm}
-                className="h-11 rounded-xl border border-slate-300 px-5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-              >
-                초기화
-              </button>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="h-11 rounded-xl bg-slate-950 px-6 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-              >
-                {saving ? "저장 중" : editing ? "수정 저장" : "신규 등록"}
-              </button>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button type="button" className="ui-btn ui-btn-outline" onClick={() => setForm(emptyForm)} disabled={saving}>초기화</button>
+              <button className="ui-btn ui-btn-primary" disabled={saving}>{saving ? "저장 중" : isEdit ? "수정 저장" : "기록 저장"}</button>
             </div>
           </form>
-        </section>
+        </ContentCard>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="grid grid-cols-[220px_220px_minmax(0,1fr)] gap-3">
-            <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-              className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-            >
-              {statusOptions.map((item) => (
-                <option key={item} value={item}>
-                  {item === "전체" ? "전체 상태" : item}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value)}
-              className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-            >
-              {typeOptions.map((item) => (
-                <option key={item} value={item}>
-                  {item === "전체" ? "전체 유형" : item}
-                </option>
-              ))}
-            </select>
-
-            <input
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="항공기명, 등록번호, 담당자, 메모 검색"
-              className="h-11 rounded-xl border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 outline-none placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
-            />
-          </div>
-        </section>
-
-        {error && (
-          <section className="rounded-3xl border border-rose-200 bg-rose-50 p-5 text-sm font-semibold text-rose-700">
-            {error}
-          </section>
-        )}
-
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-            <div>
-              <h2 className="text-lg font-bold text-slate-950">
-                점검/정비 목록
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                표시 {filteredRows.length}건 / 전체 {maintenanceRows.length}건
-              </p>
+        <ContentCard className="overflow-hidden p-0">
+          <div className="border-b border-[#e6eef8] p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-[#10213f]">정비/점검 기록 목록</h2>
+                <p className="mt-1 text-sm text-[#6f8199]">성격별로 분리해 기록하고 항공기별로 함께 확인합니다.</p>
+              </div>
+              <span className="ui-badge bg-slate-50 text-slate-600 border-slate-200">표시 {filtered.length}건</span>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <select className="ui-input" value={kindFilter} onChange={(event) => setKindFilter(event.target.value)}>
+                <option>전체</option>
+                <option>정기 정비/점검</option>
+                <option>일상 점검</option>
+                <option>결함/Squawk</option>
+              </select>
+              <select className="ui-input" value={aircraftFilter} onChange={(event) => setAircraftFilter(event.target.value)}>
+                <option value="전체">항공기 전체</option>
+                {aircraft.map((row, index) => {
+                  const id = text(row.aircraftId || row.aircraft_id);
+                  return <option key={id || index} value={id}>{aircraftRegistration(row)}</option>;
+                })}
+              </select>
+              <select className="ui-input" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+                <option>전체</option>
+                {[...periodicStatuses, ...dailyStatuses, ...squawkStatuses].filter((item, index, arr) => arr.indexOf(item) === index).map((item) => <option key={item}>{item}</option>)}
+              </select>
+              <input className="ui-input" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="항공기, 내용, 담당자 검색" />
             </div>
           </div>
 
-          {loading ? (
-            <div className="p-12 text-center text-sm font-medium text-slate-500">
-              데이터를 불러오는 중입니다.
-            </div>
-          ) : filteredRows.length === 0 ? (
-            <div className="p-12 text-center text-sm font-medium text-slate-500">
-              표시할 데이터가 없습니다.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1280px] border-collapse text-left text-sm">
-                <thead className="bg-slate-50 text-xs font-bold uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th className="px-6 py-4">ID</th>
-                    <th className="px-6 py-4">항공기</th>
-                    <th className="px-6 py-4">점검일</th>
-                    <th className="px-6 py-4">유형</th>
-                    <th className="px-6 py-4">상태</th>
-                    <th className="px-6 py-4">다음 점검일</th>
-                    <th className="px-6 py-4">담당자</th>
-                    <th className="px-6 py-4 text-right">비용</th>
-                    <th className="px-6 py-4">메모</th>
-                    <th className="px-6 py-4 text-center">관리</th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-100">
-                  {filteredRows.map((row, index) => {
-                    const overdue = isOverdue(row.nextInspectionDate);
-                    const dueSoon = isDueSoon(row.nextInspectionDate);
-
-                    return (
-                      <tr
-                        key={row.maintenanceId || index}
-                        className="transition hover:bg-slate-50"
-                      >
-                        <td className="px-6 py-5 align-top font-bold text-slate-700">
-                          {text(row.maintenanceId)}
-                        </td>
-                        <td className="px-6 py-5 align-top">
-                          <p className="font-bold text-slate-950">
-                            {text(row.aircraftName || row.aircraftId)}
-                          </p>
-                          <p className="mt-1 text-xs font-medium text-slate-500">
-                            {text(row.registrationNo, "") || text(row.aircraftId)}
-                          </p>
-                        </td>
-                        <td className="px-6 py-5 align-top text-slate-700">
-                          {text(row.inspectionDate)}
-                        </td>
-                        <td className="px-6 py-5 align-top text-slate-700">
-                          {text(row.maintenanceType)}
-                        </td>
-                        <td className="px-6 py-5 align-top">
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-black ring-1 ${getStatusBadgeClass(
-                              row.status
-                            )}`}
-                          >
-                            {text(row.status)}
-                          </span>
-                        </td>
-                        <td className="px-6 py-5 align-top">
-                          <p
-                            className={
-                              overdue
-                                ? "font-black text-rose-600"
-                                : dueSoon
-                                  ? "font-black text-amber-600"
-                                  : "text-slate-700"
-                            }
-                          >
-                            {text(row.nextInspectionDate)}
-                          </p>
-                          {(overdue || dueSoon) && (
-                            <p className="mt-1 text-xs font-bold text-slate-500">
-                              {overdue ? "점검일 경과" : "30일 내 점검"}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-6 py-5 align-top text-slate-700">
-                          {text(row.mechanic)}
-                        </td>
-                        <td className="px-6 py-5 align-top text-right font-bold text-slate-700">
-                          {formatMoney(row.cost)}
-                        </td>
-                        <td className="px-6 py-5 align-top text-slate-700">
-                          <div className="max-w-sm whitespace-pre-line leading-relaxed">
-                            {text(row.memo)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-5 align-top text-center">
-                          <button
-                            type="button"
-                            onClick={() => startEdit(row)}
-                            className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
-                          >
-                            수정
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+          <div className="max-h-[860px] space-y-3 overflow-y-auto p-5">
+            {loading ? <div className="rounded-2xl bg-slate-50 p-6 text-center text-[#6f8199]">불러오는 중입니다.</div> : null}
+            {!loading && filtered.length === 0 ? <div className="rounded-2xl bg-slate-50 p-6 text-center text-[#6f8199]">표시할 기록이 없습니다.</div> : null}
+            {!loading && filtered.map((row, index) => {
+              const rowKind = recordKindOf(row);
+              const risk = memoValue(row.memo, "위험도");
+              const operationDecision = memoValue(row.memo, "운항판단");
+              const flightAvailable = memoValue(row.memo, "다음 비행 가능 여부");
+              const content = memoValue(row.memo, rowKind === "결함/Squawk" ? "발견 결함" : "정비/점검 내용") || memoValue(row.memo, "조치 내용") || text(row.memo, "내용 없음").split(/\r?\n/)[0];
+              return (
+                <button key={text(row.maintenanceId || row.maintenance_id) || index} type="button" onClick={() => setForm(toForm(row))} className={`w-full rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md ${rowKind === "결함/Squawk" ? "border-rose-100 bg-rose-50/35" : rowKind === "일상 점검" ? "border-sky-100 bg-sky-50/35" : "border-[#dbe5f1] bg-white"}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`ui-badge ${kindBadgeClass(rowKind)}`}>{rowKind}</span>
+                        <span className={`ui-badge ${statusClass(row)}`}>{text(row.status, "-")}</span>
+                        {rowKind === "결함/Squawk" && risk ? <span className={`ui-badge ${riskClass(risk)}`}>위험도 {risk}</span> : null}
+                        {rowKind === "일상 점검" && flightAvailable ? <span className="ui-badge bg-white text-slate-600 border-slate-200">비행 {flightAvailable}</span> : null}
+                      </div>
+                      <p className="mt-3 text-lg font-semibold text-[#10213f]">{aircraftRegistration(row)}</p>
+                      <p className="mt-1 text-sm text-[#6f8199]">{normalizeDate(row.inspectionDate || row.inspection_date) || "-"} · {text(row.maintenanceType || row.maintenance_type, "-")} · {text(row.mechanic, "담당자 미입력")}</p>
+                    </div>
+                    <div className="text-right text-sm text-[#6f8199]">
+                      {rowKind === "정기 정비/점검" ? <p>다음 예정 {dDayText(row.nextInspectionDate || row.next_inspection_date)}</p> : null}
+                      {rowKind === "일상 점검" ? <p>{memoValue(row.memo, "점검 단계") || "일상 점검"}</p> : null}
+                      {rowKind === "결함/Squawk" ? <p>{operationDecision || "운항판단 미입력"}</p> : null}
+                      <p className="mt-1">수정 ›</p>
+                    </div>
+                  </div>
+                  <p className="mt-3 rounded-2xl bg-white/70 px-4 py-3 text-sm text-[#31435f]">{content}</p>
+                </button>
+              );
+            })}
+          </div>
+        </ContentCard>
       </div>
-    </div>
+    </PageContainer>
+  );
+}
+
+function Field({ label, required, className = "", children }: { label: string; required?: boolean; className?: string; children: React.ReactNode }) {
+  return (
+    <label className={`ui-label ${className}`}>
+      <span>{label}{required ? <em className="ml-1 text-rose-500">*</em> : null}</span>
+      {children}
+    </label>
+  );
+}
+
+function CheckField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <Field label={label}>
+      <select className="ui-input" value={value} onChange={(event) => onChange(event.target.value)}>
+        {checkValues.map((item) => <option key={item}>{item}</option>)}
+      </select>
+    </Field>
   );
 }

@@ -533,6 +533,56 @@ async function updateStudent(data: JsonRecord) {
   return toCamelObject(saved as JsonRecord);
 }
 
+
+async function deleteStudent(data: JsonRecord) {
+  const supabase = getSupabaseServerClient();
+  const studentId = getStudentId(data);
+
+  if (!studentId) {
+    throw new Error("studentId가 필요합니다.");
+  }
+
+  const confirmName = text(data.confirmName || data.confirm_name);
+  const requestedName = text(data.name || data.studentName || data.student_name);
+
+  const { data: existing, error: findError } = await supabase
+    .from("students")
+    .select("student_id,name,user_id")
+    .eq("student_id", studentId)
+    .maybeSingle();
+
+  if (findError) throw new Error(findError.message);
+  if (!existing) throw new Error("삭제할 교육생을 찾지 못했습니다.");
+
+  const existingRow = existing as JsonRecord;
+  const existingName = text(existingRow.name);
+
+  if (!confirmName) {
+    throw new Error("삭제 확인을 위해 교육생 이름을 입력해야 합니다.");
+  }
+
+  if (confirmName !== existingName) {
+    throw new Error("입력한 이름이 교육생 이름과 일치하지 않습니다.");
+  }
+
+  if (requestedName && requestedName !== existingName) {
+    throw new Error("삭제 요청 정보가 현재 교육생 정보와 일치하지 않습니다. 새로고침 후 다시 시도하세요.");
+  }
+
+  const { error } = await supabase
+    .from("students")
+    .delete()
+    .eq("student_id", studentId);
+
+  if (error) throw new Error(error.message);
+
+  return {
+    studentId,
+    name: existingName,
+    userId: text(existingRow.user_id),
+  };
+}
+
 async function handlePost(body: JsonRecord) {
   const action = text(body.action || body.mode);
   const data = asRecord(body.data || body.student || body);
@@ -545,6 +595,16 @@ async function handlePost(body: JsonRecord) {
   ) {
     const student = await insertStudent(data);
     return { message: "교육생을 등록했습니다.", student, data: student };
+  }
+
+  if (
+    action === "delete" ||
+    action === "deleteStudent" ||
+    action === "removeStudent" ||
+    action === "deleteRow"
+  ) {
+    const deleted = await deleteStudent(data);
+    return { message: "교육생을 삭제했습니다.", deleted, data: deleted };
   }
 
   if (
