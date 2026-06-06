@@ -340,6 +340,26 @@ function normalizeRows(value: unknown): Row[] {
   return Array.isArray(value) ? value as Row[] : [];
 }
 
+async function fetchJsonWithTimeout(url: string, timeoutMs = 4500) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) return null;
+    return await response.json() as unknown;
+  } catch (error) {
+    console.warn("대시보드 API 호출 지연 또는 실패", error);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
   const emptyData: Required<DashboardApiResponse> = {
     bookings: [],
@@ -354,51 +374,16 @@ async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
   };
 
   try {
-    const directData = await safeFetchAppsScriptDashboardData();
-
-    if (normalizeRows(directData.bookings).length > 0 || normalizeRows(directData.aircraft).length > 0) {
-      return {
-        bookings: normalizeRows(directData.bookings),
-        users: normalizeRows(directData.users),
-        aircraft: normalizeRows(directData.aircraft),
-        instructors: normalizeRows(directData.instructors),
-        students: normalizeRows(directData.students),
-        notifications: normalizeRows(directData.notifications),
-        instructorSchedules: normalizeRows(directData.instructorSchedules),
-        trainingCharges: normalizeRows(directData.trainingCharges),
-        logs: normalizeRows(directData.logs),
-      };
-    }
-
     const baseUrl = getAppBaseUrl();
+    const dashboardData = await fetchJsonWithTimeout(`${baseUrl}/api/dashboard?_ts=${Date.now()}`) as DashboardApiResponse | null;
 
-    const [dashboardResult, bookingsResult] = await Promise.allSettled([
-      fetch(`${baseUrl}/api/dashboard?_ts=${Date.now()}`, { cache: "no-store" }),
-      fetch(`${baseUrl}/api/bookings?_ts=${Date.now()}`, { cache: "no-store" }),
-    ]);
-
-    let dashboardData: DashboardApiResponse = {};
-    let bookingCalendarData: BookingsApiResponse = {};
-
-    if (dashboardResult.status === "fulfilled" && dashboardResult.value.ok) {
-      dashboardData = (await dashboardResult.value.json()) as DashboardApiResponse;
-    }
-
-    if (bookingsResult.status === "fulfilled" && bookingsResult.value.ok) {
-      bookingCalendarData = (await bookingsResult.value.json()) as BookingsApiResponse;
-    }
+    if (!dashboardData) return emptyData;
 
     return {
-      bookings: normalizeRows(bookingCalendarData.bookings).length > 0
-        ? normalizeRows(bookingCalendarData.bookings)
-        : normalizeRows(dashboardData.bookings),
+      bookings: normalizeRows(dashboardData.bookings),
       users: normalizeRows(dashboardData.users),
-      aircraft: normalizeRows(bookingCalendarData.aircraft).length > 0
-        ? normalizeRows(bookingCalendarData.aircraft)
-        : normalizeRows(dashboardData.aircraft),
-      instructors: normalizeRows(bookingCalendarData.instructors).length > 0
-        ? normalizeRows(bookingCalendarData.instructors)
-        : normalizeRows(dashboardData.instructors),
+      aircraft: normalizeRows(dashboardData.aircraft),
+      instructors: normalizeRows(dashboardData.instructors),
       students: normalizeRows(dashboardData.students),
       notifications: normalizeRows(dashboardData.notifications),
       instructorSchedules: normalizeRows(dashboardData.instructorSchedules),
@@ -3203,8 +3188,6 @@ export default async function DashboardPage({
     instructorSchedules,
     logs,
   } = await safeGetDashboardData();
-  const weather = await safeGetWeatherData();
-
   const today = todayText();
   const dateOptions = createDateOptions(today);
   const requestedDate = firstParam(params.date);
