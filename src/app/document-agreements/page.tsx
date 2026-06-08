@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import PageContainer from "@/components/PageContainer";
-import ContentCard from "@/components/ContentCard";
 
 type Row = Record<string, string | number | boolean | null | undefined>;
 type ApiResult = { ok?: boolean; message?: string; experienceConsents?: Row[]; data?: { experienceConsents?: Row[] } };
@@ -27,6 +26,25 @@ function boolText(value: unknown) {
   if (value === true) return "O";
   if (value === false) return "X";
   return text(value) || "-";
+}
+
+function isSelected(value: unknown) {
+  const raw = text(value).toUpperCase();
+  return value === true || raw === "O" || raw === "Y" || raw === "YES" || raw === "TRUE";
+}
+
+function productList(row: Row) {
+  const list = [
+    isSelected(row.actionCam) ? "액션캠" : "",
+    isSelected(row.simulator) ? "시뮬레이터" : "",
+    isSelected(row.photoPrint) ? "사진 인화" : "",
+  ].filter(Boolean);
+  return list;
+}
+
+function productText(row: Row) {
+  const list = productList(row);
+  return list.length ? list.join(", ") : "-";
 }
 
 function qrUrl(value: string) {
@@ -69,7 +87,7 @@ export default function DocumentAgreementsPage() {
   const filtered = rows.filter((row) => {
     const q = keyword.trim().toLowerCase();
     if (!q) return true;
-    return [row.passengerName, row.phone, row.flightDate, row.reservationSource, row.consentId, row.signatureName]
+    return [row.passengerName, row.phone, row.flightDate, row.reservationSource, row.consentId, row.signatureName, productText(row)]
       .map((value) => text(value).toLowerCase())
       .join(" ")
       .includes(q);
@@ -84,8 +102,11 @@ export default function DocumentAgreementsPage() {
   return (
     <PageContainer title="체험 동의서 관리" description="대기실 QR코드로 체험객 탑승자 서약서를 모바일에서 작성받습니다.">
       <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <ContentCard title="대기실 QR 코드">
-          <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-white to-blue-50/60 p-5">
+        <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold tracking-[-0.03em] text-slate-950">대기실 QR 코드</h2>
+          </div>
+          <div className="rounded-[24px] border border-slate-200 bg-gradient-to-br from-white to-blue-50/60 p-5">
             <div className="flex flex-col items-center text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-blue-500">SKYNURI CONSENT</p>
               <h2 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-slate-950">탑승자 서약서</h2>
@@ -104,43 +125,50 @@ export default function DocumentAgreementsPage() {
           <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
             QR을 스캔하면 모바일 전용 서약서 페이지로 이동합니다. 제출된 서약서는 아래 목록에서 확인할 수 있습니다.
           </div>
-        </ContentCard>
+        </section>
 
-        <ContentCard title="제출된 체험 동의서">
+        <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <h2 className="shrink-0 text-lg font-semibold tracking-[-0.03em] text-slate-950">제출된 체험 동의서</h2>
+          </div>
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <input className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="성명, 연락처, 탑승일, 예약경로 검색" />
-            <button onClick={loadData} className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700">새로고침</button>
+            <input className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="성명, 연락처, 탑승일, 예약경로, 추가상품 검색" />
+            <button onClick={loadData} className="min-w-[104px] whitespace-nowrap rounded-2xl border border-slate-300 bg-white px-4 py-3 text-center text-sm font-semibold leading-none text-slate-700">새로고침</button>
           </div>
           {message ? <p className="mb-3 rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</p> : null}
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <div className="overflow-x-auto rounded-2xl border border-slate-100">
+            <table className="min-w-[860px] w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3">제출</th>
                   <th className="px-4 py-3">탑승자</th>
                   <th className="px-4 py-3">탑승일</th>
                   <th className="px-4 py-3">연락처</th>
+                  <th className="px-4 py-3">추가상품</th>
                   <th className="px-4 py-3">건강</th>
                   <th className="px-4 py-3">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {loading ? <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">불러오는 중...</td></tr> : null}
+                {loading ? <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">불러오는 중...</td></tr> : null}
                 {!loading && filtered.map((row) => (
                   <tr key={text(row.consentId)}>
                     <td className="px-4 py-3 text-xs text-slate-500">{dateTimeText(row.createdAt)}</td>
                     <td className="px-4 py-3"><div className="font-semibold text-slate-900">{text(row.passengerName) || "-"}</div><div className="text-xs text-slate-500">{dateText(row.birthDate)}</div></td>
                     <td className="px-4 py-3">{dateText(row.flightDate) || "-"}</td>
-                    <td className="px-4 py-3">{text(row.phone) || "-"}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{text(row.phone) || "-"}</td>
+                    <td className="px-4 py-3">
+                      <ProductBadges row={row} />
+                    </td>
                     <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${row.healthClear === false ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>{row.healthClear === false ? "No" : "Yes"}</span></td>
                     <td className="px-4 py-3"><button onClick={() => setSelected(row)} className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">상세</button></td>
                   </tr>
                 ))}
-                {!loading && filtered.length === 0 ? <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-500">표시할 서약서가 없습니다.</td></tr> : null}
+                {!loading && filtered.length === 0 ? <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">표시할 서약서가 없습니다.</td></tr> : null}
               </tbody>
             </table>
           </div>
-        </ContentCard>
+        </section>
       </div>
 
       {selected ? (
@@ -160,6 +188,7 @@ export default function DocumentAgreementsPage() {
               <Info label="전화번호" value={text(selected.phone)} />
               <Info label="탑승일" value={dateText(selected.flightDate)} />
               <Info label="예약경로" value={text(selected.reservationSource)} />
+              <Info label="선택 추가상품" value={productText(selected)} />
               <Info label="액션캠" value={boolText(selected.actionCam)} />
               <Info label="시뮬레이터" value={boolText(selected.simulator)} />
               <Info label="사진 인화" value={boolText(selected.photoPrint)} />
@@ -174,6 +203,20 @@ export default function DocumentAgreementsPage() {
         </div>
       ) : null}
     </PageContainer>
+  );
+}
+
+function ProductBadges({ row }: { row: Row }) {
+  const items = productList(row);
+  if (!items.length) return <span className="text-xs text-slate-400">-</span>;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {items.map((item) => (
+        <span key={item} className="whitespace-nowrap rounded-full bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700">
+          {item}
+        </span>
+      ))}
+    </div>
   );
 }
 
