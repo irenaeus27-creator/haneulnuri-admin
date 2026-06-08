@@ -47,6 +47,10 @@ function productText(row: Row) {
   return list.length ? list.join(", ") : "-";
 }
 
+function marketingText(row: Row) {
+  return isSelected(row.marketingConsent) ? "동의" : "미동의";
+}
+
 function qrUrl(value: string) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=16&data=${encodeURIComponent(value)}`;
 }
@@ -87,7 +91,7 @@ export default function DocumentAgreementsPage() {
   const filtered = rows.filter((row) => {
     const q = keyword.trim().toLowerCase();
     if (!q) return true;
-    return [row.passengerName, row.phone, row.flightDate, row.reservationSource, row.consentId, row.signatureName, productText(row)]
+    return [row.passengerName, row.phone, row.flightDate, row.reservationSource, row.consentId, row.signatureName, productText(row), marketingText(row)]
       .map((value) => text(value).toLowerCase())
       .join(" ")
       .includes(q);
@@ -132,12 +136,12 @@ export default function DocumentAgreementsPage() {
             <h2 className="shrink-0 text-lg font-semibold tracking-[-0.03em] text-slate-950">제출된 체험 동의서</h2>
           </div>
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <input className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="성명, 연락처, 탑승일, 예약경로, 추가상품 검색" />
+            <input className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="성명, 연락처, 탑승일, 예약경로, 추가상품, 마케팅 동의 검색" />
             <button onClick={loadData} className="min-w-[104px] whitespace-nowrap rounded-2xl border border-slate-300 bg-white px-4 py-3 text-center text-sm font-semibold leading-none text-slate-700">새로고침</button>
           </div>
           {message ? <p className="mb-3 rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</p> : null}
           <div className="overflow-x-auto rounded-2xl border border-slate-100">
-            <table className="min-w-[860px] w-full divide-y divide-slate-200 text-sm">
+            <table className="min-w-[980px] w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="px-4 py-3">제출</th>
@@ -145,12 +149,13 @@ export default function DocumentAgreementsPage() {
                   <th className="px-4 py-3">탑승일</th>
                   <th className="px-4 py-3">연락처</th>
                   <th className="px-4 py-3">추가상품</th>
+                  <th className="px-4 py-3">마케팅</th>
                   <th className="px-4 py-3">건강</th>
                   <th className="px-4 py-3">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {loading ? <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">불러오는 중...</td></tr> : null}
+                {loading ? <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">불러오는 중...</td></tr> : null}
                 {!loading && filtered.map((row) => (
                   <tr key={text(row.consentId)}>
                     <td className="px-4 py-3 text-xs text-slate-500">{dateTimeText(row.createdAt)}</td>
@@ -160,11 +165,12 @@ export default function DocumentAgreementsPage() {
                     <td className="px-4 py-3">
                       <ProductBadges row={row} />
                     </td>
+                    <td className="px-4 py-3"><MarketingBadge row={row} /></td>
                     <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${row.healthClear === false ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>{row.healthClear === false ? "No" : "Yes"}</span></td>
                     <td className="px-4 py-3"><button onClick={() => setSelected(row)} className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700">상세</button></td>
                   </tr>
                 ))}
-                {!loading && filtered.length === 0 ? <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">표시할 서약서가 없습니다.</td></tr> : null}
+                {!loading && filtered.length === 0 ? <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">표시할 서약서가 없습니다.</td></tr> : null}
               </tbody>
             </table>
           </div>
@@ -203,6 +209,15 @@ export default function DocumentAgreementsPage() {
         </div>
       ) : null}
     </PageContainer>
+  );
+}
+
+function MarketingBadge({ row }: { row: Row }) {
+  const selected = isSelected(row.marketingConsent);
+  return (
+    <span className={`whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-semibold ${selected ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+      {selected ? "동의" : "미동의"}
+    </span>
   );
 }
 
