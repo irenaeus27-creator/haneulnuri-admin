@@ -296,6 +296,10 @@ function isSystemNormal() {
 
 export default function Sidebar() {
   const pathname = usePathname();
+
+  if (pathname.startsWith("/experience-consent")) {
+    return null;
+  }
   const { pendingBookingCount, pendingUserCount } = usePendingApprovals();
   const systemNormal = isSystemNormal();
   const [aircraftWarning, setAircraftWarning] = useState<AircraftWarningLevel>("none");
