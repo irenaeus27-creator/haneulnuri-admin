@@ -3,14 +3,17 @@
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import PageContainer from "@/components/PageContainer";
 import ContentCard from "@/components/ContentCard";
+import { useCurrentAuth } from "@/components/AuthContext";
 
 type Row = Record<string, unknown>;
 
 type InstructorForm = {
   instructorId: string;
+  userId: string;
   name: string;
   phone: string;
   email: string;
+  password: string;
   licenseNo: string;
   photoUrl: string;
   status: string;
@@ -38,6 +41,8 @@ type MonthlyStats = {
   experienceMinutes: number;
   rideCount: number;
   rideMinutes: number;
+  rentalCount?: number;
+  rentalMinutes?: number;
   otherCount: number;
   otherMinutes: number;
   totalCount: number;
@@ -46,11 +51,30 @@ type MonthlyStats = {
   recentLogDate: string;
 };
 
+type MonthlyFlightDetail = {
+  id: string;
+  bookingId: string;
+  instructorId: string;
+  flightDate: string;
+  startTime: string;
+  endTime: string;
+  flightType: string;
+  targetName: string;
+  aircraftName: string;
+  courseName: string;
+  content: string;
+  actualMinutes: number;
+  settlementMinutes: number;
+  status: string;
+};
+
 const emptyInstructorForm: InstructorForm = {
   instructorId: "",
+  userId: "",
   name: "",
   phone: "",
   email: "",
+  password: "",
   licenseNo: "",
   photoUrl: "",
   status: "근무중",
@@ -125,6 +149,8 @@ function defaultStats(instructorId: string): MonthlyStats {
     experienceMinutes: 0,
     rideCount: 0,
     rideMinutes: 0,
+    rentalCount: 0,
+    rentalMinutes: 0,
     otherCount: 0,
     otherMinutes: 0,
     totalCount: 0,
@@ -249,10 +275,14 @@ async function fetchJson(url: string) {
 }
 
 export default function InstructorsPage() {
+  const currentAuth = useCurrentAuth();
   const [instructors, setInstructors] = useState<Row[]>([]);
   const [schedules, setSchedules] = useState<Row[]>([]);
   const [monthlyStats, setMonthlyStats] = useState<
     Record<string, MonthlyStats>
+  >({});
+  const [monthlyFlightDetails, setMonthlyFlightDetails] = useState<
+    Record<string, MonthlyFlightDetail[]>
   >({});
   const [form, setForm] = useState<InstructorForm>(emptyInstructorForm);
   const [scheduleForm, setScheduleForm] =
@@ -264,8 +294,11 @@ export default function InstructorsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [drawerMode, setDrawerMode] = useState<"none" | "instructorCreate" | "instructorEdit" | "schedule">("none");
 
-  const isEdit = Boolean(form.instructorId);
+  const isEdit = drawerMode === "instructorEdit" || Boolean(form.instructorId);
 
   async function load() {
     setLoading(true);
@@ -278,6 +311,7 @@ export default function InstructorsPage() {
       Array.isArray(data.instructorSchedules) ? data.instructorSchedules : [],
     );
     setMonthlyStats((data.monthlyStats || {}) as Record<string, MonthlyStats>);
+    setMonthlyFlightDetails((data.monthlyFlightDetails || {}) as Record<string, MonthlyFlightDetail[]>);
     setLoading(false);
   }
 
@@ -291,6 +325,11 @@ export default function InstructorsPage() {
         (row) => text(row.instructorId || row.instructor_id) === selectedId,
       ) || null,
     [instructors, selectedId],
+  );
+
+  const selectedFlightDetails = useMemo(
+    () => monthlyFlightDetails[selectedId] || [],
+    [monthlyFlightDetails, selectedId],
   );
 
   const latestScheduleByInstructor = useMemo(() => {
@@ -333,14 +372,27 @@ export default function InstructorsPage() {
     [instructors],
   );
 
+  function openInstructorCreate() {
+    setForm(emptyInstructorForm);
+    setScheduleForm(emptyScheduleForm);
+    setDrawerMode("instructorCreate");
+  }
+
+  function openInstructorEdit(row: Row) {
+    selectInstructor(row);
+    setDrawerMode("instructorEdit");
+  }
+
   function selectInstructor(row: Row) {
     const instructorId = text(row.instructorId || row.instructor_id);
     setSelectedId(instructorId);
     setForm({
       instructorId,
+      userId: text(row.userId || row.user_id),
       name: text(row.name),
       phone: text(row.phone),
       email: text(row.email),
+      password: "",
       licenseNo: text(row.licenseNo || row.license_no),
       photoUrl: text(row.photoUrl || row.photo_url),
       status: text(row.status, "근무중"),
@@ -358,9 +410,17 @@ export default function InstructorsPage() {
       alert("교관명을 입력하세요.");
       return;
     }
+    if (!form.email.trim()) {
+      alert("교관 로그인 계정 생성을 위해 이메일을 입력하세요.");
+      return;
+    }
+    if (drawerMode === "instructorCreate" && form.password.trim().length < 6) {
+      alert("신규 교관은 6자 이상의 임시 비밀번호가 필요합니다.");
+      return;
+    }
     setSaving(true);
     try {
-      const action = isEdit ? "updateInstructor" : "addInstructor";
+      const action = drawerMode === "instructorEdit" ? "updateInstructor" : "addInstructor";
       const response = await fetch("/api/instructors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -372,6 +432,7 @@ export default function InstructorsPage() {
       setForm(emptyInstructorForm);
       setScheduleForm(emptyScheduleForm);
       setSelectedId("");
+      setDrawerMode("none");
       await load();
     } catch (error) {
       alert(error instanceof Error ? error.message : "저장에 실패했습니다.");
@@ -423,6 +484,7 @@ export default function InstructorsPage() {
           scheduleId: savedScheduleId,
         }));
       await load();
+      setDrawerMode("none");
       alert("스케줄을 저장했습니다.");
     } catch (error) {
       alert(
@@ -445,6 +507,74 @@ export default function InstructorsPage() {
       }),
     });
     await load();
+  }
+
+  function openDeleteInstructor(row?: Row) {
+    const targetId = text(row?.instructorId || row?.instructor_id || form.instructorId);
+    if (!targetId) {
+      alert("삭제할 교관 ID를 찾지 못했습니다.");
+      return;
+    }
+
+    setDeleteTarget(row || (form as unknown as Row));
+    setDeletePassword("");
+  }
+
+  async function confirmDeleteInstructor() {
+    const target = deleteTarget;
+    const instructorId = text(target?.instructorId || target?.instructor_id || form.instructorId);
+    const instructorName = text(target?.name || form.name, "선택한 교관");
+    const adminEmail = text(currentAuth.profile?.email);
+
+    if (!instructorId) {
+      alert("삭제할 교관 ID를 찾지 못했습니다.");
+      return;
+    }
+
+    if (!adminEmail) {
+      alert("현재 로그인한 관리자 이메일을 확인하지 못했습니다. 다시 로그인한 뒤 시도하세요.");
+      return;
+    }
+
+    if (!deletePassword.trim()) {
+      alert("관리자 비밀번호를 입력하세요.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await fetch("/api/instructors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "deleteInstructor",
+          data: {
+            instructorId,
+            adminEmail,
+            confirmPassword: deletePassword,
+          },
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.ok === false) {
+        throw new Error(result.message || "교관 삭제에 실패했습니다.");
+      }
+
+      setDeleteTarget(null);
+      setDeletePassword("");
+      setDrawerMode("none");
+      if (selectedId === instructorId) {
+        setSelectedId("");
+        setForm(emptyInstructorForm);
+        setScheduleForm(emptyScheduleForm);
+      }
+      await load();
+      alert(`${instructorName} 교관을 삭제했습니다.`);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "교관 삭제에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function uploadPhoto(file: File | null) {
@@ -528,10 +658,10 @@ export default function InstructorsPage() {
   return (
     <PageContainer
       title="교관관리"
-      description="교관 기본정보, 근무 스케줄, 월말 정산 기준 실적을 한 화면에서 관리합니다."
+      description="정산 기준 실적과 교관별 월간 비행 상세 내역을 중심으로 관리합니다."
     >
       <ContentCard className="p-5">
-        <div className="grid gap-3 xl:grid-cols-[1fr_180px_180px]">
+        <div className="grid gap-3 xl:grid-cols-[1fr_180px_180px_150px]">
           <input
             className="ui-input"
             value={keyword}
@@ -557,28 +687,32 @@ export default function InstructorsPage() {
               setSettlementMonth(event.target.value || currentMonthText())
             }
           />
+          <button
+            type="button"
+            className="ui-btn ui-btn-primary"
+            onClick={openInstructorCreate}
+          >
+            + 교관 등록
+          </button>
         </div>
       </ContentCard>
 
-      <div className="grid gap-4 xl:grid-cols-[430px_1fr]">
+      <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
         <ContentCard className="overflow-hidden p-0">
-          <div className="border-b border-blue-100 p-5">
+          <div className="border-b border-blue-100 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-[18px] font-semibold text-[#10213f]">
+                <h2 className="text-[17px] font-semibold text-[#10213f]">
                   교관 목록
                 </h2>
-                <p className="mt-1 text-[13px] font-medium text-[#6f8199]">
-                  정산은 비행기록에 저장된 실제 기록만 기준으로 계산합니다.
+                <p className="mt-1 text-[12px] font-medium text-[#6f8199]">
+                  교관을 선택하면 월간 정산 상세가 표시됩니다.
                 </p>
               </div>
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-[12px] font-semibold text-blue-700">
-                {filtered.length}명
-              </span>
             </div>
           </div>
 
-          <div className="max-h-[760px] overflow-y-auto p-4">
+          <div className="max-h-[calc(100vh-220px)] overflow-y-auto p-4">
             {loading ? (
               <p className="rounded-2xl bg-slate-50 p-4 text-[14px] text-[#6f8199]">
                 불러오는 중입니다.
@@ -589,6 +723,7 @@ export default function InstructorsPage() {
                 표시할 교관이 없습니다.
               </p>
             ) : null}
+
             <div className="space-y-3">
               {filtered.map((row, index) => {
                 const instructorId = text(
@@ -601,42 +736,44 @@ export default function InstructorsPage() {
                 const selected = instructorId === selectedId;
 
                 return (
-                  <button
+                  <div
                     key={instructorId || index}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => selectInstructor(row)}
-                    className={`w-full rounded-3xl border p-4 text-left transition ${
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") selectInstructor(row);
+                    }}
+                    className={`w-full cursor-pointer rounded-3xl border p-3.5 text-left transition ${
                       selected
-                        ? "border-blue-400 bg-blue-50/80 shadow-[0_16px_36px_rgba(37,99,235,0.12)]"
+                        ? "border-blue-300 bg-blue-50 shadow-[0_18px_34px_rgba(37,99,235,0.12)]"
                         : "border-[#dbe5f1] bg-white hover:border-blue-200 hover:bg-blue-50/40"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <InstructorAvatar
-                            name={text(row.name, "?")}
-                            photoUrl={text(row.photoUrl || row.photo_url)}
-                            size="sm"
-                          />
-                          <div>
-                            <p className="text-[16px] font-semibold text-[#10213f]">
-                              {text(row.name, "-")}
-                            </p>
-                            <p className="mt-0.5 text-[12px] font-medium text-[#6f8199]">
-                              {text(row.phone, "연락처 없음")}
-                            </p>
-                          </div>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <InstructorAvatar
+                          name={text(row.name, "?")}
+                          photoUrl={text(row.photoUrl || row.photo_url)}
+                          size="sm"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate text-[16px] font-semibold leading-tight text-[#10213f]">
+                            {text(row.name, "-")}
+                          </p>
+                          <p className="mt-1 truncate text-[12px] font-medium leading-none text-[#6f8199]">
+                            {text(row.phone, "연락처 없음")}
+                          </p>
                         </div>
                       </div>
                       <span
-                        className={`shrink-0 rounded-full border px-2.5 py-1 text-[12px] font-semibold ${badgeClass(row.status)}`}
+                        className={`shrink-0 rounded-full border px-2.5 py-1 text-[12px] font-medium ${badgeClass(row.status)}`}
                       >
                         {text(row.status, "-")}
                       </span>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2 text-[13px]">
+                    <div className="mt-3 grid grid-cols-2 gap-2">
                       <Metric
                         label="정산시간"
                         value={hours(numberValue(stats.totalMinutes))}
@@ -646,209 +783,291 @@ export default function InstructorsPage() {
                         value={`${numberValue(stats.totalCount)}회`}
                       />
                       <Metric
-                        label="교육"
-                        value={`${numberValue(stats.educationCount)}회 · ${hours(numberValue(stats.educationMinutes))}`}
+                        label="체험비행"
+                        value={`${numberValue(stats.experienceCount)}회 · ${hours(numberValue(stats.experienceMinutes))}`}
                       />
                       <Metric
-                        label="체험/동승"
-                        value={`${numberValue(stats.experienceCount) + numberValue(stats.rideCount)}회 · ${hours(numberValue(stats.experienceMinutes) + numberValue(stats.rideMinutes))}`}
+                        label="교육/동승"
+                        value={`${numberValue(stats.educationCount) + numberValue(stats.rideCount)}회 · ${hours(numberValue(stats.educationMinutes) + numberValue(stats.rideMinutes))}`}
                       />
                     </div>
 
-                    <div className="mt-3 rounded-2xl bg-slate-50 px-3 py-2 text-[12px] font-medium text-[#6f8199]">
+                    <div className="mt-2.5 rounded-2xl bg-slate-50/80 px-3 py-2 text-[12px] font-medium leading-none text-[#6f8199]">
                       가능 {scheduleInfo.startTime}~{scheduleInfo.endTime} ·
                       휴무 {scheduleInfo.offDays}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
           </div>
         </ContentCard>
 
-        <div className="space-y-4">
-          <ContentCard className="p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+        <ContentCard className="min-h-[760px] p-5">
+          {selectedInstructor ? (
+            <div>
+              <div className="mb-5 flex flex-wrap items-start justify-between gap-3 border-b border-blue-100 pb-5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <InstructorAvatar
+                    name={text(selectedInstructor.name, "?")}
+                    photoUrl={text(selectedInstructor.photoUrl || selectedInstructor.photo_url)}
+                    size="sm"
+                  />
+                  <div>
+                    <p className="text-[13px] font-semibold text-blue-600">
+                      {settlementMonth} 정산 기준
+                    </p>
+                    <h2 className="mt-1 text-[24px] font-semibold tracking-[-0.04em] text-[#10213f]">
+                      {text(selectedInstructor.name, "-")} 교관 정산 상세
+                    </h2>
+                    <p className="mt-1 text-[13px] font-medium text-[#6f8199]">
+                      예약이 아니라 저장된 비행기록 기준입니다. 체험비행은 코스명까지 표시합니다.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn-outline"
+                    onClick={() => selectedInstructor && openInstructorEdit(selectedInstructor)}
+                  >
+                    정보수정
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn-outline"
+                    onClick={() => setDrawerMode("schedule")}
+                  >
+                    스케줄
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-2xl border border-rose-200 bg-white px-4 py-2 text-[14px] font-semibold text-rose-700 hover:bg-rose-50"
+                    onClick={() => selectedInstructor && openDeleteInstructor(selectedInstructor)}
+                    disabled={saving}
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+
+              <SettlementStats
+                stats={monthlyStats[selectedId] || defaultStats(selectedId)}
+                details={selectedFlightDetails}
+              />
+            </div>
+          ) : (
+            <div className="flex min-h-[520px] items-center justify-center rounded-3xl border border-dashed border-[#cbd8e8] bg-slate-50 p-8 text-center">
               <div>
-                <h2 className="text-[18px] font-semibold text-[#10213f]">
-                  {isEdit ? "교관 상세 수정" : "교관 신규 등록"}
-                </h2>
-                <p className="mt-1 text-[13px] font-medium text-[#6f8199]">
-                  기본정보와 근무 스케줄을 같은 화면에서 관리합니다.
+                <p className="text-[18px] font-semibold text-[#10213f]">
+                  교관을 선택하세요
                 </p>
+                <p className="mt-2 text-[14px] font-medium text-[#6f8199]">
+                  왼쪽 교관 목록에서 교관을 선택하면 월간 정산 요약과 전체 비행 상세 내역이 표시됩니다.
+                </p>
+              </div>
+            </div>
+          )}
+        </ContentCard>
+      </div>
+
+      {drawerMode !== "none" ? (
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35 backdrop-blur-[2px]">
+          <div className="h-full w-full max-w-[620px] overflow-y-auto bg-white shadow-[-24px_0_70px_rgba(15,23,42,0.22)]">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur">
+              <div>
+                <p className="text-[12px] font-semibold tracking-[0.14em] text-blue-500">
+                  INSTRUCTOR
+                </p>
+                <h3 className="mt-1 text-[22px] font-semibold tracking-[-0.04em] text-[#10213f]">
+                  {drawerMode === "schedule"
+                    ? `${scheduleForm.instructorName || form.name || "교관"} 근무/휴무 스케줄`
+                    : drawerMode === "instructorEdit"
+                      ? "교관 정보 수정"
+                      : "교관 신규 등록"}
+                </h3>
               </div>
               <button
                 type="button"
-                className="ui-btn ui-btn-outline"
-                onClick={resetForms}
+                className="rounded-2xl border border-slate-200 px-4 py-2 text-[14px] font-semibold text-slate-600 hover:bg-slate-50"
+                onClick={() => setDrawerMode("none")}
               >
-                초기화
+                닫기
               </button>
             </div>
 
-            <form
-              onSubmit={submitInstructor}
-              className="mt-5 grid gap-4 xl:grid-cols-4"
-            >
-              <div className="rounded-3xl border border-[#dbe5f1] bg-slate-50/70 p-4 xl:col-span-4">
-                <div className="flex flex-wrap items-center gap-4">
-                  <InstructorAvatar
-                    name={form.name || "?"}
-                    photoUrl={form.photoUrl}
-                    size="lg"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-semibold text-[#10213f]">프로필 사진</p>
-                    <p className="mt-1 text-[12px] font-medium text-[#6f8199]">
-                      교관 정보를 먼저 저장한 뒤 JPG, PNG, WEBP 파일을 업로드하세요. 사진은 교관 카드에 바로 표시됩니다.
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <label className={`ui-btn ui-btn-outline cursor-pointer ${!form.instructorId || photoUploading ? "pointer-events-none opacity-50" : ""}`}>
-                        {photoUploading ? "업로드 중" : "사진 선택"}
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          className="hidden"
-                          disabled={!form.instructorId || photoUploading}
-                          onChange={(event) => {
-                            const file = event.target.files?.[0] || null;
-                            void uploadPhoto(file);
-                            event.currentTarget.value = "";
-                          }}
-                        />
-                      </label>
-                      {form.photoUrl ? (
-                        <button
-                          type="button"
-                          className="ui-btn ui-btn-outline"
-                          onClick={() => void removePhoto()}
-                          disabled={photoUploading}
-                        >
-                          사진 제거
-                        </button>
-                      ) : null}
+            {drawerMode === "instructorCreate" || drawerMode === "instructorEdit" ? (
+              <form onSubmit={submitInstructor} className="grid gap-4 p-6 sm:grid-cols-2">
+                <div className="rounded-3xl border border-[#dbe5f1] bg-slate-50/70 p-4 sm:col-span-2">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <InstructorAvatar
+                      name={form.name || "?"}
+                      photoUrl={form.photoUrl}
+                      size="lg"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[14px] font-semibold text-[#10213f]">프로필 사진</p>
+                      <p className="mt-1 text-[12px] font-medium text-[#6f8199]">
+                        신규 등록 시 로그인 계정과 교관 정보가 함께 생성됩니다. 사진은 저장 후 업로드하세요.
+                      </p>
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        <label className={`ui-btn ui-btn-outline cursor-pointer ${!form.instructorId || photoUploading ? "pointer-events-none opacity-50" : ""}`}>
+                          {photoUploading ? "업로드 중" : "사진 선택"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            disabled={!form.instructorId || photoUploading}
+                            onChange={(event) => {
+                              const file = event.target.files?.[0] || null;
+                              void uploadPhoto(file);
+                              event.currentTarget.value = "";
+                            }}
+                          />
+                        </label>
+                        {form.photoUrl ? (
+                          <button
+                            type="button"
+                            className="ui-btn ui-btn-outline"
+                            onClick={() => void removePhoto()}
+                            disabled={photoUploading}
+                          >
+                            사진 제거
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <Field label="교관명" required>
-                <input
-                  className="ui-input"
-                  value={form.name}
-                  onChange={(event) =>
-                    setForm({ ...form, name: event.target.value })
-                  }
-                  placeholder="예: 한기준"
-                />
-              </Field>
-              <Field label="연락처">
-                <input
-                  className="ui-input"
-                  value={form.phone}
-                  onChange={(event) =>
-                    setForm({ ...form, phone: event.target.value })
-                  }
-                  placeholder="010-0000-0000"
-                />
-              </Field>
-              <Field label="이메일">
-                <input
-                  className="ui-input"
-                  value={form.email}
-                  onChange={(event) =>
-                    setForm({ ...form, email: event.target.value })
-                  }
-                  placeholder="email@example.com"
-                />
-              </Field>
-              <Field label="면장번호">
-                <input
-                  className="ui-input"
-                  value={form.licenseNo}
-                  onChange={(event) =>
-                    setForm({ ...form, licenseNo: event.target.value })
-                  }
-                  placeholder="면장번호"
-                />
-              </Field>
-              <Field label="상태">
-                <select
-                  className="ui-input"
-                  value={form.status}
-                  onChange={(event) =>
-                    setForm({ ...form, status: event.target.value })
-                  }
-                >
-                  <option>근무중</option>
-                  <option>휴무</option>
-                  <option>외부일정</option>
-                  <option>비활성</option>
-                </select>
-              </Field>
-              <Field label="사용 여부">
-                <select
-                  className="ui-input"
-                  value={form.active}
-                  onChange={(event) =>
-                    setForm({ ...form, active: event.target.value })
-                  }
-                >
-                  <option value="Y">사용</option>
-                  <option value="N">비활성</option>
-                </select>
-              </Field>
-              <Field label="메모" className="xl:col-span-2">
-                <input
-                  className="ui-input"
-                  value={form.memo}
-                  onChange={(event) =>
-                    setForm({ ...form, memo: event.target.value })
-                  }
-                  placeholder="교관 관련 메모"
-                />
-              </Field>
-              <div className="flex flex-wrap gap-2 xl:col-span-4">
-                <button className="ui-btn ui-btn-primary" disabled={saving}>
-                  {saving ? "저장 중" : isEdit ? "수정 저장" : "교관 등록"}
-                </button>
-                {isEdit ? (
-                  <button
-                    type="button"
-                    className="ui-btn ui-btn-danger"
-                    onClick={() =>
-                      selectedInstructor && void deactivate(selectedInstructor)
+                <Field label="교관명" required>
+                  <input
+                    className="ui-input"
+                    value={form.name}
+                    onChange={(event) =>
+                      setForm({ ...form, name: event.target.value })
+                    }
+                    placeholder="예: 한기준"
+                  />
+                </Field>
+                <Field label="연락처">
+                  <input
+                    className="ui-input"
+                    value={form.phone}
+                    onChange={(event) =>
+                      setForm({ ...form, phone: event.target.value })
+                    }
+                    placeholder="010-0000-0000"
+                  />
+                </Field>
+                <Field label="이메일" required>
+                  <input
+                    className="ui-input"
+                    type="email"
+                    value={form.email}
+                    onChange={(event) =>
+                      setForm({ ...form, email: event.target.value })
+                    }
+                    placeholder="email@example.com"
+                  />
+                </Field>
+                {drawerMode === "instructorCreate" ? (
+                  <Field label="임시 비밀번호" required>
+                    <input
+                      className="ui-input"
+                      type="password"
+                      value={form.password}
+                      onChange={(event) =>
+                        setForm({ ...form, password: event.target.value })
+                      }
+                      placeholder="6자 이상"
+                    />
+                  </Field>
+                ) : null}
+                {drawerMode === "instructorEdit" ? (
+                  <Field label="연결 회원 ID">
+                    <input
+                      className="ui-input bg-slate-50 text-slate-500"
+                      value={form.userId || "연결 정보 없음"}
+                      readOnly
+                    />
+                  </Field>
+                ) : null}
+                <Field label="면장번호">
+                  <input
+                    className="ui-input"
+                    value={form.licenseNo}
+                    onChange={(event) =>
+                      setForm({ ...form, licenseNo: event.target.value })
+                    }
+                    placeholder="면장번호"
+                  />
+                </Field>
+                <Field label="상태">
+                  <select
+                    className="ui-input"
+                    value={form.status}
+                    onChange={(event) =>
+                      setForm({ ...form, status: event.target.value })
                     }
                   >
-                    비활성화
+                    <option>근무중</option>
+                    <option>휴무</option>
+                    <option>외부일정</option>
+                    <option>비활성</option>
+                  </select>
+                </Field>
+                <Field label="사용 여부">
+                  <select
+                    className="ui-input"
+                    value={form.active}
+                    onChange={(event) =>
+                      setForm({ ...form, active: event.target.value })
+                    }
+                  >
+                    <option value="Y">사용</option>
+                    <option value="N">비활성</option>
+                  </select>
+                </Field>
+                <Field label="메모" className="sm:col-span-2">
+                  <input
+                    className="ui-input"
+                    value={form.memo}
+                    onChange={(event) =>
+                      setForm({ ...form, memo: event.target.value })
+                    }
+                    placeholder="교관 관련 메모"
+                  />
+                </Field>
+                <div className="sticky bottom-0 -mx-6 mt-2 flex flex-wrap gap-2 border-t border-slate-200 bg-white px-6 py-4 sm:col-span-2">
+                  <button className="ui-btn ui-btn-primary" disabled={saving}>
+                    {saving ? "저장 중" : drawerMode === "instructorEdit" ? "수정 저장" : "계정 생성 + 교관 등록"}
                   </button>
-                ) : null}
-              </div>
-            </form>
-          </ContentCard>
-
-          <div className="grid gap-4 2xl:grid-cols-[1fr_420px]">
-            <ContentCard className="p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-[17px] font-semibold text-[#10213f]">
-                    근무/휴무 스케줄
-                  </h3>
-                  <p className="mt-1 text-[13px] font-medium text-[#6f8199]">
-                    교관 선택 후 기본 가능시간과 반복 휴무요일을 저장합니다.
-                  </p>
+                  {drawerMode === "instructorEdit" ? (
+                    <>
+                      <button
+                        type="button"
+                        className="ui-btn ui-btn-danger"
+                        onClick={() =>
+                          selectedInstructor ? void deactivate(selectedInstructor) : void deactivate(form as unknown as Row)
+                        }
+                      >
+                        비활성화
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-2xl border border-rose-300 bg-rose-50 px-4 py-2 text-[14px] font-semibold text-rose-700 hover:bg-rose-100"
+                        onClick={() => openDeleteInstructor(selectedInstructor || (form as unknown as Row))}
+                        disabled={saving}
+                      >
+                        교관 삭제
+                      </button>
+                    </>
+                  ) : null}
                 </div>
-                <button
-                  type="button"
-                  className="ui-btn ui-btn-primary"
-                  onClick={() => void saveSchedule()}
-                  disabled={saving || !scheduleForm.instructorId}
-                >
-                  스케줄 저장
-                </button>
-              </div>
-
-              <div className="mt-5 grid gap-4 xl:grid-cols-2">
+              </form>
+            ) : (
+              <div className="grid gap-4 p-6 sm:grid-cols-2">
                 <Field label="기본 가능 시작시간">
                   <select
                     className="ui-input"
@@ -916,7 +1135,7 @@ export default function InstructorsPage() {
                     <option>휴무</option>
                   </select>
                 </Field>
-                <div className="xl:col-span-2">
+                <div className="sm:col-span-2">
                   <p className="mb-2 text-[13px] font-semibold text-[#243b63]">
                     반복 휴무요일
                   </p>
@@ -936,9 +1155,9 @@ export default function InstructorsPage() {
                     })}
                   </div>
                 </div>
-                <Field label="스케줄 메모" className="xl:col-span-2">
+                <Field label="스케줄 메모" className="sm:col-span-2">
                   <textarea
-                    className="ui-input min-h-[92px] resize-none"
+                    className="ui-input min-h-[110px] resize-none"
                     value={scheduleForm.memo}
                     onChange={(event) =>
                       setScheduleForm({
@@ -949,30 +1168,84 @@ export default function InstructorsPage() {
                     placeholder="예: 주말 오전만 가능, 특정 기간 외부일정 등"
                   />
                 </Field>
-              </div>
-            </ContentCard>
-
-            <ContentCard className="p-5">
-              <h3 className="text-[17px] font-semibold text-[#10213f]">
-                {settlementMonth} 정산 기준
-              </h3>
-              <p className="mt-1 text-[13px] font-medium text-[#6f8199]">
-                예약이 아니라 저장된 비행기록 기준입니다.
-              </p>
-
-              {selectedInstructor ? (
-                <SettlementStats
-                  stats={monthlyStats[selectedId] || defaultStats(selectedId)}
-                />
-              ) : (
-                <div className="mt-5 rounded-3xl border border-dashed border-[#cbd8e8] bg-slate-50 p-5 text-center text-[14px] font-medium text-[#6f8199]">
-                  왼쪽에서 교관을 선택하면 월간 정산 기준 실적이 표시됩니다.
+                <div className="sticky bottom-0 -mx-6 mt-2 flex flex-wrap gap-2 border-t border-slate-200 bg-white px-6 py-4 sm:col-span-2">
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn-primary"
+                    onClick={() => void saveSchedule()}
+                    disabled={saving || !scheduleForm.instructorId}
+                  >
+                    {saving ? "저장 중" : "스케줄 저장"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn-outline"
+                    onClick={() => setDrawerMode("none")}
+                  >
+                    취소
+                  </button>
                 </div>
-              )}
-            </ContentCard>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      ) : null}
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-[440px] rounded-3xl bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
+            <div className="mb-5">
+              <p className="text-[12px] font-semibold tracking-[0.14em] text-rose-500">
+                DELETE INSTRUCTOR
+              </p>
+              <h3 className="mt-1 text-[22px] font-semibold tracking-[-0.04em] text-[#10213f]">
+                교관 삭제 확인
+              </h3>
+              <p className="mt-2 text-[13px] font-medium leading-6 text-[#6f8199]">
+                {text(deleteTarget.name || form.name, "선택한 교관")} 교관을 목록에서 삭제합니다.
+                기존 비행기록과 정산 내역은 유지됩니다.
+              </p>
+            </div>
+
+            <label className="ui-label">
+              <span>관리자 비밀번호</span>
+              <input
+                className="ui-input"
+                type="password"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void confirmDeleteInstructor();
+                }}
+                autoFocus
+                placeholder="현재 로그인한 관리자 비밀번호"
+              />
+            </label>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                className="ui-btn ui-btn-outline"
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeletePassword("");
+                }}
+                disabled={saving}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="rounded-2xl bg-rose-600 px-4 py-2 text-[14px] font-semibold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
+                onClick={() => void confirmDeleteInstructor()}
+                disabled={saving}
+              >
+                {saving ? "삭제 중" : "비밀번호 확인 후 삭제"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
     </PageContainer>
   );
 }
@@ -1030,15 +1303,28 @@ function Field({
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-slate-50 px-3 py-2">
-      <p className="text-[11px] font-semibold text-[#8391a7]">{label}</p>
-      <p className="mt-0.5 text-[13px] font-semibold text-[#10213f]">{value}</p>
+    <div className="rounded-2xl bg-slate-50/80 px-3 py-2">
+      <p className="text-[12px] font-medium leading-none text-[#6f8199]">{label}</p>
+      <p className="mt-1.5 text-[13px] font-semibold leading-none text-[#10213f]">{value}</p>
     </div>
   );
 }
 
-function SettlementStats({ stats }: { stats: MonthlyStats }) {
+function SettlementStats({
+  stats,
+  details,
+}: {
+  stats: MonthlyStats;
+  details: MonthlyFlightDetail[];
+}) {
   const rows = [
+    {
+      label: "합계",
+      count: stats.totalCount,
+      minutes: stats.totalMinutes,
+      tone: "bg-blue-50 text-blue-700",
+      subText: `교육생 ${stats.studentCount}명 · 최근 ${stats.recentLogDate || "-"}`,
+    },
     {
       label: "교육비행",
       count: stats.educationCount,
@@ -1058,6 +1344,12 @@ function SettlementStats({ stats }: { stats: MonthlyStats }) {
       tone: "bg-violet-50 text-violet-700",
     },
     {
+      label: "렌탈비행",
+      count: stats.rentalCount || 0,
+      minutes: stats.rentalMinutes || 0,
+      tone: "bg-amber-50 text-amber-700",
+    },
+    {
       label: "기타",
       count: stats.otherCount,
       minutes: stats.otherMinutes,
@@ -1065,38 +1357,194 @@ function SettlementStats({ stats }: { stats: MonthlyStats }) {
     },
   ];
 
+  const [detailTypeFilter, setDetailTypeFilter] = useState("전체");
+  const [detailKeyword, setDetailKeyword] = useState("");
+
+  const detailTypeOptions = useMemo(
+    () => [
+      "전체",
+      ...Array.from(
+        new Set(details.map((item) => text(item.flightType)).filter(Boolean)),
+      ),
+    ],
+    [details],
+  );
+
+  const filteredDetails = useMemo(() => {
+    const query = detailKeyword.trim().toLowerCase();
+
+    return details.filter((item) => {
+      const matchesType = detailTypeFilter === "전체" || item.flightType === detailTypeFilter;
+      const matchesKeyword =
+        !query ||
+        [
+          item.flightDate,
+          item.startTime,
+          item.endTime,
+          item.flightType,
+          item.targetName,
+          item.aircraftName,
+          item.courseName,
+          item.content,
+          item.status,
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(query);
+
+      return matchesType && matchesKeyword;
+    });
+  }, [detailKeyword, detailTypeFilter, details]);
+
+  const filteredSummary = useMemo(
+    () =>
+      filteredDetails.reduce(
+        (result, item) => {
+          result.count += 1;
+          result.actualMinutes += item.actualMinutes || 0;
+          result.settlementMinutes += item.settlementMinutes || 0;
+          return result;
+        },
+        { count: 0, actualMinutes: 0, settlementMinutes: 0 },
+      ),
+    [filteredDetails],
+  );
+
   return (
-    <div className="mt-5 space-y-3">
-      <div className="rounded-3xl border border-blue-100 bg-blue-50/60 p-4">
-        <p className="text-[13px] font-semibold text-blue-700">합계</p>
-        <div className="mt-1 flex items-end justify-between gap-3">
-          <p className="text-[30px] font-semibold leading-none text-[#10213f]">
-            {hours(stats.totalMinutes)}
-          </p>
-          <p className="text-[14px] font-semibold text-[#39516f]">
-            {stats.totalCount}회
-          </p>
-        </div>
-        <p className="mt-2 text-[12px] font-medium text-[#6f8199]">
-          교육생 {stats.studentCount}명 · 최근 기록 {stats.recentLogDate || "-"}
-        </p>
+    <div className="mt-5 space-y-4">
+      <div className="grid grid-cols-6 overflow-hidden rounded-3xl border border-[#dbe5f1] bg-white">
+        {rows.map((row, index) => (
+          <div
+            key={row.label}
+            className={`min-w-0 px-4 py-3 ${index > 0 ? "border-l border-[#e5edf7]" : ""}`}
+          >
+            <span
+              className={`inline-flex rounded-full px-2.5 py-1 text-[12px] font-semibold ${row.tone}`}
+            >
+              {row.label}
+            </span>
+            <p className="mt-2 whitespace-nowrap text-[14px] font-semibold text-[#10213f]">
+              {row.count}회 · {hours(row.minutes)}
+            </p>
+            {"subText" in row && row.subText ? (
+              <p className="mt-1 truncate text-[11px] font-medium text-[#6f8199]">
+                {row.subText}
+              </p>
+            ) : null}
+          </div>
+        ))}
       </div>
 
-      {rows.map((row) => (
-        <div
-          key={row.label}
-          className="flex items-center justify-between rounded-2xl border border-[#dbe5f1] bg-white px-4 py-3"
-        >
-          <span
-            className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${row.tone}`}
-          >
-            {row.label}
-          </span>
-          <span className="text-[13px] font-semibold text-[#10213f]">
-            {row.count}회 · {hours(row.minutes)}
+      <div className="rounded-3xl border border-[#dbe5f1] bg-white p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h4 className="text-[15px] font-semibold text-[#10213f]">
+              월간 비행 상세 내역
+            </h4>
+            <p className="mt-1 text-[12px] font-medium text-[#6f8199]">
+              교관이 수행한 모든 비행기록 기준입니다. 체험비행은 코스명으로 필터/검색할 수 있습니다.
+            </p>
+          </div>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-[12px] font-semibold text-[#39516f]">
+            {filteredDetails.length} / {details.length}건
           </span>
         </div>
-      ))}
+
+        <div className="mt-4 grid gap-2 lg:grid-cols-[150px_1fr_260px]">
+          <select
+            value={detailTypeFilter}
+            onChange={(event) => setDetailTypeFilter(event.target.value)}
+            className="h-10 rounded-2xl border border-[#dbe5f1] bg-white px-3 text-[13px] font-medium text-[#10213f] outline-none focus:border-blue-300"
+          >
+            {detailTypeOptions.map((item) => (
+              <option key={item} value={item}>
+                {item === "전체" ? "전체 구분" : item}
+              </option>
+            ))}
+          </select>
+
+          <input
+            value={detailKeyword}
+            onChange={(event) => setDetailKeyword(event.target.value)}
+            placeholder="대상자, 항공기, 체험코스, 내용 검색"
+            className="h-10 rounded-2xl border border-[#dbe5f1] bg-white px-3 text-[13px] font-medium text-[#10213f] outline-none placeholder:text-[#9aa8bb] focus:border-blue-300"
+          />
+
+          <div className="flex h-10 items-center justify-end rounded-2xl bg-slate-50 px-3 text-[12px] font-semibold text-[#39516f]">
+            표시 {filteredSummary.count}건 · 실비행 {hours(filteredSummary.actualMinutes)} · 정산 {hours(filteredSummary.settlementMinutes)}
+          </div>
+        </div>
+
+        <div className="mt-3 max-h-[520px] overflow-auto rounded-2xl border border-slate-100">
+          <table className="min-w-[860px] w-full text-left text-[13px]">
+            <thead className="sticky top-0 bg-slate-50 text-[12px] font-semibold text-[#6f8199]">
+              <tr>
+                <th className="px-3 py-2.5">일자</th>
+                <th className="px-3 py-2.5">시간</th>
+                <th className="px-3 py-2.5">구분</th>
+                <th className="px-3 py-2.5">대상</th>
+                <th className="px-3 py-2.5">항공기</th>
+                <th className="px-3 py-2.5">체험코스/내용</th>
+                <th className="px-3 py-2.5 text-right">실비행</th>
+                <th className="px-3 py-2.5 text-right">정산</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredDetails.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-8 text-center text-[13px] text-[#6f8199]">
+                    조건에 맞는 비행기록이 없습니다.
+                  </td>
+                </tr>
+              ) : (
+                filteredDetails.map((item) => (
+                  <tr key={item.id || `${item.flightDate}-${item.startTime}-${item.flightType}`} className="align-top hover:bg-blue-50/30">
+                    <td className="whitespace-nowrap px-3 py-2.5 font-medium text-[#10213f]">
+                      {item.flightDate || "-"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-[#39516f]">
+                      {item.startTime || "-"}~{item.endTime || "-"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5">
+                      <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${flightTypeTone(item.flightType)}`}>
+                        {item.flightType || "기타"}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-[#39516f]">
+                      {item.targetName || "-"}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-[#39516f]">
+                      {item.aircraftName || "-"}
+                    </td>
+                    <td className="min-w-[220px] px-3 py-2.5">
+                      {item.flightType === "체험비행" ? (
+                        <p className="font-semibold text-emerald-700">{item.courseName || item.content || "-"}</p>
+                      ) : (
+                        <p className="font-medium text-[#10213f]">{item.content || item.courseName || "-"}</p>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right text-[#39516f]">
+                      {hours(item.actualMinutes || 0)}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold text-[#10213f]">
+                      {hours(item.settlementMinutes || 0)}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
+
+function flightTypeTone(type: string) {
+  if (type === "교육비행") return "bg-blue-50 text-blue-700";
+  if (type === "체험비행") return "bg-emerald-50 text-emerald-700";
+  if (type === "동승비행") return "bg-violet-50 text-violet-700";
+  if (type === "렌탈비행") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
+

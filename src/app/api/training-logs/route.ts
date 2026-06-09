@@ -120,7 +120,9 @@ async function buildSafeTrainingLogInput(input: JsonRecord): Promise<JsonRecord>
 
   if (!educationFlight) {
     const bookingId = text(input.bookingId || input.booking_id);
-    const courseMinutesValue = trainingType === "체험비행" ? await resolveExperienceCourseMinutesByBookingId(bookingId) : 0;
+    const courseInfo = trainingType === "체험비행"
+      ? await resolveExperienceCourseByBookingId(bookingId)
+      : { minutes: 0, courseName: "" };
     const baseRow = {
       ...input,
       studentId: "",
@@ -136,7 +138,7 @@ async function buildSafeTrainingLogInput(input: JsonRecord): Promise<JsonRecord>
       deductedMinutes: 0,
       deducted_minutes: 0,
     };
-    return trainingType === "체험비행" ? applyExperienceCourseMinutes(baseRow, courseMinutesValue) : baseRow;
+    return trainingType === "체험비행" ? applyExperienceCourseInfo(baseRow, courseInfo) : baseRow;
   }
 
   const student = await resolveStudentForTrainingLog(input);
@@ -308,24 +310,65 @@ function courseMinutes(row: JsonRecord) {
   );
 }
 
-function findCourseForBooking(booking: JsonRecord, courseCatalog: JsonRecord[]) {
-  const courseName = normalizedKey(booking.courseName || booking.course_name || booking.course || booking.course_id || booking.courseId);
-  const bookingTypeName = normalizedKey(booking.bookingType || booking.booking_type || booking.reservationType || booking.reservation_type);
+function catalogCourseLabel(course: JsonRecord | null | undefined) {
+  return text(
+    course?.course_name ||
+      course?.courseName ||
+      course?.route_name ||
+      course?.routeName ||
+      course?.name ||
+      course?.title,
+  );
+}
 
-  if (!courseName && !bookingTypeName) return null;
+function findCourseForBooking(booking: JsonRecord, courseCatalog: JsonRecord[]) {
+  const courseCandidates = [
+    booking.courseName,
+    booking.course_name,
+    booking.course,
+    booking.course_id,
+    booking.courseId,
+    booking.experience_course,
+    booking.experienceCourse,
+    booking.product_name,
+    booking.productName,
+  ]
+    .map(normalizedKey)
+    .filter(Boolean);
+
+  if (courseCandidates.length === 0) return null;
 
   return (
     courseCatalog.find((course) => {
-      const names = [course.courseName, course.course_name, course.name, course.courseId, course.course_id]
+      const names = [
+        course.courseName,
+        course.course_name,
+        course.courseId,
+        course.course_id,
+        course.routeName,
+        course.route_name,
+        course.name,
+        course.title,
+      ]
         .map(normalizedKey)
         .filter(Boolean);
-      return courseName && names.includes(courseName);
-    }) ||
-    courseCatalog.find((course) => {
-      const type = normalizedKey(course.courseType || course.course_type);
-      return bookingTypeName && type && (type === bookingTypeName || bookingTypeName.includes(type) || type.includes(bookingTypeName));
-    }) ||
-    null
+      return courseCandidates.some((candidate) => names.includes(candidate));
+    }) || null
+  );
+}
+
+function courseLabelForBooking(booking: JsonRecord, courseCatalog: JsonRecord[]) {
+  const catalogLabel = catalogCourseLabel(findCourseForBooking(booking, courseCatalog));
+  if (catalogLabel) return catalogLabel;
+
+  return text(
+    booking.courseName ||
+      booking.course_name ||
+      booking.course ||
+      booking.experience_course ||
+      booking.experienceCourse ||
+      booking.product_name ||
+      booking.productName,
   );
 }
 
@@ -353,40 +396,52 @@ function settlementMinutesForBooking(booking: JsonRecord, courseCatalog: JsonRec
   return scheduledMinutes || 60;
 }
 
-async function resolveExperienceCourseMinutesByBookingId(bookingId: string) {
-  if (!bookingId) return 0;
+async function resolveExperienceCourseByBookingId(bookingId: string) {
+  if (!bookingId) return { minutes: 0, courseName: "" };
 
   const supabase = getSupabaseServerClient();
   const [{ data: bookingData }, { data: courseData }] = await Promise.all([
     supabase
       .from("bookings")
-      .select("booking_id,course_name,booking_type,reservation_type,duration_minutes,start_time,end_time")
+      .select("*")
       .eq("booking_id", bookingId)
       .maybeSingle(),
     supabase.from("course_catalog").select("*"),
   ]);
 
   const booking = bookingData as JsonRecord | null;
-  if (!booking) return 0;
+  if (!booking) return { minutes: 0, courseName: "" };
 
   if (normalizeTrainingType(booking.booking_type || booking.reservation_type) !== "체험비행") {
-    return 0;
+    return { minutes: 0, courseName: "" };
   }
 
-  return settlementMinutesForBooking(booking, (courseData || []) as JsonRecord[]);
+  const courseCatalog = (courseData || []) as JsonRecord[];
+  return {
+    minutes: settlementMinutesForBooking(booking, courseCatalog),
+    courseName: courseLabelForBooking(booking, courseCatalog),
+  };
 }
 
-function applyExperienceCourseMinutes(row: JsonRecord, courseMinutesValue: number) {
-  if (courseMinutesValue <= 0) return row;
-  return {
-    ...row,
-    actualFlightMinutes: courseMinutesValue,
-    actual_flight_minutes: courseMinutesValue,
-    payableMinutes: courseMinutesValue,
-    payable_minutes: courseMinutesValue,
-    deductedMinutes: 0,
-    deducted_minutes: 0,
-  };
+function applyExperienceCourseInfo(row: JsonRecord, courseInfo: { minutes: number; courseName: string }) {
+  const next = { ...row };
+  if (courseInfo.minutes > 0) {
+    next.actualFlightMinutes = courseInfo.minutes;
+    next.actual_flight_minutes = courseInfo.minutes;
+    next.payableMinutes = courseInfo.minutes;
+    next.payable_minutes = courseInfo.minutes;
+    next.deductedMinutes = 0;
+    next.deducted_minutes = 0;
+  }
+
+  if (courseInfo.courseName) {
+    next.lessonTitle = text(next.lessonTitle || next.lesson_title || courseInfo.courseName);
+    next.lesson_title = text(next.lesson_title || next.lessonTitle || courseInfo.courseName);
+    next.trainingItems = text(next.trainingItems || next.training_items || courseInfo.courseName);
+    next.training_items = text(next.training_items || next.trainingItems || courseInfo.courseName);
+  }
+
+  return next;
 }
 
 function buildPendingLogFromBooking(
@@ -408,6 +463,7 @@ function buildPendingLogFromBooking(
       booking.reservation_type,
   );
   const settlementMinutes = settlementMinutesForBooking(booking, courseCatalog);
+  const experienceCourseName = type === "체험비행" ? courseLabelForBooking(booking, courseCatalog) : "";
   const studentName = text(
     booking.userName ||
       booking.user_name ||
@@ -449,8 +505,8 @@ function buildPendingLogFromBooking(
     payableMinutes: settlementMinutes,
     sourceType: "booking",
     trainingType: type,
-    lessonTitle: "",
-    trainingItems: "",
+    lessonTitle: experienceCourseName,
+    trainingItems: experienceCourseName,
     instructorNotes: "",
     studentNotes: "",
     cautionNotes: "",
