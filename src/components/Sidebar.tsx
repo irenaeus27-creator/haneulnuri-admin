@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePendingApprovals } from "@/components/TopAlertBell";
+import { useCurrentAuth } from "@/components/AuthContext";
 
 type MenuItem = {
   label: string;
@@ -295,6 +296,7 @@ function isSystemNormal() {
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { profile, signOut } = useCurrentAuth();
 
   if (pathname.startsWith("/experience-consent")) {
     return null;
@@ -401,7 +403,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="px-3 pb-3 pt-2">
+      <div className="space-y-2 px-3 pb-3 pt-2">
         <div className="rounded-3xl border border-blue-100 bg-white/90 p-2.5 shadow-[0_14px_34px_rgba(15,23,42,0.06)]">
           <div className="flex items-center gap-3">
             <div className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
@@ -430,6 +432,29 @@ export default function Sidebar() {
               </svg>
             </div>
           </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white/90 p-3 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M20 21a8 8 0 0 0-16 0" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[14px] font-semibold text-slate-800">{profile?.name || "관리자"}</p>
+              <p className="truncate text-[12px] font-normal text-slate-500">{profile?.email || "로그인 계정"}</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="mt-2.5 flex h-9 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+          >
+            로그아웃
+          </button>
         </div>
       </div>
     </aside>
