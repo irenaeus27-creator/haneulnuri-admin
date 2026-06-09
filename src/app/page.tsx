@@ -6,6 +6,8 @@ import PageContainer from "@/components/PageContainer";
 import { formatBookingDate as sharedFormatBookingDate, formatBookingTime as sharedFormatBookingTime } from "@/lib/formatDateTime";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
+const RESERVATION_SLOT_MINUTES = 15;
+
 type Row = Record<string, unknown>;
 
 type DashboardApiResponse = {
@@ -233,6 +235,8 @@ const SCHEDULE_END_HOUR = 20;
 const SCHEDULE_START_MIN = SCHEDULE_START_HOUR * 60;
 const SCHEDULE_END_MIN = SCHEDULE_END_HOUR * 60;
 const SCHEDULE_TOTAL_MIN = SCHEDULE_END_MIN - SCHEDULE_START_MIN;
+const SCHEDULE_SLOT_MINUTES = 15;
+const PFI_DURATION_MINUTES = 30;
 
 const DASHBOARD_PANEL_HEADER_CLASS = "flex h-[62px] shrink-0 items-start justify-between px-4 py-3";
 const DASHBOARD_PANEL_TITLE_CLASS = "text-[15px] font-semibold leading-none tracking-[-0.01em] text-[#10213f]";
@@ -830,7 +834,7 @@ function normalizeDate(value: unknown) {
 }
 
 function normalizeTime(value: unknown) {
-  const valueText = sharedFormatBookingTime(value);
+  const valueText = sharedFormatBookingTime(value, RESERVATION_SLOT_MINUTES);
   return valueText === "-" ? "" : valueText;
 }
 
@@ -1348,9 +1352,32 @@ function isRentalBookingType(value: unknown) {
   return text(value).includes("렌탈");
 }
 
+function isCancelRequestStatus(value: unknown) {
+  const status = text(value).replace(/\s/g, "").toLowerCase();
+
+  return [
+    "취소요청",
+    "취소신청",
+    "취소대기",
+    "cancelrequest",
+    "cancelrequested",
+    "cancellationrequest",
+    "pendingcancel",
+  ].includes(status);
+}
+
 function isCancelledStatus(value: unknown) {
-  const status = text(value).replace(/\s/g, "");
-  return ["취소", "취소완료", "반려", "노쇼", "기상취소", "cancelled", "rejected"].includes(status);
+  const status = text(value).replace(/\s/g, "").toLowerCase();
+
+  if (!status) return false;
+  if (isCancelRequestStatus(status)) return false;
+
+  if (status.includes("기상취소")) return true;
+  if (status.includes("예약취소")) return true;
+  if (status.includes("취소")) return true;
+  if (status.includes("cancelled") || status.includes("canceled")) return true;
+
+  return ["취소완료", "반려", "노쇼", "noshow", "no-show", "rejected"].includes(status);
 }
 
 function isConfirmedStatus(value: unknown) {
@@ -1487,7 +1514,7 @@ function buildScheduleItems(bookings: Row[], aircraftResources: Row[], selectedD
 
     if (requiresPfi(row)) {
       const startMinutes = timeToMinutes(startTime);
-      const pfiStart = Math.max(0, startMinutes - 30);
+      const pfiStart = Math.max(0, startMinutes - PFI_DURATION_MINUTES);
       const pfiEnd = startMinutes;
 
       if (pfiEnd > pfiStart) {
@@ -2135,7 +2162,7 @@ async function createBookingChangeNotification(booking: Row, oldStart: string, o
     read: "N",
     category: "예약변경",
     createdAt: new Date().toISOString(),
-    memo: "대시보드 30분 이동 기능에서 자동 생성",
+    memo: "대시보드 15분 이동 기능에서 자동 생성",
   };
 
   const response = await fetch(apiUrl, {
@@ -2414,6 +2441,10 @@ function ScheduleGraph({
     { length: SCHEDULE_END_HOUR - SCHEDULE_START_HOUR },
     (_, index) => SCHEDULE_START_HOUR + index,
   );
+  const quarterSlots = Array.from(
+    { length: SCHEDULE_TOTAL_MIN / SCHEDULE_SLOT_MINUTES + 1 },
+    (_, index) => SCHEDULE_START_MIN + index * SCHEDULE_SLOT_MINUTES,
+  );
   const showCurrentTimeLine = false;
   const currentTimeLeft = ((currentTimeMinutes - SCHEDULE_START_MIN) / SCHEDULE_TOTAL_MIN) * 100;
 
@@ -2494,11 +2525,11 @@ function ScheduleGraph({
                       aria-hidden="true"
                     />
                   ) : null}
-                  {hours.map((hour, index) => (
+                  {quarterSlots.map((minutes) => (
                     <div
-                      key={`${aircraftName}-${hour}`}
-                      className="absolute bottom-0 top-0 border-l border-dashed border-[#dbe5f1]"
-                      style={{ left: `${((hour - SCHEDULE_START_HOUR) / (SCHEDULE_END_HOUR - SCHEDULE_START_HOUR)) * 100}%` }}
+                      key={`${aircraftName}-slot-${minutes}`}
+                      className={`absolute bottom-0 top-0 border-l border-dashed ${minutes % 60 === 0 ? "border-[#dbe5f1]" : "border-[#eef3f9]"}`}
+                      style={{ left: `${((minutes - SCHEDULE_START_MIN) / SCHEDULE_TOTAL_MIN) * 100}%` }}
                     />
                   ))}
 
@@ -3411,11 +3442,13 @@ export default async function DashboardPage({
     }),
   ];
 
-  const todayBookings = bookings.filter((booking) => normalizeDate(getBookingDateValue(booking)) === today);
+  const todayBookings = bookings
+    .filter((booking) => normalizeDate(getBookingDateValue(booking)) === today)
+    .filter(isActiveBooking);
   const todayScheduleItems = buildScheduleItems(bookings, visibleDashboardAircraft, today, aircraftLookup);
   const instructorTodaySchedules = buildInstructorScheduleSummary(todayScheduleItems);
   const pendingRequestBookings = bookings.filter((booking) => getBookingStatus(booking).replace(/\s/g, "") === "요청");
-  const cancelRequestBookings = bookings.filter((booking) => getBookingStatus(booking).replace(/\s/g, "") === "취소요청");
+  const cancelRequestBookings = bookings.filter((booking) => isCancelRequestStatus(getBookingStatus(booking)));
   const pendingUsers = users.filter(isPendingUser);
   const approvalWaitingCount = pendingRequestBookings.length + cancelRequestBookings.length + pendingUsers.length;
   const todayFlightHours = sumFlightHours(todayBookings);

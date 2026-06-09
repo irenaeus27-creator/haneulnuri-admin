@@ -6,6 +6,40 @@ export const revalidate = 0;
 
 type Row = Record<string, unknown>;
 
+function text(value: unknown, fallback = "") {
+  if (value === null || value === undefined) return fallback;
+  return String(value).trim();
+}
+
+function isCancelRequestStatus(value: unknown) {
+  const status = text(value).replace(/\s/g, "").toLowerCase();
+
+  return [
+    "취소요청",
+    "취소신청",
+    "취소대기",
+    "cancelrequest",
+    "cancelrequested",
+    "cancellationrequest",
+    "pendingcancel",
+  ].includes(status);
+}
+
+function isCancelledStatus(value: unknown) {
+  const status = text(value).replace(/\s/g, "").toLowerCase();
+
+  if (!status) return false;
+  if (isCancelRequestStatus(status)) return false;
+
+  if (status.includes("기상취소")) return true;
+  if (status.includes("예약취소")) return true;
+  if (status.includes("취소")) return true;
+  if (status.includes("cancelled") || status.includes("canceled")) return true;
+
+  return ["취소완료", "반려", "노쇼", "noshow", "no-show", "rejected"].includes(status);
+}
+
+
 function toCamelKey(key: string) {
   return key.replace(/_([a-z0-9])/g, (_, char: string) => char.toUpperCase());
 }

@@ -100,7 +100,7 @@ export function formatBookingDate(value: unknown) {
   return formatKstDate(value);
 }
 
-export function formatBookingTime(value: unknown, intervalMinutes = 30) {
+export function formatBookingTime(value: unknown, intervalMinutes = 15) {
   const raw = String(value ?? "").trim();
   const parts = parseKstParts(raw);
 

@@ -352,6 +352,106 @@ function currentUsedMinutes(row: JsonRecord) {
   return Math.round(Math.max(usedTraining, used, usedHours, 0));
 }
 
+
+function boolLike(value: unknown) {
+  const raw = text(value).toUpperCase();
+  return raw === "TRUE" || raw === "Y" || raw === "YES" || raw === "1" || raw === "완료" || raw === "차감";
+}
+
+function falseLike(value: unknown) {
+  const raw = text(value).toUpperCase();
+  return raw === "FALSE" || raw === "N" || raw === "NO" || raw === "0" || raw === "미차감";
+}
+
+function normalizeTrainingType(value: unknown) {
+  const raw = text(value, "교육비행");
+  if (raw.includes("교육")) return "교육비행";
+  if (raw.includes("체험")) return "체험비행";
+  if (raw.includes("동승")) return "동승비행";
+  if (raw.includes("렌탈") || raw.includes("대여")) return "렌탈비행";
+  return raw || "기타";
+}
+
+function logBelongsToStudent(log: JsonRecord, student: JsonRecord) {
+  const logStudentId = text(log.studentId || log.student_id);
+  const logUserId = text(log.userId || log.user_id);
+  const logStudentName = text(log.studentName || log.student_name);
+  const studentId = text(student.studentId || student.student_id);
+  const userId = text(student.userId || student.user_id);
+  const studentName = text(student.name || student.studentName || student.student_name);
+
+  return Boolean(
+    (logStudentId && studentId && logStudentId === studentId) ||
+      (logUserId && userId && logUserId === userId) ||
+      (logUserId && studentId && logUserId === studentId) ||
+      (logStudentId && userId && logStudentId === userId) ||
+      (!logStudentId && !logUserId && logStudentName && studentName && logStudentName === studentName)
+  );
+}
+
+function activeSavedTrainingLog(log: JsonRecord) {
+  const status = text(log.status);
+  return !["작성대기", "대기", "취소", "반려"].includes(status);
+}
+
+function deductedMinutesForStudentLog(log: JsonRecord) {
+  if (normalizeTrainingType(log.trainingType || log.training_type) !== "교육비행") return 0;
+  if (!activeSavedTrainingLog(log)) return 0;
+
+  const rawDeducted = log.timeDeducted ?? log.time_deducted;
+  if (falseLike(rawDeducted)) return 0;
+
+  const explicitDeducted = boolLike(rawDeducted);
+  const minutes =
+    toNumber(log.deductedMinutes || log.deducted_minutes) ||
+    toNumber(log.actualFlightMinutes || log.actual_flight_minutes) ||
+    toNumber(log.scheduledMinutes || log.scheduled_minutes);
+
+  if (!explicitDeducted && text(rawDeducted) && minutes <= 0) return 0;
+  return Math.max(Math.round(minutes), 0);
+}
+
+function logDateText(log: JsonRecord) {
+  return text(log.trainingDate || log.training_date).slice(0, 10);
+}
+
+function applyTrainingLogAggregatesToStudents(students: JsonRecord[], trainingLogs: JsonRecord[]) {
+  return students.map((student) => {
+    const relatedLogs = trainingLogs.filter((log) => logBelongsToStudent(log, student));
+    const completedLogs = relatedLogs
+      .map((log) => ({ log, minutes: deductedMinutesForStudentLog(log) }))
+      .filter((item) => item.minutes > 0);
+
+    const usedMinutes = completedLogs.reduce((sum, item) => sum + item.minutes, 0);
+    const manualCount = toNumber(student.manualTrainingCount || student.manual_training_count);
+    const completedCount = completedLogs.length + Math.max(Math.round(manualCount), 0);
+    const lastTrainingDate = completedLogs
+      .map((item) => logDateText(item.log))
+      .filter(Boolean)
+      .sort((a, b) => b.localeCompare(a, "ko"))[0] || text(student.lastTrainingDate || student.last_training_date);
+    const chargedMinutes = currentChargedMinutes(student);
+    const totalUsedMinutes = usedMinutes + toNumber(student.manualTrainingMinutes || student.manual_training_minutes);
+    const remainingMinutes = chargedMinutes || totalUsedMinutes ? Math.max(chargedMinutes - totalUsedMinutes, 0) : currentUsedMinutes(student);
+
+    return {
+      ...student,
+      usedTrainingMinutes: usedMinutes,
+      usedMinutes,
+      usedTrainingHours: Number((usedMinutes / 60).toFixed(2)),
+      usedHours: Number((usedMinutes / 60).toFixed(2)),
+      completedTrainingCount: completedCount,
+      lastTrainingLogId: text(completedLogs[0]?.log.trainingLogId || completedLogs[0]?.log.training_log_id || student.lastTrainingLogId || student.last_training_log_id),
+      lastTrainingDate,
+      lastFlightDate: lastTrainingDate,
+      recentFlightDate: lastTrainingDate,
+      remainingTrainingMinutes: remainingMinutes,
+      remainingMinutes,
+      remainingTrainingHours: Number((remainingMinutes / 60).toFixed(2)),
+      remainingHours: Number((remainingMinutes / 60).toFixed(2)),
+    };
+  });
+}
+
 function applyTrainingCharge(row: JsonRecord, totalMinutes: number, usedMinutes = 0) {
   const normalizedTotal = Math.max(Math.round(totalMinutes), 0);
   const normalizedUsed = Math.max(Math.round(usedMinutes), 0);
@@ -438,6 +538,7 @@ async function ensureLinkedUser(row: JsonRecord, input: JsonRecord) {
     phone: text(row.phone || input.phone),
     email: text(row.email || input.email),
     role: "student",
+    member_type: "학생회원",
     status: "승인완료",
     created_at: now,
     approved_at: now,
@@ -632,10 +733,11 @@ export async function GET() {
       selectRows("instructors", { orderColumn: "instructor_id", ascending: true }),
       selectRows("aircraft", { orderColumn: "aircraft_id", ascending: true }),
       selectRows("users", { orderColumn: "created_at", ascending: false }),
-      selectRows("training_logs", { orderColumn: "training_date", ascending: false, limit: 300 }),
+      selectRows("training_logs", { orderColumn: "training_date", ascending: false, limit: 5000 }),
     ]);
 
-    const data = { students, instructors, aircraft, users, trainingLogs };
+    const studentsWithLogTotals = applyTrainingLogAggregatesToStudents(students, trainingLogs as JsonRecord[]);
+    const data = { students: studentsWithLogTotals, instructors, aircraft, users, trainingLogs };
 
     return NextResponse.json({
       ok: true,

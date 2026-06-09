@@ -119,7 +119,9 @@ async function buildSafeTrainingLogInput(input: JsonRecord): Promise<JsonRecord>
   const educationFlight = isEducationType(trainingType);
 
   if (!educationFlight) {
-    return {
+    const bookingId = text(input.bookingId || input.booking_id);
+    const courseMinutesValue = trainingType === "체험비행" ? await resolveExperienceCourseMinutesByBookingId(bookingId) : 0;
+    const baseRow = {
       ...input,
       studentId: "",
       student_id: null,
@@ -134,6 +136,7 @@ async function buildSafeTrainingLogInput(input: JsonRecord): Promise<JsonRecord>
       deductedMinutes: 0,
       deducted_minutes: 0,
     };
+    return trainingType === "체험비행" ? applyExperienceCourseMinutes(baseRow, courseMinutesValue) : baseRow;
   }
 
   const student = await resolveStudentForTrainingLog(input);
@@ -292,9 +295,104 @@ function findStudentForBooking(booking: JsonRecord, students: JsonRecord[]) {
   );
 }
 
+function normalizedKey(value: unknown) {
+  return text(value).replace(/\s/g, "").toLowerCase();
+}
+
+function courseMinutes(row: JsonRecord) {
+  return (
+    Number(row.durationMinutes || row.duration_minutes || 0) ||
+    Number(row.defaultMinutes || row.default_minutes || 0) ||
+    Number(row.minutes || row.minute || 0) ||
+    0
+  );
+}
+
+function findCourseForBooking(booking: JsonRecord, courseCatalog: JsonRecord[]) {
+  const courseName = normalizedKey(booking.courseName || booking.course_name || booking.course || booking.course_id || booking.courseId);
+  const bookingTypeName = normalizedKey(booking.bookingType || booking.booking_type || booking.reservationType || booking.reservation_type);
+
+  if (!courseName && !bookingTypeName) return null;
+
+  return (
+    courseCatalog.find((course) => {
+      const names = [course.courseName, course.course_name, course.name, course.courseId, course.course_id]
+        .map(normalizedKey)
+        .filter(Boolean);
+      return courseName && names.includes(courseName);
+    }) ||
+    courseCatalog.find((course) => {
+      const type = normalizedKey(course.courseType || course.course_type);
+      return bookingTypeName && type && (type === bookingTypeName || bookingTypeName.includes(type) || type.includes(bookingTypeName));
+    }) ||
+    null
+  );
+}
+
+function settlementMinutesForBooking(booking: JsonRecord, courseCatalog: JsonRecord[]) {
+  const type = normalizeTrainingType(
+    booking.bookingType ||
+      booking.booking_type ||
+      booking.reservationType ||
+      booking.reservation_type,
+  );
+  const startTime = booking.startTime || booking.start_time;
+  const endTime = booking.endTime || booking.end_time;
+  const scheduledMinutes =
+    Number(booking.durationMinutes || booking.duration_minutes || 0) ||
+    minutesBetween(startTime, endTime);
+
+  if (type === "체험비행") {
+    const course = findCourseForBooking(booking, courseCatalog);
+    const minutes = course ? courseMinutes(course) : 0;
+    if (minutes > 0) return minutes;
+  }
+
+  if (type === "교육비행") return 60;
+
+  return scheduledMinutes || 60;
+}
+
+async function resolveExperienceCourseMinutesByBookingId(bookingId: string) {
+  if (!bookingId) return 0;
+
+  const supabase = getSupabaseServerClient();
+  const [{ data: bookingData }, { data: courseData }] = await Promise.all([
+    supabase
+      .from("bookings")
+      .select("booking_id,course_name,booking_type,reservation_type,duration_minutes,start_time,end_time")
+      .eq("booking_id", bookingId)
+      .maybeSingle(),
+    supabase.from("course_catalog").select("*"),
+  ]);
+
+  const booking = bookingData as JsonRecord | null;
+  if (!booking) return 0;
+
+  if (normalizeTrainingType(booking.booking_type || booking.reservation_type) !== "체험비행") {
+    return 0;
+  }
+
+  return settlementMinutesForBooking(booking, (courseData || []) as JsonRecord[]);
+}
+
+function applyExperienceCourseMinutes(row: JsonRecord, courseMinutesValue: number) {
+  if (courseMinutesValue <= 0) return row;
+  return {
+    ...row,
+    actualFlightMinutes: courseMinutesValue,
+    actual_flight_minutes: courseMinutesValue,
+    payableMinutes: courseMinutesValue,
+    payable_minutes: courseMinutesValue,
+    deductedMinutes: 0,
+    deducted_minutes: 0,
+  };
+}
+
 function buildPendingLogFromBooking(
   booking: JsonRecord,
   students: JsonRecord[],
+  courseCatalog: JsonRecord[],
 ) {
   const student = findStudentForBooking(booking, students);
   const scheduledMinutes =
@@ -303,6 +401,13 @@ function buildPendingLogFromBooking(
       booking.startTime || booking.start_time,
       booking.endTime || booking.end_time,
     );
+  const type = normalizeTrainingType(
+    booking.bookingType ||
+      booking.booking_type ||
+      booking.reservationType ||
+      booking.reservation_type,
+  );
+  const settlementMinutes = settlementMinutesForBooking(booking, courseCatalog);
   const studentName = text(
     booking.userName ||
       booking.user_name ||
@@ -339,16 +444,11 @@ function buildPendingLogFromBooking(
     actualStartTime: timeText(booking.startTime || booking.start_time),
     actualEndTime: timeText(booking.endTime || booking.end_time),
     scheduledMinutes,
-    actualFlightMinutes: 60,
+    actualFlightMinutes: settlementMinutes,
     groundBriefingMinutes: 0,
-    payableMinutes: 60,
+    payableMinutes: settlementMinutes,
     sourceType: "booking",
-    trainingType: normalizeTrainingType(
-      booking.bookingType ||
-        booking.booking_type ||
-        booking.reservationType ||
-        booking.reservation_type,
-    ),
+    trainingType: type,
     lessonTitle: "",
     trainingItems: "",
     instructorNotes: "",
@@ -372,7 +472,7 @@ function buildPendingLogFromBooking(
         booking.booking_type ||
         booking.reservationType ||
         booking.reservation_type,
-    ) ? 60 : 0,
+    ) ? settlementMinutes : 0,
     status: "작성대기",
   };
 }
@@ -493,7 +593,7 @@ async function handlePost(body: JsonRecord) {
 export async function GET() {
   const startedAt = Date.now();
   try {
-    const [trainingLogs, students, instructors, aircraft, bookings] =
+    const [trainingLogs, students, instructors, aircraft, bookings, courseCatalog] =
       await Promise.all([
         selectRows("training_logs", {
           orderColumn: "training_date",
@@ -507,17 +607,34 @@ export async function GET() {
         }),
         selectRows("aircraft", { orderColumn: "aircraft_id", ascending: true }),
         selectFlightBookings(),
+        selectRows("course_catalog", { orderColumn: "course_id", ascending: true }),
       ]);
+    const bookingMap = new Map<string, JsonRecord>();
+    bookings.forEach((booking) => {
+      const id = text(booking.bookingId || booking.booking_id || booking.id);
+      if (id) bookingMap.set(id, booking as JsonRecord);
+    });
+
+    const normalizedTrainingLogs = trainingLogs.map((item) => {
+      const trainingType = normalizeTrainingType(item.trainingType || item.training_type);
+      const bookingId = text(item.bookingId || item.booking_id);
+      if (trainingType !== "체험비행" || !bookingId) return item;
+
+      const booking = bookingMap.get(bookingId);
+      const minutes = booking ? settlementMinutesForBooking(booking, courseCatalog) : 0;
+      return minutes > 0 ? { ...item, actualFlightMinutes: minutes, payableMinutes: minutes } : item;
+    });
+
     const savedBookingIds = new Set(
-      trainingLogs.map((item) => text(item.bookingId)).filter(Boolean),
+      normalizedTrainingLogs.map((item) => text(item.bookingId)).filter(Boolean),
     );
     const pendingLogs = bookings
       .filter(
         (booking) =>
           !savedBookingIds.has(text(booking.bookingId || booking.id)),
       )
-      .map((booking) => buildPendingLogFromBooking(booking, students));
-    const data = { trainingLogs, pendingLogs, students, instructors, aircraft };
+      .map((booking) => buildPendingLogFromBooking(booking, students, courseCatalog));
+    const data = { trainingLogs: normalizedTrainingLogs, pendingLogs, students, instructors, aircraft, courseCatalog };
     return NextResponse.json({
       ok: true,
       success: true,
@@ -526,11 +643,12 @@ export async function GET() {
       ...data,
       data,
       counts: {
-        trainingLogs: trainingLogs.length,
+        trainingLogs: normalizedTrainingLogs.length,
         pendingLogs: pendingLogs.length,
         students: students.length,
         instructors: instructors.length,
         aircraft: aircraft.length,
+        courseCatalog: courseCatalog.length,
       },
       elapsedMs: Date.now() - startedAt,
     });

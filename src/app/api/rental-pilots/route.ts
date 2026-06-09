@@ -112,12 +112,32 @@ export async function GET() {
   const startedAt = Date.now();
 
   try {
-    const [rows, users, aircraft, flightRecords] = await Promise.all([
+    const [rows, users, aircraft, flightRecords, trainingLogs] = await Promise.all([
       selectRows(TABLE, { orderColumn: ORDER_COLUMN, ascending: true }),
       selectOptionalRows("users", "name"),
       selectOptionalRows("aircraft", "aircraft_id"),
       selectOptionalRows("flight_records", "flight_date"),
+      selectOptionalRows("training_logs", "training_date"),
     ]);
+
+    const normalizedTrainingLogRecords = trainingLogs
+      .filter((row) => {
+        const type = text(row.trainingType || row.training_type);
+        return type.includes("렌탈") || type.includes("동승");
+      })
+      .map((row) => ({
+        ...row,
+        sourceTable: "training_logs",
+        flightDate: row.trainingDate || row.training_date,
+        flightType: row.trainingType || row.training_type,
+        bookingDate: row.trainingDate || row.training_date,
+        customerName: row.studentName || row.student_name,
+        userName: row.studentName || row.student_name,
+        actualFlightMinutes: row.actualFlightMinutes || row.actual_flight_minutes,
+        settlementMinutes: row.deductedMinutes || row.deducted_minutes,
+      }));
+
+    const combinedFlightRecords = [...flightRecords, ...normalizedTrainingLogRecords];
 
     return NextResponse.json({
       ok: true,
@@ -127,13 +147,13 @@ export async function GET() {
       [RESPONSE_KEY]: rows,
       users,
       aircraft,
-      flightRecords,
-      data: { [RESPONSE_KEY]: rows, users, aircraft, flightRecords },
+      flightRecords: combinedFlightRecords,
+      data: { [RESPONSE_KEY]: rows, users, aircraft, flightRecords: combinedFlightRecords },
       counts: {
         [RESPONSE_KEY]: rows.length,
         users: users.length,
         aircraft: aircraft.length,
-        flightRecords: flightRecords.length,
+        flightRecords: combinedFlightRecords.length,
       },
       elapsedMs: Date.now() - startedAt,
     });

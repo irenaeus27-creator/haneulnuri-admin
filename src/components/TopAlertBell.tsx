@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatBookingDate as sharedFormatBookingDate, formatBookingTime as sharedFormatBookingTime } from "@/lib/formatDateTime";
 
+const RESERVATION_SLOT_MINUTES = 15;
+
 type BookingRow = {
   bookingId?: string;
   bookingDate?: string;
@@ -76,7 +78,7 @@ function normalizeDate(value: unknown) {
 }
 
 function normalizeTime(value: unknown) {
-  const valueText = sharedFormatBookingTime(value);
+  const valueText = sharedFormatBookingTime(value, RESERVATION_SLOT_MINUTES);
   return valueText === "-" ? "" : valueText;
 }
 

@@ -35,6 +35,8 @@ const CANONICAL_SETTING_VALUES: Record<string, Record<string, string>> = {
     교육: "교육비행",
     렌탈비행: "렌탈비행",
     렌탈: "렌탈비행",
+    동승비행: "동승비행",
+    동승: "동승비행",
     자가비행: "자가비행",
     자가: "자가비행",
     정비: "정비",
@@ -62,8 +64,8 @@ const CANONICAL_SETTING_VALUES: Record<string, Record<string, string>> = {
 
 const ORDERED_SETTING_VALUES: Record<string, string[]> = {
   aircraftStatus: ["운항 가능", "점검 중", "정비 대기", "정비 중", "예약 불가", "비활성"],
-  bookingStatus: ["요청", "확정", "예정", "완료", "취소", "기상취소", "노쇼", "반려", "취소요청"],
-  bookingType: ["체험비행", "교육비행", "렌탈비행", "자가비행", "정비", "기타"],
+  bookingStatus: ["요청", "확정", "예정", "취소", "기상취소", "노쇼", "반려", "취소요청"],
+  bookingType: ["체험비행", "교육비행", "렌탈비행", "동승비행", "자가비행", "정비", "기타"],
   paymentStatus: ["미결제", "결제완료", "부분결제", "환불"],
   trainingStatus: ["교육중", "수료", "보류", "중단"],
 };

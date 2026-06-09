@@ -154,11 +154,62 @@ function isActiveBooking(row: JsonRecord) {
   return !["취소", "기상취소", "노쇼", "반려"].includes(status);
 }
 
-function buildPendingRecordFromBooking(booking: JsonRecord) {
+function normalizedKey(value: unknown) {
+  return text(value).replace(/\s/g, "").toLowerCase();
+}
+
+function courseMinutes(row: JsonRecord) {
+  return (
+    Number(row.durationMinutes || row.duration_minutes || 0) ||
+    Number(row.defaultMinutes || row.default_minutes || 0) ||
+    Number(row.minutes || row.minute || 0) ||
+    0
+  );
+}
+
+function findCourseForBooking(booking: JsonRecord, courseCatalog: JsonRecord[]) {
+  const courseName = normalizedKey(booking.courseName || booking.course_name || booking.course || booking.courseId || booking.course_id);
+  const bookingTypeName = normalizedKey(booking.bookingType || booking.booking_type || booking.reservationType || booking.reservation_type);
+
+  return (
+    courseCatalog.find((course) => {
+      const names = [course.courseName, course.course_name, course.name, course.courseId, course.course_id]
+        .map(normalizedKey)
+        .filter(Boolean);
+      return courseName && names.includes(courseName);
+    }) ||
+    courseCatalog.find((course) => {
+      const type = normalizedKey(course.courseType || course.course_type);
+      return bookingTypeName && type && (type === bookingTypeName || bookingTypeName.includes(type) || type.includes(bookingTypeName));
+    }) ||
+    null
+  );
+}
+
+function operationMinutesForBooking(booking: JsonRecord, courseCatalog: JsonRecord[]) {
   const scheduledMinutes =
     Number(booking.durationMinutes || booking.duration_minutes || 0) ||
     minutesBetween(booking.startTime || booking.start_time, booking.endTime || booking.end_time) ||
     30;
+  const type = text(
+    booking.bookingType ||
+      booking.booking_type ||
+      booking.reservationType ||
+      booking.reservation_type,
+    "체험비행",
+  );
+
+  if (type.includes("체험")) {
+    const course = findCourseForBooking(booking, courseCatalog);
+    const minutes = course ? courseMinutes(course) : 0;
+    if (minutes > 0) return minutes;
+  }
+
+  return scheduledMinutes;
+}
+
+function buildPendingRecordFromBooking(booking: JsonRecord, courseCatalog: JsonRecord[]) {
+  const scheduledMinutes = operationMinutesForBooking(booking, courseCatalog);
   const type = text(
     booking.bookingType ||
       booking.booking_type ||
@@ -225,6 +276,13 @@ async function selectOperationBookings() {
     .filter((row) => isOperationBooking(row) && isActiveBooking(row));
 }
 
+async function selectCourseCatalog() {
+  const supabase = getSupabaseServerClient();
+  const { data, error } = await supabase.from("course_catalog").select("*");
+  if (error) return [] as JsonRecord[];
+  return (data || []).map((row) => toCamelObject(row as JsonRecord));
+}
+
 async function handlePost(body: JsonRecord) {
   const action = text(body.action);
   const data = (body.data || body) as JsonRecord;
@@ -287,7 +345,7 @@ export async function GET() {
   try {
     let tableReady = true;
     let flightRecords: JsonRecord[] = [];
-    const bookings = await selectOperationBookings();
+    const [bookings, courseCatalog] = await Promise.all([selectOperationBookings(), selectCourseCatalog()]);
 
     try {
       flightRecords = await selectFlightRecords();
@@ -302,7 +360,7 @@ export async function GET() {
     );
     const pendingFlightRecords = bookings
       .filter((booking) => !savedBookingIds.has(text(booking.bookingId || booking.id)))
-      .map((booking) => buildPendingRecordFromBooking(booking));
+      .map((booking) => buildPendingRecordFromBooking(booking, courseCatalog));
 
     const data = { flightRecords, pendingFlightRecords };
 

@@ -268,16 +268,14 @@ function timeToMinutes(value: unknown) {
   return hour * 60 + minute;
 }
 
-function displayThirtyMinuteTime(value: unknown) {
+function displayReservationSlotTime(value: unknown) {
   const normalized = normalizeTime(value);
   const [hour, minute] = normalized.split(":").map(Number);
 
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) return normalized;
 
-  const snappedMinute = minute < 15 ? 0 : minute < 45 ? 30 : 0;
-  const snappedHour = minute >= 45 ? hour + 1 : hour;
-
-  return `${String(snappedHour).padStart(2, "0")}:${String(snappedMinute).padStart(2, "0")}`;
+  const total = hour * 60 + minute;
+  return minutesToTime(Math.round(total / 15) * 15);
 }
 
 function minutesBetween(startTime: string, endTime: string) {
@@ -327,21 +325,17 @@ function minutesToHoursInput(value: unknown) {
   return hours.toFixed(1);
 }
 
-function buildThirtyMinuteOptions() {
+function buildReservationTimeOptions() {
   const options: string[] = [];
 
-  for (let hour = 7; hour <= 20; hour += 1) {
-    options.push(`${String(hour).padStart(2, "0")}:00`);
-
-    if (hour < 20) {
-      options.push(`${String(hour).padStart(2, "0")}:30`);
-    }
+  for (let minutes = 7 * 60; minutes <= 20 * 60; minutes += 15) {
+    options.push(minutesToTime(minutes));
   }
 
   return options;
 }
 
-const THIRTY_MINUTE_TIME_OPTIONS = buildThirtyMinuteOptions();
+const RESERVATION_TIME_OPTIONS = buildReservationTimeOptions();
 
 function toForm(row: TrainingLogRow): TrainingLogForm {
   const isSavedLog = Boolean(text(row.trainingLogId));
@@ -361,11 +355,11 @@ function toForm(row: TrainingLogRow): TrainingLogForm {
     aircraftId: text(row.aircraftId),
     aircraftName: text(row.aircraftName),
     trainingDate: normalizeDate(row.trainingDate),
-    scheduledStartTime: displayThirtyMinuteTime(row.scheduledStartTime),
-    scheduledEndTime: displayThirtyMinuteTime(row.scheduledEndTime),
-    actualStartTime: displayThirtyMinuteTime(row.actualStartTime),
+    scheduledStartTime: displayReservationSlotTime(row.scheduledStartTime),
+    scheduledEndTime: displayReservationSlotTime(row.scheduledEndTime),
+    actualStartTime: displayReservationSlotTime(row.actualStartTime),
     actualEndTime: addMinutesToTime(
-      displayThirtyMinuteTime(row.actualStartTime),
+      displayReservationSlotTime(row.actualStartTime),
       actualMinutes,
     ),
     scheduledMinutes: text(row.scheduledMinutes, "0"),
@@ -602,10 +596,10 @@ function sourceClass(row: TrainingLogRow) {
 }
 
 function timeRangeLabel(row: TrainingLogRow) {
-  const actualStart = displayThirtyMinuteTime(row.actualStartTime);
-  const actualEnd = displayThirtyMinuteTime(row.actualEndTime);
-  const scheduledStart = displayThirtyMinuteTime(row.scheduledStartTime);
-  const scheduledEnd = displayThirtyMinuteTime(row.scheduledEndTime);
+  const actualStart = displayReservationSlotTime(row.actualStartTime);
+  const actualEnd = displayReservationSlotTime(row.actualEndTime);
+  const scheduledStart = displayReservationSlotTime(row.scheduledStartTime);
+  const scheduledEnd = displayReservationSlotTime(row.scheduledEndTime);
   const actual = actualStart
     ? `${actualStart}${actualEnd ? `~${actualEnd}` : ""}`
     : "";
@@ -849,15 +843,18 @@ export default function TrainingLogsPage() {
       .sort((a, b) => {
         const aDate = normalizeDate(a.trainingDate);
         const bDate = normalizeDate(b.trainingDate);
-        if (aDate === bDate) {
-          return normalizeTime(
-            a.scheduledStartTime || a.actualStartTime,
-          ).localeCompare(
-            normalizeTime(b.scheduledStartTime || b.actualStartTime),
-            "ko",
-          );
-        }
-        return bDate.localeCompare(aDate, "ko");
+        if (aDate !== bDate) return bDate.localeCompare(aDate, "ko");
+
+        const aCompleted = isCompletedLog(a);
+        const bCompleted = isCompletedLog(b);
+        if (aCompleted !== bCompleted) return aCompleted ? 1 : -1;
+
+        return normalizeTime(
+          a.scheduledStartTime || a.actualStartTime,
+        ).localeCompare(
+          normalizeTime(b.scheduledStartTime || b.actualStartTime),
+          "ko",
+        );
       });
   }, [
     allLogs,
@@ -879,6 +876,56 @@ export default function TrainingLogsPage() {
   );
 
   const visibleLogs = filteredLogs;
+
+  const dailySummary = useMemo(() => {
+    const typeCounts: Record<string, { count: number; minutes: number }> = {
+      교육비행: { count: 0, minutes: 0 },
+      체험비행: { count: 0, minutes: 0 },
+      렌탈비행: { count: 0, minutes: 0 },
+      동승비행: { count: 0, minutes: 0 },
+      기타: { count: 0, minutes: 0 },
+    };
+
+    let totalMinutes = 0;
+    let completedMinutes = 0;
+
+    filteredLogs.forEach((item) => {
+      const type = normalizeFlightType(logFlightType(item));
+      const minutes =
+        Number(item.actualFlightMinutes || 0) ||
+        hoursTextToMinutes(item.actualFlightHours || item.actualFlightHoursText || "") ||
+        Number(item.payableMinutes || 0) ||
+        Number(item.scheduledMinutes || 0) ||
+        minutesBetween(
+          text(item.scheduledStartTime || item.actualStartTime),
+          text(item.scheduledEndTime || item.actualEndTime),
+        );
+
+      if (!typeCounts[type]) typeCounts[type] = { count: 0, minutes: 0 };
+      typeCounts[type].count += 1;
+      typeCounts[type].minutes += minutes;
+      totalMinutes += minutes;
+      if (isCompletedLog(item)) completedMinutes += minutes;
+    });
+
+    return {
+      totalCount: filteredLogs.length,
+      totalMinutes,
+      completedMinutes,
+      pendingCount: filteredLogs.filter((item) => !isCompletedLog(item)).length,
+      completedCount: filteredLogs.filter((item) => isCompletedLog(item)).length,
+      typeCounts,
+    };
+  }, [filteredLogs]);
+
+  const summaryItems = [
+    { label: "전체 비행", value: `${dailySummary.totalCount}건`, sub: minutesToHoursInput(dailySummary.totalMinutes) ? `${minutesToHoursInput(dailySummary.totalMinutes)}시간` : "0시간" },
+    { label: "작성 필요", value: `${dailySummary.pendingCount}건`, sub: "", tone: "amber" },
+    { label: "작성 완료", value: `${dailySummary.completedCount}건`, sub: minutesToHoursInput(dailySummary.completedMinutes) ? `${minutesToHoursInput(dailySummary.completedMinutes)}시간` : "0시간", tone: "green" },
+    { label: "교육", value: `${dailySummary.typeCounts["교육비행"]?.count || 0}건`, sub: `${minutesToHoursInput(dailySummary.typeCounts["교육비행"]?.minutes || 0) || "0.0"}시간` },
+    { label: "체험", value: `${dailySummary.typeCounts["체험비행"]?.count || 0}건`, sub: `${minutesToHoursInput(dailySummary.typeCounts["체험비행"]?.minutes || 0) || "0.0"}시간` },
+    { label: "렌탈/동승", value: `${(dailySummary.typeCounts["렌탈비행"]?.count || 0) + (dailySummary.typeCounts["동승비행"]?.count || 0)}건`, sub: `${minutesToHoursInput((dailySummary.typeCounts["렌탈비행"]?.minutes || 0) + (dailySummary.typeCounts["동승비행"]?.minutes || 0)) || "0.0"}시간` },
+  ];
 
   function updateForm(key: keyof TrainingLogForm, value: string) {
     setForm((prev) => {
@@ -1299,6 +1346,15 @@ export default function TrainingLogsPage() {
 
             <div className="flex flex-wrap gap-2">
               <button
+                type="button"
+                onClick={() => {
+                  window.location.href = `/training-logs/daily-report?date=${dateFilter || todayIsoText()}`;
+                }}
+                className="inline-flex h-10 items-center rounded-xl border border-[#cfdbea] bg-white px-4 text-[13px] font-medium text-[#28486d] hover:bg-[#f7faff]"
+              >
+                일일 보고서
+              </button>
+              <button
                   type="button"
                   onClick={startManualLog}
                   className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#1264f4] px-4 text-[13px] font-medium text-white shadow-[0_8px_16px_rgba(18,100,244,0.22)] hover:bg-[#0f56d8]"
@@ -1437,27 +1493,46 @@ export default function TrainingLogsPage() {
           </div>
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-[minmax(420px,0.72fr)_minmax(620px,1.28fr)]">
-          <div className="overflow-hidden rounded-[22px] border border-[#d9e2ef] bg-white shadow-[0_8px_26px_rgba(15,23,42,0.045)]">
-            <div className="border-b border-[#e7eef7] px-5 py-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <section className="grid gap-4 xl:grid-cols-[minmax(500px,0.95fr)_minmax(560px,1.05fr)]">
+          <div className="overflow-hidden rounded-[20px] border border-[#d9e2ef] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)]">
+            <div className="border-b border-[#e7eef7] px-4 py-2.5">
+              <div className="mb-3 border-b border-[#edf2f8] pb-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="text-[13px] font-semibold text-[#102544]">비행 요약</span>
+                  <span className="text-[12px] font-medium text-[#7d8fa6]">{compactDateLabel(dateFilter)}</span>
+                </div>
+                <div className="grid grid-cols-3 gap-x-3 gap-y-3 2xl:grid-cols-6">
+                  {summaryItems.map((item) => (
+                    <div key={item.label} className="min-w-[96px] border-l border-[#e7eef7] pl-3 first:border-l-0 first:pl-0">
+                      <div className="whitespace-nowrap text-[11px] font-medium text-[#6d7f96]">{item.label}</div>
+                      <div className="mt-1 flex min-w-0 items-end gap-1.5">
+                        <span className="whitespace-nowrap text-[19px] font-semibold leading-none tracking-[-0.02em] text-[#102544]">{item.value}</span>
+                        {item.sub ? (
+                          <span className="mb-0.5 whitespace-nowrap text-[11px] font-medium leading-none text-[#7d8fa6]">{item.sub}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <h2 className="text-[17px] font-semibold text-[#102544]">
+                    <h2 className="text-[15px] font-semibold text-[#102544]">
                       오늘의 비행 예약
                     </h2>
-                    <span className="rounded-full bg-[#eef4fb] px-2.5 py-1 text-[12px] font-medium text-[#1264f4]">
+                    <span className="rounded-full bg-[#eef4fb] px-2 py-0.5 text-[11px] font-medium text-[#1264f4]">
                       {visibleLogs.length}건
                     </span>
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] font-medium text-[#6d7f96]">
-                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[12px] font-semibold text-amber-700 ring-1 ring-amber-200">
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-[#6d7f96]">
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200">
                       작성 필요 {pendingLogCount}건
                     </span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[12px] font-medium text-slate-500 ring-1 ring-slate-200">
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 ring-1 ring-slate-200">
                       작성 완료 {completedLogCount}건
                     </span>
-                    <span>교육·체험·렌탈·동승 비행을 한 목록에서 작성합니다.</span>
+                    <span className="truncate">교육·체험·렌탈·동승 통합 작성</span>
                   </div>
                 </div>
               </div>
@@ -1468,13 +1543,13 @@ export default function TrainingLogsPage() {
                 비행기록 데이터를 불러오는 중입니다.
               </div>
             ) : (
-              <div className="max-h-[780px] space-y-2.5 overflow-y-auto p-3">
+              <div className="max-h-[720px] space-y-2 overflow-y-auto p-2.5">
                 {visibleLogs.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-[#cfdbea] bg-[#f8fbfe] p-8 text-center">
                     <div className="text-[14px] font-medium text-[#33527a]">
                       표시할 비행 예약 또는 비행기록이 없습니다.
                     </div>
-                    <div className="mt-0.5 text-[11px] font-medium text-[#8a9ab0]">
+                    <div className="mt-0.5 text-[10px] font-medium text-[#8a9ab0]">
                       날짜, 교관, 상태 필터를 확인하거나 예약 없이 작성할 수 있습니다.
                     </div>
                   </div>
@@ -1487,8 +1562,8 @@ export default function TrainingLogsPage() {
                       (text(form.bookingId) &&
                         text(form.bookingId) === text(item.bookingId));
                     const status = text(item.status, "작성대기");
-                    const start = displayThirtyMinuteTime(item.actualStartTime || item.scheduledStartTime) || "-";
-                    const end = displayThirtyMinuteTime(item.actualEndTime || item.scheduledEndTime) || "-";
+                    const start = displayReservationSlotTime(item.actualStartTime || item.scheduledStartTime) || "-";
+                    const end = displayReservationSlotTime(item.actualEndTime || item.scheduledEndTime) || "-";
                     const flightType = logFlightType(item);
                     const educationFlight = isEducationFlightType(flightType);
                     const hourText = minutesToHoursInput(item.actualFlightMinutes) || "1.0";
@@ -1506,7 +1581,7 @@ export default function TrainingLogsPage() {
                         key={`${text(item.trainingLogId || item.bookingId, "training-log")}-${index}`}
                         type="button"
                         onClick={() => startCreateFrom(item)}
-                        className={`group w-full rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)] ${
+                        className={`group w-full rounded-xl border p-2 text-left transition hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] ${
                           isSelected
                             ? "border-[#1264f4] bg-[#f4f8ff] shadow-[0_8px_22px_rgba(18,100,244,0.12)]"
                             : completed
@@ -1514,51 +1589,51 @@ export default function TrainingLogsPage() {
                               : "border-[#1264f4]/70 bg-white"
                         }`}
                       >
-                        <div className="flex gap-3">
-                          <div className={`flex min-h-[76px] w-[70px] shrink-0 flex-col items-center justify-center rounded-xl text-center ${
+                        <div className="flex gap-2.5">
+                          <div className={`flex min-h-[58px] w-[62px] shrink-0 flex-col items-center justify-center rounded-lg text-center ${
                             completed
                               ? "bg-[#f1f5f9] text-[#8a9ab0] ring-1 ring-[#e2e8f0]"
                               : "bg-[#eef4ff] text-[#1264f4]"
                           }`}>
-                            <span className="text-[15px] font-semibold leading-none">{start}</span>
-                            <span className="my-0.5 text-[13px] font-semibold leading-none">-</span>
-                            <span className="text-[15px] font-semibold leading-none">{end}</span>
+                            <span className="text-[13px] font-semibold leading-none">{start}</span>
+                            <span className="my-0.5 text-[11px] font-semibold leading-none">-</span>
+                            <span className="text-[13px] font-semibold leading-none">{end}</span>
                           </div>
                           <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${sourceClass(item)}`}>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ${sourceClass(item)}`}>
                                 {sourceLabel(item)}
                               </span>
-                              <span className="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700 ring-1 ring-indigo-200">
+                              <span className="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-indigo-200">
                                 {flightType}
                               </span>
-                              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${completionClass(item)}`}>
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ${completionClass(item)}`}>
                                 {completionLabel(item)}
                               </span>
                               {completed && status === "차감완료" ? (
-                                <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500 ring-1 ring-slate-200">
+                                <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-slate-200">
                                   차감완료
                                 </span>
                               ) : null}
                             </div>
-                            <div className="mt-1.5 flex items-start justify-between gap-3">
+                            <div className="mt-1 flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <div className={`truncate text-[15px] font-semibold ${completed ? "text-[#526173]" : "text-[#102544]"}`}>
+                                <div className={`truncate text-[14px] font-semibold ${completed ? "text-[#526173]" : "text-[#102544]"}`}>
                                   {text(item.studentName, `${targetLabelByType(flightType)} 미지정`)}
                                 </div>
-                                <div className={`mt-1 text-[12px] font-medium ${completed ? "text-[#8a9ab0]" : "text-[#6d7f96]"}`}>
+                                <div className={`mt-0.5 text-[11px] font-medium ${completed ? "text-[#8a9ab0]" : "text-[#6d7f96]"}`}>
                                   {text(item.aircraftName, "항공기 미지정")}
                                   {requiresInstructorByType(flightType) ? ` · ${text(item.instructorName, "교관 미지정")}` : " · 단독비행"}
                                 </div>
-                                <div className="mt-0.5 text-[11px] font-medium text-[#8a9ab0]">
+                                <div className="mt-0.5 text-[10px] font-medium text-[#8a9ab0]">
                                   {normalizeDate(item.trainingDate) || "-"}
                                 </div>
                               </div>
-                              <div className={`shrink-0 rounded-xl px-2.5 py-1.5 text-[11px] font-medium ring-1 ${completed ? "bg-[#f8fafc] text-[#8a9ab0] ring-[#e2e8f0]" : "bg-white/80 text-[#102544] ring-[#dfe8f2]"}`}>
+                              <div className={`shrink-0 rounded-lg px-2 py-1 text-[10px] font-medium ring-1 ${completed ? "bg-[#f8fafc] text-[#8a9ab0] ring-[#e2e8f0]" : "bg-white/80 text-[#102544] ring-[#dfe8f2]"}`}>
                                 {flightType === "교육비행" ? "교육" : flightType === "렌탈비행" ? "렌탈" : "비행"} {hourText}시간
                               </div>
                             </div>
-                            <div className={`mt-3 rounded-xl px-2.5 py-1.5 text-[11px] font-medium ${
+                            <div className={`mt-1.5 truncate rounded-lg px-2 py-1 text-[10px] font-medium ${
                               completed
                                 ? "bg-[#f1f5f9] text-[#8a9ab0]"
                                 : "bg-[#f7faff] text-[#5d728e]"
@@ -1566,7 +1641,7 @@ export default function TrainingLogsPage() {
                               {summary}
                             </div>
                           </div>
-                          <div className="flex items-center text-[24px] font-light text-[#60738d] opacity-60 transition group-hover:translate-x-0.5 group-hover:opacity-100">
+                          <div className="flex items-center text-[20px] font-light text-[#60738d] opacity-50 transition group-hover:translate-x-0.5 group-hover:opacity-100">
                             ›
                           </div>
                         </div>
@@ -1578,17 +1653,17 @@ export default function TrainingLogsPage() {
                 <button
                   type="button"
                   onClick={startManualLog}
-                  className="w-full rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-left transition hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)]"
+                  className="w-full rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-left transition hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)]"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[22px] font-medium text-amber-600 ring-1 ring-amber-200">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[18px] font-medium text-amber-600 ring-1 ring-amber-200">
                       +
                     </span>
                     <div>
-                      <div className="text-[14px] font-semibold text-amber-800">
+                      <div className="text-[13px] font-semibold text-amber-800">
                         예약 없이 비행일지 작성
                       </div>
-                      <div className="mt-0.5 text-[12px] font-medium text-amber-700">
+                      <div className="mt-0.5 text-[11px] font-medium text-amber-700">
                         교육비행은 교육생, 렌탈비행은 렌탈회원 기준으로 작성하고, 체험/기타는 대상자명을 직접 입력합니다.
                       </div>
                     </div>
@@ -1600,12 +1675,12 @@ export default function TrainingLogsPage() {
 
           <section
             id="training-log-form"
-            className="rounded-[22px] border border-[#d9e2ef] bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.045)]"
+            className="rounded-[20px] border border-[#d9e2ef] bg-white p-3 shadow-[0_8px_26px_rgba(15,23,42,0.045)] xl:max-h-[calc(100vh-250px)] xl:overflow-y-auto"
           >
-            <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="mb-2 flex items-start justify-between gap-3">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-[18px] font-semibold text-[#102544]">
+                  <h2 className="text-[16px] font-semibold text-[#102544]">
                     {editing
                       ? "비행일지 수정"
                       : manualMode
@@ -1615,11 +1690,11 @@ export default function TrainingLogsPage() {
                   <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 ring-1 ring-blue-200">
                     {form.bookingId ? "예약 기반" : "수동 작성"}
                   </span>
-                  <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
+                  <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 ring-1 ring-indigo-200">
                     {form.trainingType || "교육비행"}
                   </span>
                 </div>
-                <p className="mt-1 text-[13px] font-medium text-[#6d7f96]">
+                <p className="mt-0.5 text-[12px] font-medium text-[#6d7f96]">
                   좌측 정보를 참고해서 실제 작성에 필요한 항목만 입력합니다.
                 </p>
               </div>
@@ -1637,8 +1712,8 @@ export default function TrainingLogsPage() {
                 왼쪽 비행 예약을 선택하거나 상단의 ‘예약 없이 작성’을 누르세요.
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="grid gap-3 rounded-2xl border border-[#dfe8f2] bg-[#f8fbff] p-4 md:grid-cols-4">
+              <div className="space-y-2.5">
+                <div className="grid gap-2 rounded-xl border border-[#dfe8f2] bg-[#f8fbff] px-3 py-1.5 md:grid-cols-4">
                   <InfoTile label="예약 시간" value={form.bookingId ? `${form.scheduledStartTime || "-"} ~ ${form.scheduledEndTime || "-"}` : "수동 작성"} />
                   <InfoTile label="비행 구분" value={form.trainingType || "교육비행"} />
                   <InfoTile label={targetLabelByType(form.trainingType)} value={form.studentName || (isEducationFlightType(form.trainingType) ? "선택 필요" : "선택 사항")} />
@@ -1663,12 +1738,12 @@ export default function TrainingLogsPage() {
                 </Field>
 
                 {manualMode ? (
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-[12px] font-medium text-[#33527a]">
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/60 px-3 py-2 text-[11px] font-medium text-[#33527a]">
                     교육/체험/동승은 담당 교관을 선택하고, 렌탈 단독비행은 교관 없이 항공기와 렌탈회원명만으로 저장할 수 있습니다.
                   </div>
                 ) : null}
 
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-2.5 md:grid-cols-3">
                   {requiresInstructorByType(form.trainingType) ? (
                     <Field label={manualMode ? "1. 교관 선택" : "교관"}>
                       <select
@@ -1749,7 +1824,7 @@ export default function TrainingLogsPage() {
                   </Field>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-2.5 md:grid-cols-3">
                   <Field label="비행일자">
                     <input
                       type="date"
@@ -1765,7 +1840,7 @@ export default function TrainingLogsPage() {
                       className="input-base"
                     >
                       <option value="">시작시간 선택</option>
-                      {THIRTY_MINUTE_TIME_OPTIONS.map((time) => (
+                      {RESERVATION_TIME_OPTIONS.map((time) => (
                         <option key={time} value={time}>
                           {time}
                         </option>
@@ -1773,7 +1848,16 @@ export default function TrainingLogsPage() {
                     </select>
                   </Field>
                   <Field label="실제 비행시간">
-                    {isExperienceFlightType(form.trainingType) ? (
+                    {isExperienceFlightType(form.trainingType) && form.bookingId ? (
+                      <div className="rounded-2xl border border-[#dbe5f1] bg-[#f8fbff] px-4 py-3">
+                        <div className="text-[14px] font-semibold text-[#102544]">
+                          {Number(form.actualFlightMinutes || 0) || 0}분
+                        </div>
+                        <div className="mt-0.5 text-[11px] font-medium text-[#6d7f96]">
+                          체험비행은 예약 여유시간이 아니라 코스관리의 소요시간을 기준으로 정산합니다.
+                        </div>
+                      </div>
+                    ) : isExperienceFlightType(form.trainingType) ? (
                       <select
                         value={form.actualFlightMinutes || "20"}
                         onChange={(event) => updateActualFlightMinutes(event.target.value)}
@@ -1805,7 +1889,7 @@ export default function TrainingLogsPage() {
                   <textarea
                     value={form.trainingItems}
                     onChange={(event) => updateForm("trainingItems", event.target.value)}
-                    rows={3}
+                    rows={1}
                     placeholder={isEducationFlightType(form.trainingType) ? "실시한 교육 항목을 입력하세요." : "비행 내용 또는 정산 참고 내용을 입력하세요."}
                     className="textarea-base"
                   />
@@ -1813,58 +1897,69 @@ export default function TrainingLogsPage() {
 
                 {isEducationFlightType(form.trainingType) ? (
                   <>
-                    <Field label="학생 앱 공개 내용">
-                      <textarea
-                        value={form.studentNotes}
-                        onChange={(event) => updateForm("studentNotes", event.target.value)}
-                        rows={3}
-                        placeholder="학생에게 보여줄 오늘 교육 요약입니다."
-                        className="textarea-base"
-                      />
-                    </Field>
-
-                    <div className="grid gap-3 md:grid-cols-2">
+                    <div className="grid gap-2.5 md:grid-cols-2">
+                      <Field label="학생 앱 공개 내용">
+                        <textarea
+                          value={form.studentNotes}
+                          onChange={(event) => updateForm("studentNotes", event.target.value)}
+                          rows={1}
+                          placeholder="학생에게 보여줄 오늘 교육 요약입니다."
+                          className="textarea-base"
+                        />
+                      </Field>
                       <Field label="유의사항">
                         <textarea
                           value={form.cautionNotes}
                           onChange={(event) => updateForm("cautionNotes", event.target.value)}
-                          rows={3}
+                          rows={1}
                           placeholder="다음 비행 전 주의할 점"
                           className="textarea-base"
                         />
                       </Field>
+                    </div>
+
+                    <div className="grid gap-2.5 md:grid-cols-2">
                       <Field label="다음 계획">
                         <textarea
                           value={form.nextTrainingPlan}
                           onChange={(event) => updateForm("nextTrainingPlan", event.target.value)}
-                          rows={3}
+                          rows={1}
                           placeholder="다음 교육 목표"
+                          className="textarea-base"
+                        />
+                      </Field>
+                      <Field label={noteLabelByType(form.trainingType)}>
+                        <textarea
+                          value={form.instructorNotes}
+                          onChange={(event) => updateForm("instructorNotes", event.target.value)}
+                          rows={1}
+                          placeholder="관리자/교관만 보는 메모입니다."
                           className="textarea-base"
                         />
                       </Field>
                     </div>
                   </>
-                ) : null}
+                ) : (
+                  <Field label={noteLabelByType(form.trainingType)}>
+                    <textarea
+                      value={form.instructorNotes}
+                      onChange={(event) => updateForm("instructorNotes", event.target.value)}
+                      rows={1}
+                      placeholder="정산 참고사항, 특이사항 등을 입력하세요."
+                      className="textarea-base"
+                    />
+                  </Field>
+                )}
 
-                <Field label={noteLabelByType(form.trainingType)}>
-                  <textarea
-                    value={form.instructorNotes}
-                    onChange={(event) => updateForm("instructorNotes", event.target.value)}
-                    rows={isEducationFlightType(form.trainingType) ? 3 : 4}
-                    placeholder={isEducationFlightType(form.trainingType) ? "관리자/교관만 보는 메모입니다." : "정산 참고사항, 특이사항 등을 입력하세요."}
-                    className="textarea-base"
-                  />
-                </Field>
-
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dfe8f2] bg-[#f8fbfe] px-4 py-3">
-                  <p className="text-[12px] font-medium text-[#60738d]">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#dfe8f2] bg-[#f8fbfe] px-3 py-2">
+                  <p className="text-[11px] font-medium text-[#60738d]">
                     교육비행은 학생 앱 공개와 교육시간 차감이 적용됩니다. 체험비행은 20분부터 10분 단위로 기록하며, 동승은 교관 정산용, 렌탈 단독비행은 운항/정산 참고 기록으로 저장됩니다.
                   </p>
                   <button
                     type="button"
                     onClick={() => void saveTrainingLog()}
                     disabled={saving}
-                    className="inline-flex h-10 items-center rounded-xl bg-[#1264f4] px-6 text-[13px] font-medium text-white hover:bg-[#0f56d8] disabled:cursor-not-allowed disabled:bg-slate-400"
+                    className="inline-flex h-9 items-center rounded-xl bg-[#1264f4] px-5 text-[13px] font-medium text-white hover:bg-[#0f56d8] disabled:cursor-not-allowed disabled:bg-slate-400"
                   >
                     {saving ? "저장 중" : "저장"}
                   </button>
@@ -1878,7 +1973,7 @@ export default function TrainingLogsPage() {
       <style jsx global>{`
         .filter-card {
           display: flex;
-          min-height: 4.25rem;
+          min-height: 3.65rem;
           flex-direction: column;
           justify-content: center;
           gap: 0.25rem;
@@ -1893,7 +1988,7 @@ export default function TrainingLogsPage() {
           color: rgb(106 128 157);
         }
         .filter-field {
-          height: 2.05rem;
+          height: 1.95rem;
           width: 100%;
           border: 0;
           background: transparent;
@@ -1904,7 +1999,7 @@ export default function TrainingLogsPage() {
         }
         .date-nav-button,
         .today-button {
-          height: 2.05rem;
+          height: 1.95rem;
           border-radius: 0.75rem;
           border: 1px solid rgb(212 222 235);
           background: white;
@@ -1921,8 +2016,8 @@ export default function TrainingLogsPage() {
           color: rgb(18 100 244);
         }
         .input-base {
-          margin-top: 0.4rem;
-          height: 2.65rem;
+          margin-top: 0.3rem;
+          height: 2.15rem;
           width: 100%;
           border-radius: 0.85rem;
           border: 1px solid rgb(212 222 235);
@@ -1941,13 +2036,14 @@ export default function TrainingLogsPage() {
           box-shadow: 0 0 0 4px rgba(191, 219, 254, 0.65);
         }
         .textarea-base {
-          margin-top: 0.4rem;
+          margin-top: 0.25rem;
+          min-height: 2.35rem;
           width: 100%;
           resize: vertical;
           border-radius: 1rem;
           border: 1px solid rgb(212 222 235);
           background: white;
-          padding: 0.75rem 0.9rem;
+          padding: 0.45rem 0.7rem;
           font-size: 0.85rem;
           font-weight: 500;
           color: rgb(32 55 86);
@@ -1989,7 +2085,7 @@ const FLIGHT_SETTLEMENT_HOUR_OPTIONS = Array.from({ length: 26 }, (_, index) =>
 function flightRecordFromRow(row: FlightRecordRow): FlightRecordForm {
   const actualMinutes = Number(row.actualFlightMinutes || 30) || 30;
   const settlementMinutes = Number(row.settlementMinutes || actualMinutes) || actualMinutes;
-  const startTime = displayThirtyMinuteTime(row.actualStartTime) || "07:00";
+  const startTime = displayReservationSlotTime(row.actualStartTime) || "07:00";
 
   return {
     flightRecordId: text(row.flightRecordId),
@@ -2002,7 +2098,7 @@ function flightRecordFromRow(row: FlightRecordRow): FlightRecordForm {
     aircraftName: text(row.aircraftName),
     customerName: text(row.customerName),
     actualStartTime: startTime,
-    actualEndTime: displayThirtyMinuteTime(row.actualEndTime) || addMinutesToTime(startTime, actualMinutes),
+    actualEndTime: displayReservationSlotTime(row.actualEndTime) || addMinutesToTime(startTime, actualMinutes),
     actualFlightHours: minutesToHoursInput(actualMinutes) || "0.5",
     actualFlightMinutes: String(actualMinutes),
     settlementHours: minutesToHoursInput(settlementMinutes) || "0.5",
@@ -2248,7 +2344,7 @@ function FlightRecordsPanel({
   }
 
   return (
-    <section className="grid gap-4 xl:grid-cols-[minmax(420px,0.72fr)_minmax(620px,1.28fr)]">
+    <section className="grid gap-4 xl:grid-cols-[minmax(500px,0.95fr)_minmax(560px,1.05fr)]">
       <div className="overflow-hidden rounded-[22px] border border-[#d9e2ef] bg-white shadow-[0_8px_26px_rgba(15,23,42,0.045)]">
         <div className="border-b border-[#e7eef7] px-5 py-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -2259,7 +2355,7 @@ function FlightRecordsPanel({
                   {visibleRecords.length}건
                 </span>
               </div>
-              <p className="mt-1 text-[12px] font-medium text-[#6d7f96]">
+              <p className="mt-0.5 text-[11px] font-medium text-[#6d7f96]">
                 비행시간 차감과 학생 앱 공개 없이 교관 정산용 실적으로만 저장합니다.
               </p>
             </div>
@@ -2294,13 +2390,13 @@ function FlightRecordsPanel({
             {visibleRecords.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-[#cfdbea] bg-[#f8fbfe] p-8 text-center">
                 <div className="text-[14px] font-medium text-[#33527a]">표시할 체험/기타 실적이 없습니다.</div>
-                <div className="mt-0.5 text-[11px] font-medium text-[#8a9ab0]">체험비행 예약이 있거나 직접 입력하면 여기에 표시됩니다.</div>
+                <div className="mt-0.5 text-[10px] font-medium text-[#8a9ab0]">체험비행 예약이 있거나 직접 입력하면 여기에 표시됩니다.</div>
               </div>
             ) : (
               visibleRecords.map((item, index) => {
                 const completed = Boolean(text(item.flightRecordId));
-                const start = displayThirtyMinuteTime(item.actualStartTime) || "-";
-                const end = displayThirtyMinuteTime(item.actualEndTime) || "-";
+                const start = displayReservationSlotTime(item.actualStartTime) || "-";
+                const end = displayReservationSlotTime(item.actualEndTime) || "-";
                 const actualHours = minutesToHoursInput(item.actualFlightMinutes) || "0.5";
                 const settleHours = minutesToHoursInput(item.settlementMinutes || item.actualFlightMinutes) || actualHours;
                 return (
@@ -2323,12 +2419,12 @@ function FlightRecordsPanel({
                           <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700 ring-1 ring-blue-200">
                             {text(item.flightType, "체험비행")}
                           </span>
-                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ring-1 ${completed ? "bg-slate-100 text-slate-500 ring-slate-200" : "bg-amber-50 text-amber-700 ring-amber-200"}`}>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ${completed ? "bg-slate-100 text-slate-500 ring-slate-200" : "bg-amber-50 text-amber-700 ring-amber-200"}`}>
                             {completed ? text(item.status, "정산대상") : "작성 필요"}
                           </span>
                         </div>
                         <div className="mt-2 truncate text-[16px] font-semibold text-[#102544]">{text(item.customerName, "대상자 미입력")}</div>
-                        <div className="mt-1 text-[12px] font-medium text-[#6d7f96]">
+                        <div className="mt-0.5 text-[11px] font-medium text-[#6d7f96]">
                           {text(item.aircraftName, "항공기 미지정")} · {text(item.instructorName, "교관 미지정")} · {normalizeDate(item.flightDate) || "-"}
                         </div>
                         <div className="mt-3 text-[12px] font-medium text-[#60738d]">
@@ -2345,10 +2441,10 @@ function FlightRecordsPanel({
         )}
       </div>
 
-      <section id="flight-record-form" className="rounded-[22px] border border-[#d9e2ef] bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.045)]">
-        <div className="mb-4 flex items-start justify-between gap-3">
+      <section id="flight-record-form" className="rounded-[20px] border border-[#d9e2ef] bg-white p-3 shadow-[0_8px_26px_rgba(15,23,42,0.045)] xl:max-h-[calc(100vh-250px)] xl:overflow-y-auto">
+        <div className="mb-2 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-[18px] font-semibold text-[#102544]">
+            <h2 className="text-[16px] font-semibold text-[#102544]">
               {form.flightRecordId ? "체험/기타 실적 수정" : form.bookingId ? "체험비행 예약 실적 작성" : "체험/기타 실적 작성"}
             </h2>
             <p className="mt-1 text-[13px] font-medium text-[#6d7f96]">
@@ -2364,8 +2460,8 @@ function FlightRecordsPanel({
           </button>
         </div>
 
-        <div className="space-y-4">
-          <div className="grid gap-3 md:grid-cols-3">
+        <div className="space-y-2.5">
+          <div className="grid gap-2.5 md:grid-cols-3">
             <Field label="비행유형">
               <select value={form.flightType} onChange={(event) => updateRecordForm("flightType", event.target.value)} className="input-base">
                 <option value="체험비행">체험비행</option>
@@ -2386,7 +2482,7 @@ function FlightRecordsPanel({
             </Field>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-2.5 md:grid-cols-3">
             <Field label="교관">
               <select value={form.instructorId} onChange={(event) => selectFlightInstructor(event.target.value)} className="input-base">
                 <option value="">교관 선택</option>
@@ -2410,11 +2506,11 @@ function FlightRecordsPanel({
             </Field>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-2.5 md:grid-cols-3">
             <Field label="실제 시작시간">
               <select value={form.actualStartTime} onChange={(event) => updateRecordForm("actualStartTime", event.target.value)} className="input-base">
                 <option value="">시작시간 선택</option>
-                {THIRTY_MINUTE_TIME_OPTIONS.map((time) => <option key={time} value={time}>{time}</option>)}
+                {RESERVATION_TIME_OPTIONS.map((time) => <option key={time} value={time}>{time}</option>)}
               </select>
             </Field>
             <Field label="실제 비행시간">
@@ -2433,15 +2529,15 @@ function FlightRecordsPanel({
             <textarea value={form.memo} onChange={(event) => updateRecordForm("memo", event.target.value)} rows={5} placeholder="정산 참고사항, 체험코스, 특이사항 등을 입력하세요." className="textarea-base" />
           </Field>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dfe8f2] bg-[#f8fbfe] px-4 py-3">
-            <p className="text-[12px] font-medium text-[#60738d]">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#dfe8f2] bg-[#f8fbfe] px-3 py-2">
+            <p className="text-[11px] font-medium text-[#60738d]">
               저장된 체험/기타 실적은 학생 앱에 공개되지 않고, 교관 정산용 데이터로만 사용됩니다.
             </p>
             <button
               type="button"
               onClick={() => void saveFlightRecord()}
               disabled={saving}
-              className="inline-flex h-10 items-center rounded-xl bg-[#1264f4] px-6 text-[13px] font-medium text-white hover:bg-[#0f56d8] disabled:cursor-not-allowed disabled:bg-slate-400"
+              className="inline-flex h-9 items-center rounded-xl bg-[#1264f4] px-5 text-[13px] font-medium text-white hover:bg-[#0f56d8] disabled:cursor-not-allowed disabled:bg-slate-400"
             >
               {saving ? "저장 중" : "저장"}
             </button>
@@ -2462,7 +2558,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="text-[12px] font-semibold text-[#60738d]">{label}</label>
+      <label className="text-[11px] font-semibold text-[#60738d]">{label}</label>
       {children}
     </div>
   );
@@ -2471,8 +2567,8 @@ function Field({
 function InfoTile({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] font-semibold text-[#60738d]">{label}</div>
-      <div className="mt-1 truncate text-[13px] font-semibold text-[#102544]">
+      <div className="text-[10px] font-semibold text-[#60738d]">{label}</div>
+      <div className="mt-0.5 truncate text-[11px] font-semibold text-[#102544]">
         {value}
       </div>
     </div>

@@ -3,8 +3,13 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { bookingActionLabel, bookingAuditMessage, writeLog, writeNotification } from "@/lib/supabase/audit";
 import { formatBookingTime as sharedFormatBookingTime } from "@/lib/formatDateTime";
 
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+const RESERVATION_SLOT_MINUTES = 15;
+const DAY_START_MINUTES = 7 * 60;
+const DAY_END_MINUTES = 20 * 60;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -14,7 +19,7 @@ function text(value: unknown, fallback = "") {
 }
 
 function normalizeTime(value: unknown) {
-  const valueText = sharedFormatBookingTime(value);
+  const valueText = sharedFormatBookingTime(value, RESERVATION_SLOT_MINUTES);
   return valueText === "-" ? "" : valueText;
 }
 
@@ -139,16 +144,13 @@ export async function POST(request: NextRequest) {
       throw new Error("기존 예약 시간이 올바르지 않습니다.");
     }
 
-    const stepMinutes = direction * 30;
+    const stepMinutes = direction * RESERVATION_SLOT_MINUTES;
     const newStart = addMinutes(oldStart, stepMinutes);
     const newEnd = addMinutes(oldEnd, stepMinutes);
 
     const newStartMinutes = timeToMinutes(newStart);
     const newEndMinutes = timeToMinutes(newEnd);
-    const dayStart = 7 * 60;
-    const dayEnd = 20 * 60;
-
-    if (newStartMinutes < dayStart || newEndMinutes > dayEnd || newEndMinutes <= newStartMinutes) {
+    if (newStartMinutes < DAY_START_MINUTES || newEndMinutes > DAY_END_MINUTES || newEndMinutes <= newStartMinutes) {
       throw new Error("이동 가능한 시간은 07:00~20:00 사이입니다.");
     }
 

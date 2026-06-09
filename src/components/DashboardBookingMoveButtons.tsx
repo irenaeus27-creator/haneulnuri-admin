@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { formatBookingDate as sharedFormatBookingDate, formatBookingTime as sharedFormatBookingTime } from "@/lib/formatDateTime";
 
+
 type BookingPayload = Record<string, unknown>;
 
 const SCHEDULE_START_MIN = 7 * 60;
 const SCHEDULE_END_MIN = 20 * 60;
 const SCHEDULE_TOTAL_MIN = SCHEDULE_END_MIN - SCHEDULE_START_MIN;
+const RESERVATION_SLOT_MINUTES = 15;
+const PFI_DURATION_MINUTES = 30;
 
 function text(value: unknown, fallback = "") {
   const raw = String(value ?? "").trim();
@@ -15,7 +18,7 @@ function text(value: unknown, fallback = "") {
 }
 
 function normalizeTime(value: unknown) {
-  const valueText = sharedFormatBookingTime(value);
+  const valueText = sharedFormatBookingTime(value, RESERVATION_SLOT_MINUTES);
   return valueText === "-" ? "" : valueText;
 }
 
@@ -65,7 +68,7 @@ function updateScheduleBlock(bookingId: string, startTime: string, endTime: stri
       return;
     }
 
-    const pfiStart = minutesToTime(Math.max(0, timeToMinutes(startTime) - 30));
+    const pfiStart = minutesToTime(Math.max(0, timeToMinutes(startTime) - PFI_DURATION_MINUTES));
     const style = blockStyle(pfiStart, startTime);
     pfiBlock.style.left = style.left;
     pfiBlock.style.width = style.width;
@@ -97,8 +100,8 @@ export default function DashboardBookingMoveButtons({
 
     const previousStart = currentStart;
     const previousEnd = currentEnd;
-    const nextStart = minutesToTime(timeToMinutes(currentStart) + direction * 30);
-    const nextEnd = minutesToTime(timeToMinutes(currentEnd) + direction * 30);
+    const nextStart = minutesToTime(timeToMinutes(currentStart) + direction * RESERVATION_SLOT_MINUTES);
+    const nextEnd = minutesToTime(timeToMinutes(currentEnd) + direction * RESERVATION_SLOT_MINUTES);
 
     if (timeToMinutes(nextStart) < SCHEDULE_START_MIN || timeToMinutes(nextEnd) > SCHEDULE_END_MIN) {
       setMessage("운항시간 밖으로 이동할 수 없습니다.");
@@ -160,7 +163,7 @@ export default function DashboardBookingMoveButtons({
           onClick={() => move(-1)}
           className="h-7 w-full rounded-lg bg-[#eef4fb] text-[11px] font-black text-[#274464] hover:bg-[#e2ecf8] disabled:cursor-wait disabled:opacity-60"
         >
-          {movingDirection === -1 ? "..." : "-30"}
+          {movingDirection === -1 ? "..." : "-15"}
         </button>
         <button
           type="button"
@@ -168,7 +171,7 @@ export default function DashboardBookingMoveButtons({
           onClick={() => move(1)}
           className="h-7 w-full rounded-lg bg-[#eef4fb] text-[11px] font-black text-[#274464] hover:bg-[#e2ecf8] disabled:cursor-wait disabled:opacity-60"
         >
-          {movingDirection === 1 ? "..." : "+30"}
+          {movingDirection === 1 ? "..." : "+15"}
         </button>
       </div>
       {message ? <p className="mt-1.5 text-center text-[9px] font-bold text-[#8a9ab0]">{message}</p> : null}

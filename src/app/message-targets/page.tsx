@@ -6,6 +6,8 @@ import PageContainer from "@/components/PageContainer";
 import { formatKstDate, formatKstTime } from "@/lib/formatDateTime";
 import { formatBookingTime as sharedFormatBookingTime } from "@/lib/formatDateTime";
 
+const RESERVATION_SLOT_MINUTES = 15;
+
 type Row = Record<string, string | number | boolean | null | undefined>;
 type SheetResult = { ok?: boolean; rows?: Row[]; message?: string };
 type TargetType = "bookingChanged" | "bookingCancelled";

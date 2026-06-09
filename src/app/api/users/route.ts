@@ -4,7 +4,7 @@ import { JsonRecord, buildId, insertRow, nowIso, pickAllowed, selectRows, text, 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const USER_COLUMNS = ["user_id", "name", "phone", "email", "role", "status", "member_type", "created_at", "requested_at", "approved_at", "updated_at", "memo"];
+const USER_COLUMNS = ["user_id", "name", "phone", "email", "role", "status", "member_type", "created_at", "requested_at", "approved_at", "rejected_at", "updated_at", "memo"];
 
 function normalizeUser(input: JsonRecord, isCreate = false) {
   const now = nowIso();
@@ -21,6 +21,7 @@ function normalizeUser(input: JsonRecord, isCreate = false) {
     created_at: text(input.createdAt || input.created_at) || (isCreate ? now : undefined),
     requested_at: text(input.requestedAt || input.requested_at),
     approved_at: text(input.approvedAt || input.approved_at),
+    rejected_at: text(input.rejectedAt || input.rejected_at),
     updated_at: now,
   }, USER_COLUMNS);
 }
@@ -43,13 +44,15 @@ async function handlePost(body: JsonRecord) {
 
   if (action === "approveUser") {
     const userId = text(data.userId || data.user_id);
-    const saved = await updateRow("users", "user_id", userId, { status: "승인완료", approved_at: nowIso(), updated_at: nowIso() });
+    const now = nowIso();
+    const saved = await updateRow("users", "user_id", userId, { status: "승인완료", approved_at: now, updated_at: now });
     return { message: "회원을 승인했습니다.", user: saved, data: saved };
   }
 
   if (action === "rejectUser" || action === "denyUser") {
     const userId = text(data.userId || data.user_id);
-    const saved = await updateRow("users", "user_id", userId, { status: "반려", updated_at: nowIso() });
+    const now = nowIso();
+    const saved = await updateRow("users", "user_id", userId, { status: "반려", rejected_at: now, updated_at: now });
     return { message: "회원을 반려했습니다.", user: saved, data: saved };
   }
 

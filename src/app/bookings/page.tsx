@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import TopAlertBell from "@/components/TopAlertBell";
 import { formatBookingDate as sharedFormatBookingDate, formatBookingTime as sharedFormatBookingTime } from "@/lib/formatDateTime";
 
+
 type AnyRow = Record<string, unknown>;
 
 type BookingRow = {
@@ -13,6 +14,7 @@ type BookingRow = {
   startTime?: string;
   endTime?: string;
   bookingType?: string;
+  courseId?: string;
   courseName?: string;
   userId?: string;
   userName?: string;
@@ -95,6 +97,9 @@ type CourseRow = {
   courseType?: string;
   courseName?: string;
   durationMinutes?: string | number;
+  defaultMinutes?: string | number;
+  duration_minutes?: string | number;
+  default_minutes?: string | number;
   price?: string | number;
   active?: string;
   sortOrder?: string | number;
@@ -120,6 +125,8 @@ type BookingForm = {
   startTime: string;
   endTime: string;
   bookingType: string;
+  durationMinutes?: string | number;
+  courseId?: string;
   courseName: string;
   userId: string;
   userName: string;
@@ -146,7 +153,9 @@ type CalendarDragSelection = {
 type CalendarMoveDrag = {
   bookingId: string;
   startX: number;
+  timelineLeft: number;
   timelineWidth: number;
+  grabOffsetX: number;
   deltaSteps: number;
   originalStartTime: string;
   originalEndTime: string;
@@ -155,7 +164,9 @@ type CalendarMoveDrag = {
 type CalendarResizeDrag = {
   bookingId: string;
   startX: number;
+  timelineLeft: number;
   timelineWidth: number;
+  grabOffsetX: number;
   deltaSteps: number;
   originalStartTime: string;
   originalEndTime: string;
@@ -163,26 +174,33 @@ type CalendarResizeDrag = {
 
 const defaultBookingStatuses = [
   "요청",
-  "예정",
   "확정",
+  "예정",
   "취소",
-  "취소요청",
-  "완료",
   "기상취소",
   "노쇼",
   "반려",
+  "취소요청",
 ];
 
 const defaultBookingTypes = [
   "체험비행",
   "교육비행",
   "렌탈비행",
+  "동승비행",
   "자가비행",
   "정비",
   "기타",
 ];
 
 const defaultPaymentStatuses = ["미결제", "결제완료", "부분결제", "환불"];
+
+const RESERVATION_SLOT_MINUTES = 15;
+const MIN_RESERVATION_DURATION_MINUTES = 30;
+const PFI_DURATION_MINUTES = 30;
+const CALENDAR_START_MINUTES = 7 * 60;
+const CALENDAR_END_MINUTES = 20 * 60;
+const CALENDAR_SLOT_COUNT = (CALENDAR_END_MINUTES - CALENDAR_START_MINUTES) / RESERVATION_SLOT_MINUTES;
 
 const emptyForm: BookingForm = {
   bookingId: "",
@@ -217,6 +235,24 @@ function formValue(value: unknown) {
   }
 
   return String(value);
+}
+
+function numberValue(value: unknown) {
+  const raw = formValue(value).replace(/,/g, "").trim();
+  if (!raw) return 0;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function courseDurationMinutes(item?: CourseRow | null) {
+  if (!item) return 0;
+  return numberValue(
+    item.durationMinutes ??
+      item.defaultMinutes ??
+      item.duration_minutes ??
+      item.default_minutes ??
+      0
+  );
 }
 
 function rentalPilotValue(item: Record<string, unknown>) {
@@ -370,13 +406,13 @@ function minutesToTime(totalMinutes: number) {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
-function snapToThirtyMinutes(hour: number, minute: number) {
+function snapToReservationSlotMinutes(hour: number, minute: number) {
   const total = hour * 60 + minute;
-  return Math.round(total / 30) * 30;
+  return Math.round(total / RESERVATION_SLOT_MINUTES) * RESERVATION_SLOT_MINUTES;
 }
 
 function normalizeTime(value: unknown) {
-  const valueText = sharedFormatBookingTime(value);
+  const valueText = sharedFormatBookingTime(value, RESERVATION_SLOT_MINUTES);
   return valueText === "-" ? "" : valueText;
 }
 
@@ -415,6 +451,7 @@ function toForm(row: BookingRow): BookingForm {
     startTime: normalizeTime(row.startTime),
     endTime: normalizeTime(row.endTime),
     bookingType: formValue(row.bookingType || emptyForm.bookingType),
+    courseId: formValue(row.courseId),
     courseName: formValue(row.courseName),
     userId: formValue(row.userId),
     userName: formValue(row.userName),
@@ -471,6 +508,26 @@ function aircraftStatusLabel(aircraft: AircraftRow) {
 
 function isRentalType(value: string) {
   return value.includes("렌탈");
+}
+
+function isRideAlongType(value: string) {
+  return value.includes("동승");
+}
+
+function courseTypeToBookingType(value: unknown, fallback: string) {
+  const raw = text(value, "").replace(/\s/g, "");
+  const fallbackType = text(fallback, "교육비행");
+
+  if (!raw || raw === "전체") return fallbackType;
+  if (raw.includes("체험")) return "체험비행";
+  if (raw.includes("교육")) return "교육비행";
+  if (raw.includes("렌탈")) return "렌탈비행";
+  if (raw.includes("동승")) return "동승비행";
+  if (raw.includes("자가")) return "자가비행";
+  if (raw.includes("정비") || raw.includes("점검")) return "정비";
+  if (raw.includes("기타")) return "기타";
+
+  return fallbackType;
 }
 
 function isCancelledStatus(value: unknown) {
@@ -632,7 +689,7 @@ function bookingResourceStartTime(item: BookingRow | BookingForm) {
 
   const bookingType = text(item.bookingType, "");
   if (bookingType.includes("교육") || bookingType.includes("렌탈")) {
-    return addMinutes(startTime, -30);
+    return addMinutes(startTime, -PFI_DURATION_MINUTES);
   }
 
   return startTime;
@@ -1161,7 +1218,6 @@ function statusActionButtons(status: string) {
 
   if (status === "확정" || status === "예정") {
     return [
-      { label: "완료", nextStatus: "완료", actionLabel: "비행 완료", tone: "primary" },
       { label: "기상", nextStatus: "기상취소", actionLabel: "기상취소", tone: "secondary" },
       { label: "노쇼", nextStatus: "노쇼", actionLabel: "노쇼 처리", tone: "danger" },
       { label: "취소", nextStatus: "취소", actionLabel: "관리자 취소", tone: "danger" },
@@ -1313,6 +1369,17 @@ export default function BookingsPage() {
     [getSettingValues]
   );
 
+  const bookingStatusOptionsForEdit = useMemo(() => {
+    const preferred = ["요청", "확정", "예정", "취소", "기상취소", "노쇼", "반려", "취소요청"];
+    const normalizedCurrent = normalizeBookingStatusForDisplay(form.status);
+    const currentOnly = normalizedCurrent === "완료" ? [normalizedCurrent] : [];
+
+    return uniqueValues([
+      ...preferred.filter((item) => bookingStatuses.includes(item)),
+      ...currentOnly,
+    ].filter(Boolean), preferred);
+  }, [bookingStatuses, form.status]);
+
   const bookingTypes = useMemo(
     () => getSettingValues("bookingType", defaultBookingTypes),
     [getSettingValues]
@@ -1336,10 +1403,11 @@ export default function BookingsPage() {
 
     return activeCourses.filter((item) => {
       const courseType = formValue(item.courseType);
+      const courseBookingType = courseTypeToBookingType(courseType, formType);
 
       if (!courseType || courseType === "전체") return true;
-      if (courseType === formType) return true;
-      if (formType.includes(courseType) || courseType.includes(formType)) return true;
+      if (courseBookingType === formType) return true;
+      if (formType.includes(courseBookingType) || courseBookingType.includes(formType)) return true;
 
       return false;
     });
@@ -1375,19 +1443,28 @@ export default function BookingsPage() {
   const isEducationForm = form.bookingType.includes("교육");
   const isRentalForm = isRentalType(form.bookingType);
   const isExperienceForm = form.bookingType.includes("체험");
+  const isRideAlongForm = isRideAlongType(form.bookingType);
 
   const durationOptions = useMemo(() => {
-    if (isExperienceForm) return [30];
-    if (isRentalForm) return [30, 60, 90, 120, 150, 180];
+    if (isExperienceForm) {
+      const courseDurations = filteredCoursesForForm
+        .map((item) => scheduleDurationMinutes(courseDurationMinutes(item), "체험비행"))
+        .filter((minutes) => minutes >= MIN_RESERVATION_DURATION_MINUTES);
+
+      return Array.from(new Set([MIN_RESERVATION_DURATION_MINUTES, durationMinutes, ...courseDurations, 45, 60, 75, 90, 105, 120]))
+        .filter((minutes) => Number.isFinite(minutes) && minutes >= MIN_RESERVATION_DURATION_MINUTES)
+        .sort((a, b) => a - b);
+    }
+
+    if (isRentalForm) return [30, 45, 60, 75, 90, 105, 120, 150, 180];
     return [60, 90, 120];
-  }, [isExperienceForm, isRentalForm]);
+  }, [durationMinutes, filteredCoursesForForm, isExperienceForm, isRentalForm]);
 
   const timeOptions = useMemo(() => {
     const options: string[] = [];
 
-    for (let hour = 7; hour <= 19; hour += 1) {
-      options.push(`${String(hour).padStart(2, "0")}:00`);
-      options.push(`${String(hour).padStart(2, "0")}:30`);
+    for (let minutes = CALENDAR_START_MINUTES; minutes < CALENDAR_END_MINUTES; minutes += RESERVATION_SLOT_MINUTES) {
+      options.push(minutesToTime(minutes));
     }
 
     return options;
@@ -1787,8 +1864,9 @@ export default function BookingsPage() {
 
   function bookingTypeGuideMessage() {
     if (isEducationForm) return "교육생 선택 후 배정된 항공기 중에서 예약하세요.";
-    if (isRentalForm) return "렌탈기장과 배정 항공기를 선택하세요.";
+    if (isRentalForm) return "렌탈기장과 배정 항공기를 선택하세요. 단독 렌탈은 교관 없이 예약할 수 있습니다.";
     if (isExperienceForm) return "고객 정보와 항공기, 교관을 선택하세요.";
+    if (isRideAlongForm) return "동승비행은 담당 교관을 선택하세요.";
     return "";
   }
 
@@ -1798,10 +1876,8 @@ export default function BookingsPage() {
   }
 
   function scheduleDurationMinutes(value = durationMinutes, bookingType = form.bookingType) {
-    if (bookingType.includes("체험")) return 30;
-
-    const normalized = Number(value) || 60;
-    return Math.max(30, Math.ceil(normalized / 30) * 30);
+    const normalized = Number(value) || (text(bookingType, "").includes("체험") ? MIN_RESERVATION_DURATION_MINUTES : 60);
+    return Math.max(MIN_RESERVATION_DURATION_MINUTES, Math.ceil(normalized / RESERVATION_SLOT_MINUTES) * RESERVATION_SLOT_MINUTES);
   }
 
   function autoFillEndTime(startTime: string, nextDuration = durationMinutes) {
@@ -1854,7 +1930,7 @@ export default function BookingsPage() {
         endTime: prev.startTime ? addMinutes(prev.startTime, nextDuration) : "",
       };
 
-      if (normalizedType.includes("교육") || normalizedType.includes("렌탈") || normalizedType.includes("체험")) {
+      if (normalizedType.includes("교육") || normalizedType.includes("렌탈") || normalizedType.includes("체험") || normalizedType.includes("동승")) {
         return {
           ...common,
           userId: "",
@@ -1977,11 +2053,11 @@ export default function BookingsPage() {
 
     function handleWindowMouseUp(event: MouseEvent) {
       event.preventDefault();
-      void finishActiveCalendarBlockDrag();
+      void finishActiveCalendarBlockDrag(event.clientX);
     }
 
-    function handleWindowPointerUp() {
-      void finishActiveCalendarBlockDrag();
+    function handleWindowPointerUp(event: PointerEvent) {
+      void finishActiveCalendarBlockDrag(event.clientX);
     }
 
     function handleWindowCancel() {
@@ -2161,10 +2237,8 @@ export default function BookingsPage() {
   const calendarTimeSlots = useMemo(() => {
     const slots: string[] = [];
 
-    for (let minutes = 7 * 60; minutes < 20 * 60; minutes += 30) {
-      const hour = Math.floor(minutes / 60);
-      const minute = minutes % 60;
-      slots.push(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
+    for (let minutes = CALENDAR_START_MINUTES; minutes < CALENDAR_END_MINUTES; minutes += RESERVATION_SLOT_MINUTES) {
+      slots.push(minutesToTime(minutes));
     }
 
     return slots;
@@ -2247,8 +2321,25 @@ export default function BookingsPage() {
     const endParts = nextForm.endTime.split(":");
     const startTotal = Number(startParts[0]) * 60 + Number(startParts[1]);
     const endTotal = Number(endParts[0]) * 60 + Number(endParts[1]);
-    setDurationMinutes(endTotal > startTotal ? endTotal - startTotal : 60);
-    setForm(nextForm);
+    const currentDuration = endTotal > startTotal ? endTotal - startTotal : 60;
+    const matchedCourse = `${text(row.bookingType, "")} ${text(row.courseName, "")}`.includes("체험")
+      ? activeCourses.find((item) => {
+          const rowCourseName = text(row.courseName, "");
+          const itemName = text(item.courseName, "");
+          const itemId = text(item.courseId || item.courseName, "");
+          return (!!rowCourseName && itemName === rowCourseName) || (!!nextForm.courseId && itemId === nextForm.courseId);
+        })
+      : null;
+    const matchedCourseRawDuration = courseDurationMinutes(matchedCourse);
+    const matchedCourseDuration = matchedCourseRawDuration > 0 ? scheduleDurationMinutes(matchedCourseRawDuration, "체험비행") : 0;
+    const nextDuration = matchedCourseDuration > 0 ? matchedCourseDuration : currentDuration;
+
+    setDurationMinutes(nextDuration);
+    setForm({
+      ...nextForm,
+      courseId: matchedCourse ? text(matchedCourse.courseId || matchedCourse.courseName, "") : nextForm.courseId,
+      endTime: nextForm.startTime && matchedCourseDuration > 0 ? addMinutes(nextForm.startTime, matchedCourseDuration) : nextForm.endTime,
+    });
     setEditing(true);
     setSelectedBooking(row);
     setRequestActionMemo("");
@@ -2393,16 +2484,16 @@ export default function BookingsPage() {
 
   function bookingStartForCalendar(booking: BookingRow) {
     return needsPfiBlock(booking) && calendarResourceMode === "aircraft"
-      ? addMinutes(normalizeTime(booking.startTime), -30)
+      ? addMinutes(normalizeTime(booking.startTime), -PFI_DURATION_MINUTES)
       : normalizeTime(booking.startTime);
   }
 
   function calendarBlockStyleByTime(startTime: string, endTime: string) {
     const start = timeToMinutes(startTime);
     const end = timeToMinutes(endTime);
-    const dayStart = 7 * 60;
-    const slotMinutes = 30;
-    const slotCount = 26;
+    const dayStart = CALENDAR_START_MINUTES;
+    const slotMinutes = RESERVATION_SLOT_MINUTES;
+    const slotCount = CALENDAR_SLOT_COUNT;
 
     const rawStartIndex = (start - dayStart) / slotMinutes;
     const rawEndIndex = (end - dayStart) / slotMinutes;
@@ -2562,7 +2653,7 @@ export default function BookingsPage() {
     }
 
     const startTime = calendarTimeSlots[from];
-    const selectedMinutes = scheduleDurationMinutes(Math.max(30, (to - from + 1) * 30));
+    const selectedMinutes = scheduleDurationMinutes(Math.max(MIN_RESERVATION_DURATION_MINUTES, (to - from + 1) * RESERVATION_SLOT_MINUTES));
 
     if (!startTime) {
       setCalendarDragSelection(null);
@@ -2590,7 +2681,7 @@ export default function BookingsPage() {
       resourceKey: calendarResourceKey(resource),
       date: dateText,
       startIndex: from,
-      endIndex: form.bookingType.includes("체험") ? from : to,
+      endIndex: to,
       invalid: false,
     });
   }
@@ -2618,8 +2709,8 @@ export default function BookingsPage() {
     }
 
     return {
-      startTime: addMinutes(calendarMoveDrag.originalStartTime, calendarMoveDrag.deltaSteps * 30),
-      endTime: addMinutes(calendarMoveDrag.originalEndTime, calendarMoveDrag.deltaSteps * 30),
+      startTime: addMinutes(calendarMoveDrag.originalStartTime, calendarMoveDrag.deltaSteps * RESERVATION_SLOT_MINUTES),
+      endTime: addMinutes(calendarMoveDrag.originalEndTime, calendarMoveDrag.deltaSteps * RESERVATION_SLOT_MINUTES),
     };
   }
 
@@ -2630,7 +2721,7 @@ export default function BookingsPage() {
       return calendarMovePreviewTimes(booking);
     }
 
-    const nextEnd = addMinutes(calendarResizeDrag.originalEndTime, calendarResizeDrag.deltaSteps * 30);
+    const nextEnd = addMinutes(calendarResizeDrag.originalEndTime, calendarResizeDrag.deltaSteps * RESERVATION_SLOT_MINUTES);
     const startMinutes = timeToMinutes(calendarResizeDrag.originalStartTime);
     const endMinutes = timeToMinutes(nextEnd);
 
@@ -2639,7 +2730,7 @@ export default function BookingsPage() {
       endTime:
         startMinutes >= 0 && endMinutes > startMinutes
           ? nextEnd
-          : addMinutes(calendarResizeDrag.originalStartTime, 30),
+          : addMinutes(calendarResizeDrag.originalStartTime, MIN_RESERVATION_DURATION_MINUTES),
     };
   }
 
@@ -2657,8 +2748,36 @@ export default function BookingsPage() {
     const width = timelineWidth || calendarTimelineRef.current?.getBoundingClientRect().width || 0;
     if (!width) return 0;
 
-    const slotWidth = width / 26;
+    const slotWidth = width / CALENDAR_SLOT_COUNT;
+    if (!slotWidth) return 0;
+
     return Math.round(deltaX / slotWidth);
+  }
+
+  function calendarStepFromClientX(drag: NonNullable<CalendarMoveDrag | CalendarResizeDrag>, clientX: number, anchorTime: string) {
+    const width = drag.timelineWidth || calendarTimelineRef.current?.getBoundingClientRect().width || 0;
+    if (!width) return 0;
+
+    const slotWidth = width / CALENDAR_SLOT_COUNT;
+    if (!slotWidth) return 0;
+
+    const anchorMinutes = timeToMinutes(anchorTime);
+    if (anchorMinutes < 0) return calendarStepFromDelta(clientX - drag.startX, width);
+
+    const rawTargetSlot = Math.round((clientX - drag.timelineLeft - drag.grabOffsetX) / slotWidth);
+    const originalSlot = Math.round((anchorMinutes - CALENDAR_START_MINUTES) / RESERVATION_SLOT_MINUTES);
+
+    return rawTargetSlot - originalSlot;
+  }
+
+  function calendarMoveStepsFromClientX(drag: NonNullable<CalendarMoveDrag>, clientX: number) {
+    const rawSteps = calendarStepFromClientX(drag, clientX, drag.originalStartTime);
+    return clampCalendarMoveSteps(drag.originalStartTime, drag.originalEndTime, rawSteps);
+  }
+
+  function calendarResizeStepsFromClientX(drag: NonNullable<CalendarResizeDrag>, clientX: number) {
+    const rawSteps = calendarStepFromClientX(drag, clientX, drag.originalEndTime);
+    return clampCalendarResizeSteps(drag.originalStartTime, drag.originalEndTime, rawSteps);
   }
 
   function clampCalendarMoveSteps(originalStartTime: string, originalEndTime: string, deltaSteps: number) {
@@ -2667,8 +2786,8 @@ export default function BookingsPage() {
 
     if (startMinutes < 0 || endMinutes < 0) return 0;
 
-    const minSteps = Math.ceil(((7 * 60) - startMinutes) / 30);
-    const maxSteps = Math.floor(((20 * 60) - endMinutes) / 30);
+    const minSteps = Math.ceil((CALENDAR_START_MINUTES - startMinutes) / RESERVATION_SLOT_MINUTES);
+    const maxSteps = Math.floor((CALENDAR_END_MINUTES - endMinutes) / RESERVATION_SLOT_MINUTES);
 
     return Math.max(minSteps, Math.min(maxSteps, deltaSteps));
   }
@@ -2679,16 +2798,38 @@ export default function BookingsPage() {
 
     if (startMinutes < 0 || endMinutes < 0) return 0;
 
-    const minSteps = Math.ceil((startMinutes + 30 - endMinutes) / 30);
-    const maxSteps = Math.floor(((20 * 60) - endMinutes) / 30);
+    const minSteps = Math.ceil((startMinutes + MIN_RESERVATION_DURATION_MINUTES - endMinutes) / RESERVATION_SLOT_MINUTES);
+    const maxSteps = Math.floor((CALENDAR_END_MINUTES - endMinutes) / RESERVATION_SLOT_MINUTES);
 
     return Math.max(minSteps, Math.min(maxSteps, deltaSteps));
   }
 
-  function calendarTimelineWidthFromEvent(event: React.MouseEvent) {
+  function calendarTimelineMetricsFromEvent(event: React.MouseEvent) {
     const target = event.currentTarget as HTMLElement;
     const timeline = target.closest("[data-calendar-timeline='true']") as HTMLElement | null;
-    return timeline?.getBoundingClientRect().width || calendarTimelineRef.current?.getBoundingClientRect().width || 0;
+    const rect = timeline?.getBoundingClientRect() || calendarTimelineRef.current?.getBoundingClientRect();
+
+    return {
+      left: rect?.left || 0,
+      width: rect?.width || 0,
+    };
+  }
+
+  function calendarTimelineWidthFromEvent(event: React.MouseEvent) {
+    return calendarTimelineMetricsFromEvent(event).width;
+  }
+
+  function calendarGrabOffsetX(event: React.MouseEvent, timelineLeft: number, timelineWidth: number, time: string) {
+    const minutes = timeToMinutes(time);
+
+    if (!timelineWidth || minutes < 0) {
+      return event.clientX - timelineLeft;
+    }
+
+    const totalMinutes = CALENDAR_END_MINUTES - CALENDAR_START_MINUTES;
+    const blockLeftX = ((minutes - CALENDAR_START_MINUTES) / totalMinutes) * timelineWidth;
+
+    return event.clientX - timelineLeft - blockLeftX;
   }
 
   function sameBookingPerson(a: BookingRow, b: BookingRow) {
@@ -2855,11 +2996,21 @@ export default function BookingsPage() {
   }
 
 
-  async function finishActiveCalendarBlockDrag() {
+  async function finishActiveCalendarBlockDrag(clientX?: number) {
     if (calendarBlockDragFinishingRef.current) return;
 
-    const resizeSnapshot = calendarResizeDrag;
-    const moveSnapshot = calendarMoveDrag;
+    const resizeSnapshot = calendarResizeDrag
+      ? {
+          ...calendarResizeDrag,
+          deltaSteps: typeof clientX === "number" ? calendarResizeStepsFromClientX(calendarResizeDrag, clientX) : calendarResizeDrag.deltaSteps,
+        }
+      : null;
+    const moveSnapshot = calendarMoveDrag
+      ? {
+          ...calendarMoveDrag,
+          deltaSteps: typeof clientX === "number" ? calendarMoveStepsFromClientX(calendarMoveDrag, clientX) : calendarMoveDrag.deltaSteps,
+        }
+      : null;
     const activeDrag = resizeSnapshot || moveSnapshot;
 
     if (!activeDrag) return;
@@ -2911,21 +3062,26 @@ export default function BookingsPage() {
 
     if (!bookingId) return;
 
+    const originalStartTime = normalizeTime(booking.startTime);
+    const originalEndTime = normalizeTime(booking.endTime);
+    const timelineMetrics = calendarTimelineMetricsFromEvent(event);
+
     setCalendarMoveDrag({
       bookingId,
       startX: event.clientX,
-      timelineWidth: calendarTimelineWidthFromEvent(event),
+      timelineLeft: timelineMetrics.left,
+      timelineWidth: timelineMetrics.width,
+      grabOffsetX: calendarGrabOffsetX(event, timelineMetrics.left, timelineMetrics.width, originalStartTime),
       deltaSteps: 0,
-      originalStartTime: normalizeTime(booking.startTime),
-      originalEndTime: normalizeTime(booking.endTime),
+      originalStartTime,
+      originalEndTime,
     });
   }
 
   function updateCalendarMoveDrag(event: React.MouseEvent | MouseEvent) {
     if (!calendarMoveDrag) return;
 
-    const rawDeltaSteps = calendarStepFromDelta(event.clientX - calendarMoveDrag.startX, calendarMoveDrag.timelineWidth);
-    const deltaSteps = clampCalendarMoveSteps(calendarMoveDrag.originalStartTime, calendarMoveDrag.originalEndTime, rawDeltaSteps);
+    const deltaSteps = calendarMoveStepsFromClientX(calendarMoveDrag, event.clientX);
 
     if (deltaSteps === calendarMoveDrag.deltaSteps) return;
 
@@ -2954,8 +3110,8 @@ export default function BookingsPage() {
     if (!deltaSteps) return;
 
     const bookingId = formValue(booking.bookingId);
-    const newStart = addMinutes(originalStartTime, deltaSteps * 30);
-    const newEnd = addMinutes(originalEndTime, deltaSteps * 30);
+    const newStart = addMinutes(originalStartTime, deltaSteps * RESERVATION_SLOT_MINUTES);
+    const newEnd = addMinutes(originalEndTime, deltaSteps * RESERVATION_SLOT_MINUTES);
 
     const ok = window.confirm(calendarChangeConfirmMessage("예약 시간 이동", booking, originalStartTime, originalEndTime, newStart, newEnd));
     if (!ok) return;
@@ -3040,21 +3196,26 @@ export default function BookingsPage() {
 
     if (!bookingId) return;
 
+    const originalStartTime = normalizeTime(booking.startTime);
+    const originalEndTime = normalizeTime(booking.endTime);
+    const timelineMetrics = calendarTimelineMetricsFromEvent(event);
+
     setCalendarResizeDrag({
       bookingId,
       startX: event.clientX,
-      timelineWidth: calendarTimelineWidthFromEvent(event),
+      timelineLeft: timelineMetrics.left,
+      timelineWidth: timelineMetrics.width,
+      grabOffsetX: calendarGrabOffsetX(event, timelineMetrics.left, timelineMetrics.width, originalEndTime),
       deltaSteps: 0,
-      originalStartTime: normalizeTime(booking.startTime),
-      originalEndTime: normalizeTime(booking.endTime),
+      originalStartTime,
+      originalEndTime,
     });
   }
 
   function updateCalendarResizeDrag(event: React.MouseEvent | MouseEvent) {
     if (!calendarResizeDrag) return;
 
-    const rawDeltaSteps = calendarStepFromDelta(event.clientX - calendarResizeDrag.startX, calendarResizeDrag.timelineWidth);
-    const deltaSteps = clampCalendarResizeSteps(calendarResizeDrag.originalStartTime, calendarResizeDrag.originalEndTime, rawDeltaSteps);
+    const deltaSteps = calendarResizeStepsFromClientX(calendarResizeDrag, event.clientX);
 
     if (deltaSteps === calendarResizeDrag.deltaSteps) return;
 
@@ -3081,10 +3242,10 @@ export default function BookingsPage() {
     if (!deltaSteps) return;
 
     const bookingId = formValue(booking.bookingId);
-    const newEndCandidate = addMinutes(originalEndTime, deltaSteps * 30);
+    const newEndCandidate = addMinutes(originalEndTime, deltaSteps * RESERVATION_SLOT_MINUTES);
     const startMinutes = timeToMinutes(originalStartTime);
     const endMinutes = timeToMinutes(newEndCandidate);
-    const newEnd = startMinutes >= 0 && endMinutes > startMinutes ? newEndCandidate : addMinutes(originalStartTime, 30);
+    const newEnd = startMinutes >= 0 && endMinutes > startMinutes ? newEndCandidate : addMinutes(originalStartTime, MIN_RESERVATION_DURATION_MINUTES);
 
     const ok = window.confirm(calendarChangeConfirmMessage("예약 종료시간 조절", booking, originalStartTime, originalEndTime, originalStartTime, newEnd));
     if (!ok) return;
@@ -3167,8 +3328,8 @@ export default function BookingsPage() {
 
       const oldStart = normalizeTime(booking.startTime);
       const oldEnd = normalizeTime(booking.endTime);
-      const newStart = addMinutes(oldStart, direction * 30);
-      const newEnd = addMinutes(oldEnd, direction * 30);
+      const newStart = addMinutes(oldStart, direction * RESERVATION_SLOT_MINUTES);
+      const newEnd = addMinutes(oldEnd, direction * RESERVATION_SLOT_MINUTES);
 
       setBookings((prev) =>
         prev.map((item) =>
@@ -3244,8 +3405,8 @@ export default function BookingsPage() {
 
     if (!selected) return;
 
-    const rawDuration = Number(selected.durationMinutes || 0);
-    const nextBookingType = text(selected.courseType || form.bookingType, form.bookingType);
+    const rawDuration = courseDurationMinutes(selected);
+    const nextBookingType = courseTypeToBookingType(selected.courseType, form.bookingType);
     const duration = rawDuration > 0 ? scheduleDurationMinutes(rawDuration, nextBookingType) : 0;
 
     if (duration > 0) {
@@ -3254,10 +3415,24 @@ export default function BookingsPage() {
 
     setForm((prev) => ({
       ...prev,
+      courseId: text(selected.courseId || selected.courseName, ""),
       courseName: text(selected.courseName, ""),
-      bookingType: text(selected.courseType || prev.bookingType, prev.bookingType),
+      bookingType: courseTypeToBookingType(selected.courseType, prev.bookingType),
       endTime: prev.startTime && duration > 0 ? addMinutes(prev.startTime, duration) : prev.endTime,
     }));
+  }
+
+  function selectedCourseOptionValue() {
+    const currentCourseId = text(form.courseId, "");
+    const currentCourseName = text(form.courseName, "");
+
+    const matched = activeCourses.find((item) => {
+      const itemId = text(item.courseId || item.courseName, "");
+      const itemName = text(item.courseName, "");
+      return itemId === currentCourseId || itemId === currentCourseName || itemName === currentCourseName;
+    });
+
+    return matched ? text(matched.courseId || matched.courseName, "") : "";
   }
 
   async function saveBooking() {
@@ -3358,7 +3533,8 @@ export default function BookingsPage() {
         ...aircraftPayload,
         bookingDate: normalizeDate(form.bookingDate),
         startTime: normalizedStartTime,
-        endTime: isExperienceForm ? addMinutes(normalizedStartTime, 30) : normalizeTime(form.endTime),
+        endTime: normalizeTime(form.endTime) || addMinutes(normalizedStartTime, scheduleDurationMinutes(durationMinutes, normalizedBookingType)),
+        durationMinutes: scheduleDurationMinutes(durationMinutes, normalizedBookingType),
         bookingType: normalizedBookingType,
         status: editing ? normalizeBookingStatusForDisplay(form.status) : "확정",
         paymentStatus: normalizePaymentStatusForSave(form.paymentStatus, normalizedBookingType),
@@ -3399,7 +3575,7 @@ export default function BookingsPage() {
       setLastSavedConflictKey(bookingConflictIdentityKey(payload));
       await loadData(true, true);
       setDateFilter(savedDate);
-      setDurationMinutes(savedType.includes("체험") ? 30 : savedType.includes("렌탈") ? durationMinutes : 60);
+      setDurationMinutes(savedType.includes("렌탈") || savedType.includes("체험") ? durationMinutes : 60);
       setForm({
         ...emptyForm,
         bookingDate: savedDate,
@@ -3428,12 +3604,10 @@ export default function BookingsPage() {
       return;
     }
 
-    if (["완료", "취소", "기상취소", "노쇼", "반려"].includes(nextStatus)) {
-      const caution = nextStatus === "완료"
-        ? "\n완료 처리 후 교육시간/잔여시간에 반영될 수 있습니다."
-        : nextStatus === "노쇼"
-          ? "\n노쇼 처리는 운영 기록에 남습니다."
-          : "\n처리 후 기본 목록과 캘린더에서 숨김 처리될 수 있습니다.";
+    if (["취소", "기상취소", "노쇼", "반려"].includes(nextStatus)) {
+      const caution = nextStatus === "노쇼"
+        ? "\n노쇼 처리는 운영 기록에 남습니다. 교육생 노쇼 차감은 비행기록에서 차감 기록으로 저장하세요."
+        : "\n처리 후 기본 목록과 캘린더에서 숨김 처리될 수 있습니다.";
 
       const ok = window.confirm(`${text(booking.userName, "예약자")} / ${bookingDisplayTitle(booking)}\n${nextStatus} 처리할까요?${caution}`);
       if (!ok) return;
@@ -3459,8 +3633,8 @@ export default function BookingsPage() {
               actionLabel,
               [
                 note,
-                nextStatus === "완료" && text(booking.bookingType, "").includes("교육")
-                  ? "교육비행 완료: 교육시간 차감/잔여시간 반영 필요"
+                nextStatus === "노쇼" && text(booking.bookingType, "").includes("교육")
+                  ? "교육생 노쇼: 비행기록에서 차감 여부 확인 필요"
                   : "",
               ].filter(Boolean).join(" / ")
             ),
@@ -3630,7 +3804,7 @@ export default function BookingsPage() {
                 <h2 className="shrink-0 text-[15px] font-semibold tracking-[-0.02em] text-[#10213f]">예약 캘린더</h2>
 </div>
               <p className="mt-0.5 text-[13px] font-normal text-[#6d7f96]">
-                대시보드와 같은 형태로 PFI와 예약을 함께 보면서 30분 단위로 예약을 지정합니다.
+                대시보드와 같은 형태로 PFI와 예약을 함께 보면서 15분 단위로 예약을 지정합니다.
               </p>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-[13px] font-medium text-blue-700">
@@ -3643,12 +3817,12 @@ export default function BookingsPage() {
                 ) : null}
                 {calendarMoveDrag ? (
                   <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-[13px] font-medium text-amber-700 ring-1 ring-amber-100">
-                    이동 중: {calendarMoveDrag.deltaSteps > 0 ? "+" : ""}{calendarMoveDrag.deltaSteps * 30}분
+                    이동 중: {calendarMoveDrag.deltaSteps > 0 ? "+" : ""}{calendarMoveDrag.deltaSteps * RESERVATION_SLOT_MINUTES}분
                   </span>
                 ) : null}
                 {calendarResizeDrag ? (
                   <span className="inline-flex rounded-full bg-violet-50 px-2.5 py-0.5 text-[13px] font-medium text-violet-700 ring-1 ring-violet-100">
-                    종료 조절: {calendarResizeDrag.deltaSteps > 0 ? "+" : ""}{calendarResizeDrag.deltaSteps * 30}분
+                    종료 조절: {calendarResizeDrag.deltaSteps > 0 ? "+" : ""}{calendarResizeDrag.deltaSteps * RESERVATION_SLOT_MINUTES}분
                   </span>
                 ) : null}
               </div>
@@ -3790,7 +3964,7 @@ export default function BookingsPage() {
                             cancelCalendarDrag();
                           }}
                         >
-                          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: "repeat(26, minmax(0, 1fr))" }}>
+                          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${CALENDAR_SLOT_COUNT}, minmax(0, 1fr))` }}>
                             {calendarTimeSlots.map((slotStart, slotIndex) => {
                               const aircraftUnavailable = calendarResourceMode === "aircraft" && !isAircraftOperational(resource as AircraftRow);
                               const disabled =
@@ -3840,7 +4014,7 @@ export default function BookingsPage() {
                                           : "cursor-pointer bg-blue-200/90 shadow-inner"
                                         : "cursor-pointer bg-white hover:bg-blue-50/80"
                                   }`}
-                                  title={disabled ? `${slotStart} 예약불가` : `${slotStart}부터 30분 선택`}
+                                  title={disabled ? `${slotStart} 예약불가` : `${slotStart}부터 15분 선택`}
                                 />
                               );
                             })}
@@ -3849,7 +4023,7 @@ export default function BookingsPage() {
                           {rowBookings.map((booking, index) => {
                             const bookingId = text(booking.bookingId, "booking");
                             const previewTimes = calendarPreviewTimes(booking);
-                            const pfiStart = addMinutes(previewTimes.startTime, -30);
+                            const pfiStart = addMinutes(previewTimes.startTime, -PFI_DURATION_MINUTES);
                             const pfiEnd = previewTimes.startTime;
                             const showPfi = needsPfiBlock(booking) && calendarResourceMode === "aircraft";
 
@@ -3922,7 +4096,7 @@ export default function BookingsPage() {
                                       event.stopPropagation();
                                     }}
                                     className="absolute right-0 bottom-1 top-1 hidden w-3 cursor-ew-resize rounded-full bg-white/85 shadow-sm ring-1 ring-[#9fb4cf] transition hover:bg-[#eaf3ff] group-hover:block"
-                                    title="종료시간 30분 단위 조절"
+                                    title="종료시간 15분 단위 조절"
                                   />
 
                                 </div>
@@ -4215,7 +4389,7 @@ export default function BookingsPage() {
                   {editing ? "수정 모드" : "신규 등록"}
                 </span>
               </div>
-              <p className="mt-0.5 text-[13px] font-normal text-[#61758f]">필수 항목을 선택하면 대상자 정보와 점유 시간이 자동으로 정리됩니다.</p>
+              <p className="mt-0.5 text-[13px] font-normal text-[#61758f]">필수 항목을 선택하면 대상자 정보와 코스 기준 점유 시간이 자동으로 정리됩니다.</p>
               <div className="mt-1.5 rounded-xl border border-[#e1eaf6] bg-[#f8fbff] px-3 py-1.5 text-[13px] font-medium text-[#536b87]">
                 입력 요약: {compactFormSummary(form)}
               </div>
@@ -4280,15 +4454,16 @@ export default function BookingsPage() {
 
               {isExperienceForm ? (
                 <Field label="코스/대상자">
-                  <select value="" onChange={(event) => selectCourse(event.target.value)} className="input-base compact-input">
+                  <select value={selectedCourseOptionValue()} onChange={(event) => selectCourse(event.target.value)} className="input-base compact-input">
                     <option value="">코스 선택</option>
                     {filteredCoursesForForm.map((item, index) => {
                       const courseId = text(item.courseId || item.courseName, "");
-                      const rawDuration = Number(item.durationMinutes || 0);
+                      const rawDuration = courseDurationMinutes(item);
+                      const scheduledDuration = rawDuration > 0 ? scheduleDurationMinutes(rawDuration, "체험비행") : 0;
                       const displayDuration = rawDuration > 0
-                        ? rawDuration < 30
-                          ? `${rawDuration}분 코스 · 예약 30분`
-                          : `${scheduleDurationMinutes(rawDuration)}분`
+                        ? scheduledDuration > rawDuration
+                          ? `${rawDuration}분 코스 · 예약점유 ${scheduledDuration}분`
+                          : `${rawDuration}분 코스`
                         : "";
                       const label = [item.courseName, displayDuration]
                         .map((value) => text(value, ""))
@@ -4301,7 +4476,7 @@ export default function BookingsPage() {
               ) : null}
 
               {!isRentalForm ? (
-                <Field label="담당 교관" required={isExperienceForm} auto={isEducationForm && !!form.instructorId}>
+                <Field label="담당 교관" required={isExperienceForm || isRideAlongForm} auto={isEducationForm && !!form.instructorId}>
                   <select value={form.instructorId} onChange={(event) => selectInstructor(event.target.value)} className="input-base compact-input" disabled={isEducationForm && !!form.instructorId}>
                     <option value="">{isEducationForm ? "자동 배정" : "교관 선택"}</option>
                     {instructors.filter((item) => isActiveValue(item.active)).map((item, index) => {
@@ -4428,7 +4603,7 @@ export default function BookingsPage() {
                   <p className="text-[13px] font-semibold text-[#8292a8]">예약 상태</p>
                   {editing ? (
                     <select value={form.status} onChange={(event) => updateForm("status", event.target.value)} className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]">
-                      {bookingStatuses.map((item) => <option key={item} value={item}>{item}</option>)}
+                      {bookingStatusOptionsForEdit.map((item) => <option key={item} value={item}>{item}</option>)}
                     </select>
                   ) : (
                     <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">확정</p>
@@ -4487,7 +4662,7 @@ export default function BookingsPage() {
             <div>
               <h2 className="text-[14px] font-semibold text-[#10213f]">예약 목록 필터</h2>
               <p className="hidden text-[#61758f]">
-                유형, 상태, 날짜, 검색어를 조합해 예약 목록을 빠르게 좁힙니다. 완료·취소·노쇼는 목록/캘린더에서 기본 숨김입니다. 미래 날짜의 완료 상태는 경고로 표시됩니다.
+                유형, 상태, 날짜, 검색어를 조합해 예약 목록을 빠르게 좁힙니다. 취소·기상취소·노쇼·반려는 목록/캘린더에서 기본 숨김입니다. 실제 완료는 비행기록 저장 기준으로 관리합니다.
               </p>
             </div>
             <button

@@ -17,6 +17,11 @@ function normalize(input: JsonRecord, isCreate = false) {
   const id = text(input.courseId || input.course_id) || buildId(PREFIX);
   const row: JsonRecord = { [ID_COLUMN]: id };
 
+  const durationMinutes = input.durationMinutes ?? input.duration_minutes ?? input.defaultMinutes ?? input.default_minutes;
+  const price = input.price ?? input.defaultAmount ?? input.default_amount;
+  if (durationMinutes !== undefined) row.default_minutes = durationMinutes;
+  if (price !== undefined) row.default_amount = price;
+
   ALLOWED_COLUMNS.forEach((column) => {
     const camel = column.replace(/_([a-z0-9])/g, (_: string, char: string) => char.toUpperCase());
     const value = input[camel] ?? input[column];

@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import ContentCard from "@/components/ContentCard";
 import PageContainer from "@/components/PageContainer";
 
-type CourseRow = { courseId?: string; courseType?: string; courseName?: string; durationMinutes?: string | number; price?: string | number; active?: string; memo?: string; createdAt?: string; updatedAt?: string; sortOrder?: string | number };
+type CourseRow = { courseId?: string; courseType?: string; courseName?: string; durationMinutes?: string | number; defaultMinutes?: string | number; price?: string | number; defaultAmount?: string | number; active?: string; memo?: string; createdAt?: string; updatedAt?: string; sortOrder?: string | number };
 type SettingRow = { key?: string; value?: string; memo?: string };
 type ApiResponse = { ok: boolean; message?: string; courseCatalog?: CourseRow[]; settings?: SettingRow[] };
 
@@ -17,7 +17,7 @@ function formatCurrency(value: unknown) { const n = Number(numberText(value)); r
 function formatMinutes(value: unknown) { const m = Number(numberText(value)); if (!m) return "-"; if (m % 60 === 0) return `${m / 60}시간`; if (m > 60) return `${Math.floor(m / 60)}시간 ${m % 60}분`; return `${m}분`; }
 function uniqueValues(values: string[]) { return Array.from(new Set(values.map((v) => v.trim()).filter(Boolean))); }
 function settingValues(settings: SettingRow[], key: string, fallback: string[]) { return uniqueValues([...settings.filter((s) => valueText(s.key) === key).map((s) => valueText(s.value)), ...fallback]); }
-function normalizeCourse(row: CourseRow): CourseRow { return { ...row, courseId: valueText(row.courseId), courseType: valueText(row.courseType), courseName: valueText(row.courseName), durationMinutes: numberText(row.durationMinutes), price: numberText(row.price), active: valueText(row.active) || "Y", memo: valueText(row.memo) }; }
+function normalizeCourse(row: CourseRow): CourseRow { return { ...row, courseId: valueText(row.courseId), courseType: valueText(row.courseType), courseName: valueText(row.courseName), durationMinutes: numberText(row.durationMinutes || row.defaultMinutes), defaultMinutes: numberText(row.durationMinutes || row.defaultMinutes), price: numberText(row.price || row.defaultAmount), defaultAmount: numberText(row.price || row.defaultAmount), active: valueText(row.active) || "Y", memo: valueText(row.memo) }; }
 function badgeClass(active: unknown) { const v = valueText(active); if (v === "N" || v === "비활성") return "bg-rose-50 text-rose-700 border-rose-200"; return "bg-emerald-50 text-emerald-700 border-emerald-200"; }
 function SummaryCard({ title, value, tone }: { title: string; value: string | number; tone: string }) { return <ContentCard className="p-5"><div className="flex items-center gap-4"><div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tone}`}><svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></div><div><div className="text-sm font-black text-[#36506d]">{title}</div><div className="mt-1 text-[28px] font-black leading-none text-[#10213f]">{value}</div></div></div></ContentCard>; }
 

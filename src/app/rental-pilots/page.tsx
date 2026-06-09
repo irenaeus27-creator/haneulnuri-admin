@@ -132,12 +132,12 @@ function toForm(row: Row): PilotForm {
 }
 
 function isRentalRecord(row: Row) {
-  const type = text(row.flightType || row.flight_type || row.bookingType || row.booking_type);
+  const type = text(row.flightType || row.flight_type || row.trainingType || row.training_type || row.bookingType || row.booking_type);
   return type.includes("렌탈") || type.includes("동승");
 }
 
 function isSoloRentalRecord(row: Row) {
-  const type = text(row.flightType || row.flight_type || row.bookingType || row.booking_type);
+  const type = text(row.flightType || row.flight_type || row.trainingType || row.training_type || row.bookingType || row.booking_type);
   return type.includes("렌탈") && !type.includes("동승");
 }
 
@@ -145,18 +145,27 @@ function recordMinutes(row: Row) {
   return (
     numberValue(row.actualFlightMinutes || row.actual_flight_minutes, 0) ||
     numberValue(row.settlementMinutes || row.settlement_minutes, 0) ||
+    numberValue(row.deductedMinutes || row.deducted_minutes, 0) ||
     numberValue(row.durationMinutes || row.duration_minutes, 0)
   );
 }
 
 function recordDate(row: Row) {
-  return normalizeDate(row.flightDate || row.flight_date || row.bookingDate || row.booking_date);
+  return normalizeDate(row.flightDate || row.flight_date || row.trainingDate || row.training_date || row.bookingDate || row.booking_date);
 }
 
 function recordMatchesPilot(record: Row, pilot: Row) {
-  const customer = compact(record.customerName || record.customer_name || record.userName || record.user_name || record.name);
+  const customer = compact(
+    record.customerName ||
+      record.customer_name ||
+      record.studentName ||
+      record.student_name ||
+      record.userName ||
+      record.user_name ||
+      record.name,
+  );
   if (!customer) return false;
-  return [pilot.name, pilot.phone, pilot.email, pilot.pilotId, pilot.pilot_id, pilot.userId, pilot.user_id]
+  return [pilot.name, pilot.phone, pilot.email, pilot.pilotId, pilot.pilot_id, pilot.userId, pilot.user_id, pilot.rentalPilotId, pilot.rental_pilot_id]
     .map(compact)
     .filter(Boolean)
     .some((value) => customer === value || customer.includes(value) || value.includes(customer));
