@@ -84,8 +84,6 @@ const keyLabels: Record<string, string> = {
   documentTargetType: "문서 적용 대상",
   documentStatus: "문서 상태",
   instructorScheduleStatus: "교관 스케줄 상태",
-  managedFileType: "파일/사진 종류",
-  managedFileStatus: "파일/사진 상태",
 };
 
 const integrationGroups = [
@@ -118,11 +116,9 @@ const integrationGroups = [
   },
   {
     title: "운영 확장 연동",
-    description: "교관 스케줄, 파일 URL, 쿠폰/할인 관리에서 사용됩니다.",
+    description: "교관 스케줄과 쿠폰/할인 관리에서 사용됩니다.",
     keys: [
       "instructorScheduleStatus",
-      "managedFileType",
-      "managedFileStatus",
       "discountType",
       "couponTargetType",
       "couponStatus",

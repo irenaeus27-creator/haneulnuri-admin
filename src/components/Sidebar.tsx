@@ -47,10 +47,17 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
-    title: "교육 운영",
+    title: "교육 관리",
     items: [
       { label: "교육생관리", href: "/students", icon: "students" },
       { label: "비행기록", href: "/training-logs", icon: "document" },
+    ],
+  },
+  {
+    title: "체험 관리",
+    items: [
+      { label: "코스관리", href: "/course-catalog", icon: "course" },
+      { label: "문서/서약서관리", href: "/document-agreements", icon: "document" },
     ],
   },
   {
@@ -63,20 +70,12 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
-    title: "기준 정보",
-    items: [
-      { label: "코스관리", href: "/course-catalog", icon: "course" },
-      { label: "문서/서약서관리", href: "/document-agreements", icon: "document" },
-      { label: "파일/사진 URL", href: "/file-assets", icon: "image" },
-  { label: "시스템 점검", href: "/system-health", icon: "settings" },
-      { label: "설정관리", href: "/settings", icon: "settings" },
-    ],
-  },
-  {
     title: "시스템",
     items: [
       { label: "회원관리", href: "/users", icon: "users" },
       { label: "로그관리", href: "/logs", icon: "logs" },
+      { label: "시스템 점검", href: "/system-health", icon: "settings" },
+      { label: "설정관리", href: "/settings", icon: "settings" },
     ],
   },
 ];
@@ -88,7 +87,7 @@ function isActivePath(pathname: string, href: string) {
 
 function SidebarIcon({ name, active = false }: { name: IconName; active?: boolean }) {
   const common = {
-    className: `h-[20px] w-[20px] ${active ? "text-blue-700" : "text-[#7086a7]"}`,
+    className: `h-[21px] w-[21px] ${active ? "text-blue-700" : "text-[#7086a7]"}`,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
@@ -340,8 +339,8 @@ export default function Sidebar() {
           </div>
           <div>
             <p className="text-[12px] font-bold tracking-[0.28em] text-blue-400">SKYNURI</p>
-            <h1 className="mt-0.5 whitespace-nowrap text-[19px] font-bold tracking-[-0.04em] text-slate-950">하늘누리 비행교육원</h1>
-            <p className="mt-0.5 text-[12px] font-medium text-slate-400">운영 관리 시스템</p>
+            <h1 className="mt-0.5 whitespace-nowrap text-[20px] font-semibold tracking-[-0.03em] text-slate-950">하늘누리 비행교육원</h1>
+            <p className="mt-0.5 text-[12px] font-normal text-slate-500">운영 관리 시스템</p>
           </div>
         </div>
       </div>
@@ -349,7 +348,7 @@ export default function Sidebar() {
       <nav className="flex flex-1 flex-col gap-3 overflow-y-auto px-3 py-2">
         {menuGroups.map((group) => (
           <div key={group.title} className="border-t border-blue-100/80 pt-3 first:border-t-0 first:pt-0">
-            <p className="mb-1.5 px-3 text-[13px] font-black tracking-[0.12em] text-blue-300">
+            <p className="mb-2 px-3 text-[13px] font-semibold tracking-[0.04em] text-blue-400">
               {group.title}
             </p>
 
@@ -363,19 +362,19 @@ export default function Sidebar() {
                     key={item.href}
                     href={item.href}
                     prefetch={false}
-                    className={`group flex items-center justify-between rounded-2xl px-3 py-1.5 text-[14px] font-semibold transition ${
+                    className={`group flex items-center justify-between rounded-2xl px-3.5 py-2 text-[15px] font-medium transition ${
                       active
                         ? "bg-[linear-gradient(135deg,#eaf3ff_0%,#dbeafe_100%)] text-blue-700 shadow-[0_12px_28px_rgba(37,99,235,0.12)] ring-1 ring-blue-100"
                         : "text-slate-800 hover:bg-blue-50/80 hover:text-blue-700"
                     }`}
                   >
                     <span className="flex min-w-0 items-center gap-2.5">
-                      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl transition ${
+                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition ${
                         active ? "bg-white/70 text-blue-700" : "bg-transparent text-[#7086a7] group-hover:bg-white group-hover:text-blue-600"
                       }`}>
                         <SidebarIcon name={item.icon} active={active} />
                       </span>
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate leading-6">{item.label}</span>
                     </span>
 
                     <span className="ml-2 flex shrink-0 items-center gap-1.5">
@@ -415,10 +414,10 @@ export default function Sidebar() {
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-[14px] font-extrabold text-slate-800">
+              <p className="text-[14px] font-semibold text-slate-800">
                 DB 연결 <span className={systemNormal ? "text-emerald-600" : "text-rose-600"}>{systemNormal ? "정상" : "확인 필요"}</span>
               </p>
-              <p className="mt-0.5 text-[13px] font-semibold text-slate-400">
+              <p className="mt-0.5 text-[13px] font-normal text-slate-500">
                 API 연결 {systemNormal ? "정상" : "확인 필요"}
               </p>
             </div>
