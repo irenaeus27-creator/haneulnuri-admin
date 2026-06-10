@@ -4,13 +4,14 @@ import { JsonRecord, buildId, insertRow, nowIso, pickAllowed, selectRows, text, 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const USER_COLUMNS = ["user_id", "name", "phone", "email", "role", "status", "member_type", "created_at", "requested_at", "approved_at", "rejected_at", "updated_at", "memo"];
+const USER_COLUMNS = ["user_id", "auth_user_id", "name", "phone", "email", "role", "status", "member_type", "created_at", "requested_at", "approved_at", "rejected_at", "updated_at", "memo"];
 
 function normalizeUser(input: JsonRecord, isCreate = false) {
   const now = nowIso();
   const userId = text(input.userId || input.user_id) || buildId("U");
   return pickAllowed({
     user_id: userId,
+    auth_user_id: text(input.authUserId || input.auth_user_id),
     name: text(input.name || input.userName || input.user_name),
     phone: text(input.phone),
     email: text(input.email),

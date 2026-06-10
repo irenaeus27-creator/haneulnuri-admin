@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePendingApprovals } from "@/components/TopAlertBell";
 import { useCurrentAuth } from "@/components/AuthContext";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type MenuItem = {
   label: string;
@@ -243,6 +244,25 @@ function text(value: unknown, fallback = "") {
   return raw || fallback;
 }
 
+function normalizeRole(value: unknown) {
+  const raw = text(value).toLowerCase();
+  if (raw === "관리자" || raw === "admin" || raw === "administrator" || raw === "master") return "admin";
+  if (raw === "교관" || raw === "instructor") return "instructor";
+  return raw;
+}
+
+function visibleMenuGroupsByRole(groups: MenuGroup[], role: string) {
+  if (role !== "instructor") return groups;
+
+  const hiddenLabels = new Set(["교관관리", "로그관리"]);
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !hiddenLabels.has(item.label)),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
 function todayText() {
   const now = new Date();
   const year = now.getFullYear();
@@ -297,6 +317,8 @@ function isSystemNormal() {
 export default function Sidebar() {
   const pathname = usePathname();
   const { profile, signOut } = useCurrentAuth();
+  const role = normalizeRole(profile?.role);
+  const visibleMenuGroups = visibleMenuGroupsByRole(menuGroups, role);
 
   if (pathname.startsWith("/experience-consent")) {
     return null;
@@ -304,6 +326,12 @@ export default function Sidebar() {
   const { pendingBookingCount, pendingUserCount } = usePendingApprovals();
   const systemNormal = isSystemNormal();
   const [aircraftWarning, setAircraftWarning] = useState<AircraftWarningLevel>("none");
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState("");
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [passwordChanging, setPasswordChanging] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -323,13 +351,116 @@ export default function Sidebar() {
     };
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    async function loadProfilePhoto() {
+      const email = text(profile?.email).toLowerCase();
+      if (!email || role !== "instructor") {
+        if (alive) setProfilePhotoUrl("");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/instructors", { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        const rows = Array.isArray(data.instructors)
+          ? data.instructors
+          : Array.isArray(data?.data?.instructors)
+            ? data.data.instructors
+            : [];
+        const matched = rows.find((row: Record<string, unknown>) => text(row.email).toLowerCase() === email);
+        const photoUrl = text(matched?.photoUrl || matched?.photo_url);
+        if (alive) setProfilePhotoUrl(photoUrl);
+      } catch {
+        if (alive) setProfilePhotoUrl("");
+      }
+    }
+
+    void loadProfilePhoto();
+    return () => {
+      alive = false;
+    };
+  }, [profile?.email, role]);
+
   function itemBadge(href: string) {
     if (href === "/bookings" && pendingBookingCount > 0) return pendingBookingCount;
     if (href === "/users" && pendingUserCount > 0) return pendingUserCount;
     return 0;
   }
 
+  function closePasswordModal() {
+    if (passwordChanging) return;
+    setPasswordModalOpen(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setNewPasswordConfirm("");
+  }
+
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const email = text(profile?.email);
+    if (!email) {
+      alert("로그인 이메일을 확인하지 못했습니다. 다시 로그인한 뒤 시도하세요.");
+      return;
+    }
+
+    if (profile?.isDevBypass) {
+      alert("개발 우회 로그인 상태에서는 비밀번호를 변경할 수 없습니다. 실제 계정으로 로그인해 주세요.");
+      return;
+    }
+
+    if (!currentPassword.trim()) {
+      alert("현재 비밀번호를 입력하세요.");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      alert("새 비밀번호는 8자 이상으로 입력하세요.");
+      return;
+    }
+
+    if (newPassword !== newPasswordConfirm) {
+      alert("새 비밀번호와 확인값이 일치하지 않습니다.");
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      alert("새 비밀번호는 현재 비밀번호와 다르게 입력하세요.");
+      return;
+    }
+
+    setPasswordChanging(true);
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+
+      if (verifyError) {
+        throw new Error("현재 비밀번호가 일치하지 않습니다.");
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        throw new Error(updateError.message || "비밀번호 변경에 실패했습니다.");
+      }
+
+      alert("비밀번호가 변경되었습니다. 다시 로그인해 주세요.");
+      await signOut();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "비밀번호 변경에 실패했습니다.");
+    } finally {
+      setPasswordChanging(false);
+    }
+  }
+
   return (
+    <>
     <aside className="flex min-h-screen w-[270px] shrink-0 flex-col border-r border-blue-100/80 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_45%,#ffffff_100%)] shadow-[8px_0_30px_rgba(15,23,42,0.04)]">
       <div className="px-4 pb-3 pt-4">
         <div className="flex items-center gap-2.5">
@@ -348,7 +479,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-3 overflow-y-auto px-3 py-2">
-        {menuGroups.map((group) => (
+        {visibleMenuGroups.map((group) => (
           <div key={group.title} className="border-t border-blue-100/80 pt-3 first:border-t-0 first:pt-0">
             <p className="mb-2 px-3 text-[13px] font-semibold tracking-[0.04em] text-blue-400">
               {group.title}
@@ -436,11 +567,19 @@ export default function Sidebar() {
 
         <div className="rounded-3xl border border-slate-200 bg-white/90 p-3 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M20 21a8 8 0 0 0-16 0" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100 text-slate-600 ring-1 ring-slate-200">
+              {profilePhotoUrl ? (
+                <img
+                  src={profilePhotoUrl}
+                  alt={`${profile?.name || "사용자"} 사진`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M20 21a8 8 0 0 0-16 0" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px] font-semibold text-slate-800">{profile?.name || "관리자"}</p>
@@ -448,15 +587,101 @@ export default function Sidebar() {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            className="mt-2.5 flex h-9 w-full items-center justify-center rounded-2xl border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
-          >
-            로그아웃
-          </button>
+          <div className="mt-2.5 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setPasswordModalOpen(true)}
+              className="flex h-9 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-[13px] font-semibold text-blue-700 transition hover:bg-blue-100"
+            >
+              비밀번호 변경
+            </button>
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className="flex h-9 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
       </div>
     </aside>
+
+    {passwordModalOpen ? (
+      <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 px-4 backdrop-blur-[2px]">
+        <form
+          onSubmit={changePassword}
+          className="w-full max-w-[460px] rounded-3xl bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.28)]"
+        >
+          <div className="mb-5">
+            <p className="text-[12px] font-semibold tracking-[0.14em] text-blue-500">
+              PASSWORD
+            </p>
+            <h3 className="mt-1 text-[22px] font-semibold tracking-[-0.04em] text-[#10213f]">
+              비밀번호 변경
+            </h3>
+            <p className="mt-2 text-[13px] font-medium leading-6 text-[#6f8199]">
+              현재 로그인한 계정의 비밀번호를 변경합니다. 보안을 위해 현재 비밀번호를 한 번 더 확인합니다.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-semibold text-slate-700">현재 비밀번호</span>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-[14px] font-medium text-slate-800 outline-none transition focus:border-blue-300"
+                autoComplete="current-password"
+                autoFocus
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-semibold text-slate-700">새 비밀번호</span>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-[14px] font-medium text-slate-800 outline-none transition focus:border-blue-300"
+                autoComplete="new-password"
+                placeholder="8자 이상"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[13px] font-semibold text-slate-700">새 비밀번호 확인</span>
+              <input
+                type="password"
+                value={newPasswordConfirm}
+                onChange={(event) => setNewPasswordConfirm(event.target.value)}
+                className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-3 text-[14px] font-medium text-slate-800 outline-none transition focus:border-blue-300"
+                autoComplete="new-password"
+              />
+            </label>
+          </div>
+
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={closePasswordModal}
+              disabled={passwordChanging}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-[14px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={passwordChanging}
+              className="rounded-2xl bg-blue-600 px-4 py-2 text-[14px] font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
+            >
+              {passwordChanging ? "변경 중" : "변경하기"}
+            </button>
+          </div>
+        </form>
+      </div>
+    ) : null}
+    </>
   );
 }

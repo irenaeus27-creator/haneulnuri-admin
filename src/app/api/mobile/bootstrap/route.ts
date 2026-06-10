@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   JsonRecord,
   addDaysText,
-  getUserBundleByUserId,
+  getMobileAuthContext,
   mapRows,
   mobileSupabase,
-  requireUserId,
   text,
   todayText,
 } from "@/lib/supabase/mobile-helpers";
@@ -49,18 +48,16 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const userId = requireUserId(searchParams.get("userId"));
+    const context = await getMobileAuthContext(request, searchParams.get("userId"));
 
     const [
-      userBundle,
       bookings,
       aircraft,
       instructors,
       settings,
       courseCatalog,
     ] = await Promise.all([
-      getUserBundleByUserId(userId),
-      selectMyBookings(userId),
+      selectMyBookings(context.userId),
       selectRows("aircraft", "aircraft_id"),
       selectRows("instructors", "instructor_id"),
       selectRows("settings", "id"),
@@ -72,15 +69,22 @@ export async function GET(request: NextRequest) {
       success: true,
       source: "supabase",
       service: "skynuri-mobile-bootstrap",
-      userId,
-      ...userBundle,
+      authUserId: context.authUserId,
+      userId: context.userId,
+      user: context.user,
+      student: context.student,
+      rentalPilot: context.rentalPilot,
       bookings,
       aircraft,
       instructors,
       settings,
       courseCatalog,
       data: {
-        ...userBundle,
+        authUserId: context.authUserId,
+        userId: context.userId,
+        user: context.user,
+        student: context.student,
+        rentalPilot: context.rentalPilot,
         bookings,
         aircraft,
         instructors,
@@ -97,16 +101,18 @@ export async function GET(request: NextRequest) {
       elapsedMs: Date.now() - startedAt,
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "앱 초기 데이터 조회에 실패했습니다.";
+    const status = text(message).includes("로그인") || text(message).includes("토큰") ? 401 : 500;
     return NextResponse.json(
       {
         ok: false,
         success: false,
         source: "supabase",
         service: "skynuri-mobile-bootstrap",
-        message: error instanceof Error ? error.message : "앱 초기 데이터 조회에 실패했습니다.",
+        message,
         elapsedMs: Date.now() - startedAt,
       },
-      { status: 500 }
+      { status }
     );
   }
 }

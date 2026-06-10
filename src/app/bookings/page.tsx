@@ -189,7 +189,6 @@ const defaultBookingTypes = [
   "렌탈비행",
   "동승비행",
   "자가비행",
-  "정비",
   "기타",
 ];
 
@@ -450,7 +449,7 @@ function toForm(row: BookingRow): BookingForm {
     bookingDate: normalizeDate(row.bookingDate),
     startTime: normalizeTime(row.startTime),
     endTime: normalizeTime(row.endTime),
-    bookingType: formValue(row.bookingType || emptyForm.bookingType),
+    bookingType: formValue(row.bookingType).includes("정비") || formValue(row.bookingType).includes("점검") ? "기타" : formValue(row.bookingType || emptyForm.bookingType),
     courseId: formValue(row.courseId),
     courseName: formValue(row.courseName),
     userId: formValue(row.userId),
@@ -1016,7 +1015,7 @@ function normalizeBookingTypeForSave(value: unknown) {
   if (raw.includes("렌탈")) return "렌탈비행";
   if (raw.includes("교육")) return "교육비행";
   if (raw.includes("체험")) return "체험비행";
-  if (raw.includes("정비") || raw.includes("점검")) return "정비";
+  if (raw.includes("정비") || raw.includes("점검")) return "기타";
 
   return text(value, "기타");
 }
@@ -1166,7 +1165,7 @@ function compactFormSummary(form: BookingForm) {
 
 
 function bookingDisplayTitle(item: BookingRow) {
-  return text(item.courseName || item.bookingType, "예약명 미입력");
+  return text(item.courseName || item.userName || item.bookingType, "예약명 미입력");
 }
 
 function isEducationCompletedBooking(item: BookingRow) {
@@ -1444,6 +1443,7 @@ export default function BookingsPage() {
   const isRentalForm = isRentalType(form.bookingType);
   const isExperienceForm = form.bookingType.includes("체험");
   const isRideAlongForm = isRideAlongType(form.bookingType);
+  const isOtherUseForm = form.bookingType.includes("기타") || form.bookingType.includes("정비");
 
   const durationOptions = useMemo(() => {
     if (isExperienceForm) {
@@ -1457,8 +1457,9 @@ export default function BookingsPage() {
     }
 
     if (isRentalForm) return [30, 45, 60, 75, 90, 105, 120, 150, 180];
+    if (isOtherUseForm) return [30, 45, 60, 90, 120, 150, 180, 240, 300, 360];
     return [60, 90, 120];
-  }, [durationMinutes, filteredCoursesForForm, isExperienceForm, isRentalForm]);
+  }, [durationMinutes, filteredCoursesForForm, isExperienceForm, isOtherUseForm, isRentalForm]);
 
   const timeOptions = useMemo(() => {
     const options: string[] = [];
@@ -1867,6 +1868,7 @@ export default function BookingsPage() {
     if (isRentalForm) return "렌탈기장과 배정 항공기를 선택하세요. 단독 렌탈은 교관 없이 예약할 수 있습니다.";
     if (isExperienceForm) return "고객 정보와 항공기, 교관을 선택하세요.";
     if (isRideAlongForm) return "동승비행은 담당 교관을 선택하세요.";
+    if (isOtherUseForm) return "촬영, 정비, 행사 등 항공기 사용 불가 시간을 예약명/사유로 등록하세요.";
     return "";
   }
 
@@ -1905,7 +1907,15 @@ export default function BookingsPage() {
 
   function resetTypeSpecificFields(nextType: string) {
     const normalizedType = normalizeBookingTypeForSave(nextType);
-    const nextDuration = normalizedType.includes("체험") ? 30 : 60;
+    const currentStartMinutes = timeToMinutes(form.startTime);
+    const currentEndMinutes = timeToMinutes(form.endTime);
+    const currentSelectedMinutes =
+      currentStartMinutes >= 0 && currentEndMinutes > currentStartMinutes
+        ? currentEndMinutes - currentStartMinutes
+        : durationMinutes;
+    const nextDuration = normalizedType.includes("체험")
+      ? MIN_RESERVATION_DURATION_MINUTES
+      : scheduleDurationMinutes(currentSelectedMinutes || durationMinutes || 60, normalizedType);
 
     setDurationMinutes(nextDuration);
     clearSelectedBooking();
@@ -1922,6 +1932,8 @@ export default function BookingsPage() {
     }
 
     setForm((prev) => {
+      const keepAircraftId = prev.aircraftId;
+      const keepAircraftName = prev.aircraftName;
       const common: BookingForm = {
         ...prev,
         bookingType: normalizedType,
@@ -1938,8 +1950,21 @@ export default function BookingsPage() {
           phone: "",
           instructorId: "",
           instructorName: "",
-          aircraftId: "",
-          aircraftName: "",
+          aircraftId: keepAircraftId,
+          aircraftName: keepAircraftName,
+        };
+      }
+
+      if (normalizedType.includes("기타") || normalizedType.includes("정비")) {
+        return {
+          ...common,
+          userId: "",
+          userName: "",
+          phone: "",
+          instructorId: "",
+          instructorName: "",
+          aircraftId: keepAircraftId,
+          aircraftName: keepAircraftName,
         };
       }
 
@@ -2414,16 +2439,25 @@ export default function BookingsPage() {
   }
 
   function selectAircraft(aircraftId: string) {
-    const selected = aircraft.find((item) => text(item.aircraftId, "") === aircraftId);
+    const selectedKey = formValue(aircraftId);
+    const selected = aircraft.find((item) => {
+      const keys = [
+        formValue(item.aircraftId),
+        formValue(item.aircraftName),
+        formValue(item.registrationNo),
+      ].filter(Boolean);
 
-    if (selected && !isAircraftOperational(selected)) {
+      return keys.includes(selectedKey);
+    });
+
+    if (selected && !isOtherUseForm && !isAircraftOperational(selected)) {
       alert(`${aircraftDisplay(selected)} 항공기는 현재 ${aircraftStatusLabel(selected)} 상태라 예약할 수 없습니다.`);
       return;
     }
 
     setForm((prev) => ({
       ...prev,
-      aircraftId,
+      aircraftId: selected ? text(selected.aircraftId, selectedKey) : selectedKey,
       aircraftName: selected
         ? text(selected.aircraftName || selected.registrationNo || selected.aircraftId, "")
         : "",
@@ -2521,7 +2555,7 @@ export default function BookingsPage() {
     if (calendarResourceMode === "instructor") {
       selectInstructor(text((resource as InstructorRow).instructorId, ""));
     } else {
-      selectAircraft(text((resource as AircraftRow).aircraftId, ""));
+      selectAircraft(calendarResourceKey(resource));
     }
 
     updateStartTime(startTime);
@@ -2666,7 +2700,7 @@ export default function BookingsPage() {
     if (calendarResourceMode === "instructor") {
       selectInstructor(text((resource as InstructorRow).instructorId, ""));
     } else {
-      selectAircraft(text((resource as AircraftRow).aircraftId, ""));
+      selectAircraft(calendarResourceKey(resource));
     }
 
     setDurationMinutes(selectedMinutes);
@@ -3463,7 +3497,7 @@ export default function BookingsPage() {
       }
 
       if (!form.userName.trim()) {
-        alert(isEducationForm ? "교육생을 선택하세요." : isRentalForm ? "렌탈 기장을 선택하세요." : "예약자 이름을 입력하세요.");
+        alert(isEducationForm ? "교육생을 선택하세요." : isRentalForm ? "렌탈 기장을 선택하세요." : isOtherUseForm ? "예약명 또는 사용 불가 사유를 입력하세요." : "예약자 이름을 입력하세요.");
         return;
       }
 
@@ -3487,8 +3521,13 @@ export default function BookingsPage() {
         }
       }
 
-      if (selectedAircraftForSave && !isAircraftOperational(selectedAircraftForSave)) {
+      if (selectedAircraftForSave && !isAircraftOperational(selectedAircraftForSave) && !isOtherUseForm) {
         alert(`${aircraftDisplay(selectedAircraftForSave)} 항공기는 현재 ${aircraftStatusLabel(selectedAircraftForSave)} 상태라 예약할 수 없습니다.`);
+        return;
+      }
+
+      if (isOtherUseForm && !form.aircraftId) {
+        alert("기타 예약은 사용 제한할 항공기를 선택해야 합니다.");
         return;
       }
 
@@ -3536,6 +3575,7 @@ export default function BookingsPage() {
         endTime: normalizeTime(form.endTime) || addMinutes(normalizedStartTime, scheduleDurationMinutes(durationMinutes, normalizedBookingType)),
         durationMinutes: scheduleDurationMinutes(durationMinutes, normalizedBookingType),
         bookingType: normalizedBookingType,
+        courseName: isOtherUseForm ? text(form.courseName || form.userName, "") : form.courseName,
         status: editing ? normalizeBookingStatusForDisplay(form.status) : "확정",
         paymentStatus: normalizePaymentStatusForSave(form.paymentStatus, normalizedBookingType),
         instructorId: form.instructorId,
@@ -3828,17 +3868,25 @@ export default function BookingsPage() {
               </div>
             </div>
 
-            <div className="min-w-0 rounded-[18px] border border-[#e1eaf6] bg-[#f8fbff] p-2.5">
-              <div className="grid gap-1.5 md:grid-cols-[90px_110px_135px_70px_70px_70px]">
+            <div className="w-full rounded-[20px] border border-[#dfe8f4] bg-white/90 p-3 shadow-[0_8px_22px_rgba(15,40,80,0.035)] xl:w-[620px]">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[96px_120px_minmax(170px,1fr)_auto] sm:items-end">
                 <Field label="보기">
-                  <select value={calendarViewMode} onChange={(event) => setCalendarViewMode(event.target.value as "day" | "week")} className="input-base">
+                  <select
+                    value={calendarViewMode}
+                    onChange={(event) => setCalendarViewMode(event.target.value as "day" | "week")}
+                    className="input-base mt-1 h-10 rounded-xl bg-white px-3 text-[13px] font-semibold text-[#173052]"
+                  >
                     <option value="day">일간</option>
                     <option value="week">주간</option>
                   </select>
                 </Field>
 
                 <Field label="기준">
-                  <select value={calendarResourceMode} onChange={(event) => setCalendarResourceMode(event.target.value as "aircraft" | "instructor")} className="input-base">
+                  <select
+                    value={calendarResourceMode}
+                    onChange={(event) => setCalendarResourceMode(event.target.value as "aircraft" | "instructor")}
+                    className="input-base mt-1 h-10 rounded-xl bg-white px-3 text-[13px] font-semibold text-[#173052]"
+                  >
                     <option value="aircraft">항공기별</option>
                     <option value="instructor">교관별</option>
                   </select>
@@ -3852,44 +3900,46 @@ export default function BookingsPage() {
                       updateForm("bookingDate", event.target.value);
                       setDateFilter(event.target.value);
                     }}
-                    className="input-base"
+                    className="input-base mt-1 h-10 rounded-xl bg-white px-3 text-[13px] font-semibold text-[#173052]"
                   />
                 </Field>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    const nextDate = addDaysToDate(calendarDate, calendarViewMode === "week" ? -7 : -1);
-                    updateForm("bookingDate", nextDate);
-                    setDateFilter(nextDate);
-                  }}
-                  className="mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-[#d3ddeb] bg-white px-2 text-[13px] font-medium text-[#28486d] shadow-sm hover:bg-[#f7faff]"
-                >
-                  이전
-                </button>
+                <div className="grid grid-cols-3 gap-1.5 sm:pt-[22px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextDate = addDaysToDate(calendarDate, calendarViewMode === "week" ? -7 : -1);
+                      updateForm("bookingDate", nextDate);
+                      setDateFilter(nextDate);
+                    }}
+                    className="inline-flex h-10 min-w-[56px] items-center justify-center rounded-xl border border-[#d5e0ee] bg-white px-3 text-[13px] font-semibold text-[#28486d] shadow-sm transition hover:border-[#bcd3f2] hover:bg-[#f7faff]"
+                  >
+                    이전
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    updateForm("bookingDate", todayText);
-                    setDateFilter(todayText);
-                  }}
-                  className="mt-4 inline-flex h-8 items-center justify-center rounded-lg bg-blue-50 px-2 text-[13px] font-medium text-blue-700 ring-1 ring-blue-100 hover:bg-blue-100"
-                >
-                  오늘
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateForm("bookingDate", todayText);
+                      setDateFilter(todayText);
+                    }}
+                    className="inline-flex h-10 min-w-[56px] items-center justify-center rounded-xl border border-[#b9d1ff] bg-[#eef5ff] px-3 text-[13px] font-semibold text-[#1264f4] shadow-sm transition hover:bg-[#e2efff]"
+                  >
+                    오늘
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    const nextDate = addDaysToDate(calendarDate, calendarViewMode === "week" ? 7 : 1);
-                    updateForm("bookingDate", nextDate);
-                    setDateFilter(nextDate);
-                  }}
-                  className="mt-4 inline-flex h-8 items-center justify-center rounded-lg border border-[#d3ddeb] bg-white px-2 text-[13px] font-medium text-[#28486d] shadow-sm hover:bg-[#f7faff]"
-                >
-                  다음
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextDate = addDaysToDate(calendarDate, calendarViewMode === "week" ? 7 : 1);
+                      updateForm("bookingDate", nextDate);
+                      setDateFilter(nextDate);
+                    }}
+                    className="inline-flex h-10 min-w-[56px] items-center justify-center rounded-xl border border-[#d5e0ee] bg-white px-3 text-[13px] font-semibold text-[#28486d] shadow-sm transition hover:border-[#bcd3f2] hover:bg-[#f7faff]"
+                  >
+                    다음
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -4194,7 +4244,7 @@ export default function BookingsPage() {
             <span className="rounded-full bg-blue-50 px-2 py-0.5 text-blue-700 ring-1 ring-blue-100">교육비행</span>
             <span className="rounded-full bg-orange-50 px-2 py-0.5 text-orange-700 ring-1 ring-orange-100">렌탈비행</span>
             <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 ring-1 ring-emerald-100">체험비행</span>
-            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-700 ring-1 ring-violet-100">정비/점검</span>
+            <span className="rounded-full bg-violet-50 px-2 py-0.5 text-violet-700 ring-1 ring-violet-100">기타/사용제한</span>
             <span className="rounded-full bg-sky-50 px-2 py-0.5 text-sky-700 ring-1 ring-sky-100">PFI</span>
           </div>
         </section>
@@ -4419,7 +4469,7 @@ export default function BookingsPage() {
               <Field label="예약 유형" required>
                 <select value={form.bookingType} onChange={(event) => resetTypeSpecificFields(event.target.value)} className="input-base compact-input">
                   {bookingTypes
-                    .filter((item) => ["교육비행", "렌탈비행", "체험비행"].includes(item))
+                    .filter((item) => ["교육비행", "렌탈비행", "체험비행", "기타"].includes(item))
                     .map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
               </Field>
@@ -4475,7 +4525,7 @@ export default function BookingsPage() {
                 </Field>
               ) : null}
 
-              {!isRentalForm ? (
+              {!isRentalForm && !isOtherUseForm ? (
                 <Field label="담당 교관" required={isExperienceForm || isRideAlongForm} auto={isEducationForm && !!form.instructorId}>
                   <select value={form.instructorId} onChange={(event) => selectInstructor(event.target.value)} className="input-base compact-input" disabled={isEducationForm && !!form.instructorId}>
                     <option value="">{isEducationForm ? "자동 배정" : "교관 선택"}</option>
@@ -4485,7 +4535,7 @@ export default function BookingsPage() {
                     })}
                   </select>
                 </Field>
-              ) : (
+              ) : isRentalForm ? (
                 <Field label="감독" required>
                   <select value={form.instructorId} onChange={(event) => selectInstructor(event.target.value)} className="input-base compact-input">
                     <option value="">감독 선택</option>
@@ -4495,17 +4545,18 @@ export default function BookingsPage() {
                     })}
                   </select>
                 </Field>
-              )}
+              ) : null}
 
-              <Field label="항공기" required={isRentalForm || isExperienceForm || isEducationForm} auto={isEducationForm && educationAssignedAircraft.length === 1 && !!form.aircraftId}>
+              <Field label="항공기" required={isRentalForm || isExperienceForm || isEducationForm || isOtherUseForm} auto={isEducationForm && educationAssignedAircraft.length === 1 && !!form.aircraftId}>
                 <select value={form.aircraftId} onChange={(event) => selectAircraft(event.target.value)} className="input-base compact-input" disabled={isEducationForm && educationAssignedAircraft.length <= 1 && !!form.aircraftId}>
                   <option value="">{isEducationForm ? "배정 항공기 선택" : "항공기 선택"}</option>
                   {selectableAircraftForForm.map((item, index) => {
                     const aircraftId = text(item.aircraftId, "");
-                    const disabled = !isAircraftOperational(item);
+                    const disabled = !isOtherUseForm && !isAircraftOperational(item);
+                    const statusNote = !isAircraftOperational(item) ? ` · ${aircraftStatusLabel(item)}` : "";
                     return (
                       <option key={`${aircraftId}-${index}`} value={aircraftId} disabled={disabled}>
-                        {aircraftDisplay(item)} / {aircraftId}{disabled ? ` · ${aircraftStatusLabel(item)}` : ""}
+                        {aircraftDisplay(item)} / {aircraftId}{statusNote}
                       </option>
                     );
                   })}
@@ -4582,9 +4633,18 @@ export default function BookingsPage() {
             <div className="min-w-0 rounded-[14px] border border-[#e1eaf6] bg-[#fbfdff] p-2">
               <div className="grid gap-1.5 text-[13px] font-medium text-[#36506d] md:grid-cols-4 xl:grid-cols-8">
                 <div className="rounded-lg bg-white px-2.5 py-1.5">
-                  <p className="text-[13px] font-semibold text-[#8292a8]">{isRentalForm ? "기장명" : isEducationForm ? "교육생명" : "예약자명"}</p>
-                  {isExperienceForm ? (
-                    <input value={form.userName} onChange={(event) => updateForm("userName", event.target.value)} placeholder="체험 고객명" className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]" />
+                  <p className="text-[13px] font-semibold text-[#8292a8]">{isRentalForm ? "기장명" : isEducationForm ? "교육생명" : isOtherUseForm ? "예약명/사유" : "예약자명"}</p>
+                  {isExperienceForm || isOtherUseForm ? (
+                    <input
+                      value={form.userName}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        updateForm("userName", value);
+                        if (isOtherUseForm) updateForm("courseName", value);
+                      }}
+                      placeholder={isOtherUseForm ? "예: 방송국 촬영, 정비, 행사, 임시 사용 제한" : "체험 고객명"}
+                      className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]"
+                    />
                   ) : (
                     <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{form.userName || "자동 입력"}</p>
                   )}
@@ -4594,6 +4654,8 @@ export default function BookingsPage() {
                   <p className="text-[13px] font-semibold text-[#8292a8]">연락처</p>
                   {isExperienceForm ? (
                     <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="010-0000-0000" className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]" />
+                  ) : isOtherUseForm ? (
+                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="담당자 연락처 선택" className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]" />
                   ) : (
                     <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{form.phone || "자동 입력"}</p>
                   )}
@@ -4616,7 +4678,7 @@ export default function BookingsPage() {
                 </div>
 
                 <div className="rounded-lg bg-white px-2.5 py-1.5">
-                  <p className="text-[13px] font-semibold text-[#8292a8]">코스/과정</p>
+                  <p className="text-[13px] font-semibold text-[#8292a8]">{isOtherUseForm ? "사용 제한 사유" : "코스/과정"}</p>
                   <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{form.courseName || "-"}</p>
                 </div>
               </div>

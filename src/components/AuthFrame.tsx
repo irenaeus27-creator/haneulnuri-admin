@@ -11,6 +11,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 type UserRow = {
   user_id?: string;
   userId?: string;
+  auth_user_id?: string;
+  authUserId?: string;
   name?: string;
   userName?: string;
   email?: string;
@@ -44,8 +46,17 @@ function normalizeRole(value: unknown) {
 
 function isApprovedStatus(value: unknown) {
   const raw = text(value);
+  const lower = raw.toLowerCase();
   if (!raw) return true;
-  return raw === "승인완료" || raw === "승인" || raw.toLowerCase() === "approved" || raw.toLowerCase() === "active";
+  return (
+    raw === "활성" ||
+    raw === "정상" ||
+    raw === "승인완료" ||
+    raw === "승인" ||
+    lower === "active" ||
+    lower === "approved" ||
+    lower === "enabled"
+  );
 }
 
 function buildDevProfile(): AuthProfile {
@@ -79,12 +90,15 @@ function profileFromUserRow(row: UserRow, fallback: AuthProfile): AuthProfile {
   };
 }
 
-async function loadProfileByEmail(email: string, fallback: AuthProfile): Promise<AuthProfile> {
+async function loadProfileByAuthUser(user: User, fallback: AuthProfile): Promise<AuthProfile> {
   try {
     const response = await fetch("/api/users", { cache: "no-store" });
     const data = await response.json().catch(() => ({}));
     const rows = Array.isArray(data.users) ? data.users : Array.isArray(data?.data?.users) ? data.data.users : [];
-    const matched = rows.find((row: UserRow) => text(row.email).toLowerCase() === email.toLowerCase());
+    const authUserId = text(user.id);
+    const email = text(user.email).toLowerCase();
+    const matched = rows.find((row: UserRow) => text(row.auth_user_id || row.authUserId) === authUserId) ||
+      rows.find((row: UserRow) => text(row.email).toLowerCase() === email);
     if (!matched) return fallback;
     return profileFromUserRow(matched, fallback);
   } catch {
@@ -110,7 +124,7 @@ export default function AuthFrame({ children }: { children: React.ReactNode }) {
     }
 
     const fallback = profileFromAuthUser(user);
-    const resolved = await loadProfileByEmail(fallback.email, fallback);
+    const resolved = await loadProfileByAuthUser(user, fallback);
     setProfile(resolved);
     setLoading(false);
   }, []);
@@ -160,7 +174,10 @@ export default function AuthFrame({ children }: { children: React.ReactNode }) {
   }, [devBypass, router, supabase]);
 
   const role = normalizeRole(profile?.role);
-  const isAdmin = Boolean(profile) && role === "admin" && isApprovedStatus(profile?.status);
+  const isApproved = Boolean(profile) && isApprovedStatus(profile?.status);
+  const isAdmin = Boolean(profile) && role === "admin" && isApproved;
+  const isInstructor = Boolean(profile) && role === "instructor" && isApproved;
+  const canAccessApp = isAdmin || isInstructor;
   const contextValue = useMemo(() => ({
     profile,
     loading,
@@ -190,15 +207,15 @@ export default function AuthFrame({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAdmin) {
+  if (!canAccessApp) {
     return (
       <AuthProvider value={contextValue}>
         <main className="flex min-h-screen items-center justify-center bg-[#f6f8fb] px-6">
           <section className="w-full max-w-md rounded-[32px] border border-rose-100 bg-white p-8 text-center shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
             <p className="text-[13px] font-semibold tracking-[0.16em] text-rose-400">ACCESS DENIED</p>
-            <h1 className="mt-3 text-[24px] font-semibold tracking-[-0.04em] text-slate-950">관리자 권한이 필요합니다</h1>
+            <h1 className="mt-3 text-[24px] font-semibold tracking-[-0.04em] text-slate-950">관리자 또는 교관 권한이 필요합니다</h1>
             <p className="mt-3 text-[14px] leading-6 text-slate-500">
-              현재 로그인 계정은 관리자 화면에 접근할 수 없습니다. 회원관리에서 해당 이메일의 역할을 관리자, 상태를 승인완료로 설정해주세요.
+              현재 로그인 계정은 관리자 프로그램에 접근할 수 없습니다. 회원관리에서 해당 이메일의 역할을 관리자 또는 교관으로 설정해주세요.
             </p>
             <div className="mt-5 rounded-2xl bg-slate-50 px-4 py-3 text-left text-[13px] text-slate-600">
               <p>이름: {profile?.name || "-"}</p>
