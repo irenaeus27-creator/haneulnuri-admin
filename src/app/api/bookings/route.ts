@@ -146,6 +146,8 @@ function normalizeBookingPayload(input: JsonRecord, existing?: JsonRecord) {
     reservation_type: reservationType || bookingType,
     course_name: nullIfEmpty(input.courseName || input.course_name || existing?.course_name),
     user_id: nullIfEmpty(input.userId || input.user_id || existing?.user_id),
+    student_id: nullIfEmpty(input.studentId || input.student_id || input.rentalPilotId || existing?.student_id),
+    pilot_id: nullIfEmpty(input.pilotId || input.pilot_id || existing?.pilot_id),
     user_name: nullIfEmpty(input.userName || input.user_name || input.name || existing?.user_name),
     phone: nullIfEmpty(input.phone || existing?.phone),
     instructor_id: nullIfEmpty(input.instructorId || input.instructor_id || existing?.instructor_id),
@@ -212,6 +214,102 @@ async function selectBookings(fromDate: string, toDate: string) {
   return mapRows(data as JsonRecord[], true);
 }
 
+
+function normalizeKey(value: unknown) {
+  return text(value).replace(/[^0-9a-zA-Z가-힣]/g, "").toLowerCase();
+}
+
+function isEducationBooking(row: JsonRecord) {
+  const type = text(row.bookingType || row.booking_type || row.reservationType || row.reservation_type);
+  return type.includes("교육");
+}
+
+function firstAssignedAircraftText(value: unknown) {
+  const raw = text(value);
+  if (!raw) return "";
+  return raw.split(/[,\n\/|;]+/).map((item) => item.trim()).filter(Boolean)[0] || raw;
+}
+
+function isPlaceholderName(value: unknown) {
+  const raw = text(value).replace(/\s+/g, "");
+  if (!raw) return true;
+  return ["미배정", "미정", "없음", "미지정", "선택안함", "교관미배정"].includes(raw);
+}
+
+function findInstructorName(instructorId: unknown, instructors: JsonRecord[]) {
+  const id = text(instructorId);
+  if (!id) return "";
+
+  const instructor = instructors.find((row) => {
+    const rowId = text(row.instructorId || row.instructor_id || row.id);
+    return rowId && rowId === id;
+  });
+
+  return text(instructor?.name || instructor?.instructorName || instructor?.instructor_name);
+}
+
+function findStudentForBooking(booking: JsonRecord, students: JsonRecord[]) {
+  const studentId = text(booking.studentId || booking.student_id || booking.rentalPilotId || booking.rental_pilot_id);
+  const userId = text(booking.userId || booking.user_id);
+  const phone = normalizeKey(booking.phone);
+  const name = normalizeKey(booking.userName || booking.user_name || booking.name);
+
+  return students.find((student) => {
+    const rowStudentId = text(student.studentId || student.student_id);
+    const rowUserId = text(student.userId || student.user_id);
+    const rowPhone = normalizeKey(student.phone);
+    const rowName = normalizeKey(student.name || student.studentName || student.student_name);
+
+    return Boolean(
+      (studentId && rowStudentId && studentId === rowStudentId) ||
+        (studentId && rowUserId && studentId === rowUserId) ||
+        (userId && rowUserId && userId === rowUserId) ||
+        (userId && rowStudentId && userId === rowStudentId) ||
+        (phone && rowPhone && phone === rowPhone) ||
+        (name && rowName && name === rowName)
+    );
+  });
+}
+
+function enrichBookingWithAssignedStudent(
+  booking: JsonRecord,
+  students: JsonRecord[],
+  instructors: JsonRecord[],
+) {
+  if (!isEducationBooking(booking)) return booking;
+
+  const student = findStudentForBooking(booking, students);
+
+  const assignedInstructorId = text(student?.assignedInstructorId || student?.assigned_instructor_id);
+  const assignedInstructorName = text(student?.assignedInstructorName || student?.assigned_instructor_name);
+  const currentInstructorId = text(booking.instructorId || booking.instructor_id) || assignedInstructorId;
+  const instructorNameById = findInstructorName(currentInstructorId, instructors);
+  const currentInstructorName = text(booking.instructorName || booking.instructor_name || booking.instructor);
+  const finalInstructorName = isPlaceholderName(currentInstructorName)
+    ? instructorNameById || assignedInstructorName || ""
+    : currentInstructorName;
+
+  const assignedAircraft = firstAssignedAircraftText(
+    student?.assignedAircraftIds || student?.assigned_aircraft_ids || student?.assignedAircraftId || student?.aircraftId,
+  );
+  const assignedAircraftName = text(student?.assignedAircraftName || student?.aircraftName);
+
+  return {
+    ...booking,
+    studentId: text(booking.studentId || booking.student_id || student?.studentId || student?.student_id),
+    instructorId: currentInstructorId,
+    instructorName: finalInstructorName,
+    instructor: finalInstructorName,
+    aircraftId: text(booking.aircraftId || booking.aircraft_id) || assignedAircraft,
+    aircraftName: text(booking.aircraftName || booking.aircraft_name) || assignedAircraftName || assignedAircraft,
+    aircraft: text(booking.aircraft || booking.aircraftName) || assignedAircraftName || assignedAircraft,
+  };
+}
+
+function enrichBookingsWithAssignments(bookings: JsonRecord[], students: JsonRecord[], instructors: JsonRecord[]) {
+  return bookings.map((booking) => enrichBookingWithAssignedStudent(booking, students, instructors));
+}
+
 async function loadBookingsPageData(fromDate: string, toDate: string) {
   const [
     bookings,
@@ -231,8 +329,10 @@ async function loadBookingsPageData(fromDate: string, toDate: string) {
     selectTable("rental_pilots", { orderColumn: "pilot_id", ascending: true }),
   ]);
 
+  const enrichedBookings = enrichBookingsWithAssignments(bookings, students, instructors);
+
   return {
-    bookings,
+    bookings: enrichedBookings,
     students,
     instructors,
     aircraft,

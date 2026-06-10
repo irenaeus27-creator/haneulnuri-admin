@@ -554,6 +554,156 @@ async function selectFlightBookings() {
     .filter((row) => isFlightBooking(row) && isActiveBooking(row));
 }
 
+
+function trainingLogMinutesForStudent(row: JsonRecord) {
+  const status = text(row.status).replaceAll(" ", "");
+  if (["작성대기", "대기", "취소", "기상취소", "노쇼", "반려", "삭제"].some((item) => status.includes(item))) return 0;
+
+  const trainingType = normalizeTrainingType(row.trainingType || row.training_type);
+  if (!isEducationType(trainingType)) return 0;
+
+  const deducted = Number(row.deductedMinutes || row.deducted_minutes || 0);
+  if (Number.isFinite(deducted) && deducted > 0) return Math.round(deducted);
+
+  const actual = Number(row.actualFlightMinutes || row.actual_flight_minutes || 0);
+  if (Number.isFinite(actual) && actual > 0) return Math.round(actual);
+
+  return minutesBetween(row.actualStartTime || row.actual_start_time, row.actualEndTime || row.actual_end_time);
+}
+
+function chargedTrainingMinutes(row: JsonRecord) {
+  const minuteCandidates = [
+    row.total_charged_minutes,
+    row.charged_training_minutes,
+    row.initial_charge_minutes,
+  ];
+
+  for (const value of minuteCandidates) {
+    const number = Number(value || 0);
+    if (Number.isFinite(number) && number > 0) return Math.round(number);
+  }
+
+  const hours = Number(row.initial_charge_hours || 0);
+  return Number.isFinite(hours) && hours > 0 ? Math.round(hours * 60) : 0;
+}
+
+function latestTrainingDate(logs: JsonRecord[]) {
+  return logs
+    .map((row) => text(row.training_date || row.trainingDate).slice(0, 10))
+    .filter(Boolean)
+    .sort((a, b) => b.localeCompare(a))[0] || "";
+}
+
+async function selectStudentForSavedTrainingLog(log: JsonRecord) {
+  const supabase = getSupabaseServerClient();
+  const studentId = text(log.studentId || log.student_id);
+  const userId = text(log.userId || log.user_id);
+  const studentName = text(log.studentName || log.student_name);
+
+  if (studentId) {
+    const { data, error } = await supabase.from("students").select("*").eq("student_id", studentId).maybeSingle();
+    if (error) throw new Error(`교육생 조회 실패: ${error.message}`);
+    if (data) return data as JsonRecord;
+  }
+
+  if (userId) {
+    const { data, error } = await supabase.from("students").select("*").eq("user_id", userId).maybeSingle();
+    if (error) throw new Error(`교육생 조회 실패: ${error.message}`);
+    if (data) return data as JsonRecord;
+  }
+
+  if (studentName) {
+    const { data, error } = await supabase.from("students").select("*").eq("name", studentName).limit(1).maybeSingle();
+    if (!error && data) return data as JsonRecord;
+  }
+
+  return null;
+}
+
+async function selectStudentTrainingLogsForSummary(student: JsonRecord) {
+  const supabase = getSupabaseServerClient();
+  const studentId = text(student.student_id || student.studentId);
+  const userId = text(student.user_id || student.userId);
+  const name = text(student.name || student.student_name || student.studentName);
+  const rows: JsonRecord[] = [];
+  const seen = new Set<string>();
+
+  async function append(query: unknown) {
+    const result = (await query) as { data?: unknown[] | null; error?: { message?: string } | null };
+    if (result.error) throw new Error(`교육생 비행시간 집계 실패: ${result.error.message || "unknown"}`);
+    for (const row of (result.data || []) as JsonRecord[]) {
+      const id = text(row.training_log_id || row.trainingLogId || row.id || `${row.training_date}-${row.actual_start_time}-${row.student_name}`);
+      if (id && seen.has(id)) continue;
+      if (id) seen.add(id);
+      rows.push(row);
+    }
+  }
+
+  if (studentId) await append(supabase.from("training_logs").select("*").eq("student_id", studentId));
+  if (userId) await append(supabase.from("training_logs").select("*").eq("user_id", userId));
+  if (name) await append(supabase.from("training_logs").select("*").eq("student_name", name));
+
+  return rows;
+}
+
+async function refreshStudentTrainingTimeFromTrainingLogs(log: JsonRecord) {
+  const supabase = getSupabaseServerClient();
+  const student = await selectStudentForSavedTrainingLog(log);
+  if (!student) return null;
+
+  const logs = await selectStudentTrainingLogsForSummary(student);
+  const completed = logs
+    .map((row) => ({ row, minutes: trainingLogMinutesForStudent(row) }))
+    .filter((item) => item.minutes > 0);
+
+  const usedMinutes = completed.reduce((sum, item) => sum + item.minutes, 0);
+  const chargedMinutes = chargedTrainingMinutes(student);
+  const manualMinutes = Number(student.manual_training_minutes || student.manualTrainingMinutes || 0) || 0;
+  const remainingMinutes = chargedMinutes > 0 ? Math.max(chargedMinutes - usedMinutes - manualMinutes, 0) : 0;
+  const latestDate = latestTrainingDate(completed.map((item) => item.row));
+  const now = nowIso();
+
+  const updateData: JsonRecord = {
+    used_training_minutes: usedMinutes,
+    used_minutes: usedMinutes,
+    used_training_hours: Number((usedMinutes / 60).toFixed(2)),
+    used_hours: Number((usedMinutes / 60).toFixed(2)),
+    completed_training_count: completed.length,
+    remaining_training_minutes: remainingMinutes,
+    remaining_minutes: remainingMinutes,
+    remaining_training_hours: Number((remainingMinutes / 60).toFixed(2)),
+    remaining_hours: Number((remainingMinutes / 60).toFixed(2)),
+    last_flight_date: latestDate || null,
+    recent_flight_date: latestDate || null,
+    updated_at: now,
+  };
+
+  const studentId = text(student.student_id || student.studentId);
+  const { data, error } = await supabase
+    .from("students")
+    .update(updateData)
+    .eq("student_id", studentId)
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw new Error(`교육생 비행시간 반영 실패: ${error.message}`);
+  return data ? toCamelObject(data as JsonRecord) : null;
+}
+
+async function syncTrainingLogSideEffects(sourceData: JsonRecord, savedLog: JsonRecord) {
+  const bookingId = text(savedLog.bookingId || savedLog.booking_id || sourceData.bookingId || sourceData.booking_id);
+  const supabase = getSupabaseServerClient();
+
+  if (bookingId) {
+    await supabase
+      .from("bookings")
+      .update({ status: "완료", updated_at: nowIso() })
+      .eq("booking_id", bookingId);
+  }
+
+  return refreshStudentTrainingTimeFromTrainingLogs({ ...sourceData, ...savedLog });
+}
+
 async function handlePost(body: JsonRecord) {
   const action = text(body.action);
   const data = (body.data || body) as JsonRecord;
@@ -570,9 +720,11 @@ async function handlePost(body: JsonRecord) {
         explicitId,
         row,
       );
+      const student = await syncTrainingLogSideEffects(safeData, saved);
       return {
-        message: "교육일지를 수정했습니다.",
+        message: "교육일지를 수정하고 비행시간을 반영했습니다.",
         trainingLog: saved,
+        student,
         data: saved,
       };
     }
@@ -610,9 +762,11 @@ async function handlePost(body: JsonRecord) {
           existingId,
           row,
         );
+        const student = await syncTrainingLogSideEffects(safeData, saved);
         return {
-          message: "기존 예약 교육일지를 수정했습니다.",
+          message: "기존 예약 교육일지를 수정하고 비행시간을 반영했습니다.",
           trainingLog: saved,
+          student,
           data: saved,
         };
       }
@@ -622,9 +776,11 @@ async function handlePost(body: JsonRecord) {
       "training_logs",
       normalizeTrainingLog(safeData, true),
     );
+    const student = await syncTrainingLogSideEffects(safeData, saved);
     return {
-      message: "교육일지를 등록했습니다.",
+      message: "교육일지를 등록하고 비행시간을 반영했습니다.",
       trainingLog: saved,
+      student,
       data: saved,
     };
   }
@@ -636,9 +792,11 @@ async function handlePost(body: JsonRecord) {
       safeData.trainingLogId || safeData.training_log_id || row.training_log_id,
     );
     const saved = await updateRow("training_logs", "training_log_id", id, row);
+    const student = await syncTrainingLogSideEffects(safeData, saved);
     return {
-      message: "교육일지를 수정했습니다.",
+      message: "교육일지를 수정하고 비행시간을 반영했습니다.",
       trainingLog: saved,
+      student,
       data: saved,
     };
   }

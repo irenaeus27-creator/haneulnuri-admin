@@ -4,7 +4,9 @@ import {
   MobileAuthContext,
   addDaysText,
   buildId,
+  getAssignedAircraftIds,
   getMobileAuthContext,
+  isAircraftAssignedToContext,
   mapRows,
   mobileSupabase,
   nowIso,
@@ -17,14 +19,122 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-function normalizeMobileBooking(input: JsonRecord, context: MobileAuthContext) {
+function nullableText(value: unknown) {
+  const result = text(value);
+  if (!result) return null;
+
+  const normalized = result.toLowerCase().replaceAll(" ", "");
+  if (
+    normalized === "none" ||
+    normalized === "null" ||
+    normalized === "undefined" ||
+    result === "없음" ||
+    result === "미선택" ||
+    result === "선택안함" ||
+    result === "미배정" ||
+    result === "미정" ||
+    result === "미지정"
+  ) {
+    return null;
+  }
+
+  return result;
+}
+
+function isPlaceholderName(value: unknown) {
+  const raw = text(value).replace(/\s+/g, "");
+  if (!raw) return true;
+  return ["미배정", "미정", "없음", "미지정", "선택안함", "교관미배정"].includes(raw);
+}
+
+async function resolveInstructorName(instructorId: unknown) {
+  const id = nullableText(instructorId);
+  if (!id) return "";
+
+  const supabase = mobileSupabase();
+  const { data, error } = await supabase
+    .from("instructors")
+    .select("*")
+    .eq("instructor_id", id)
+    .maybeSingle();
+
+  if (error) throw new Error(`교관 조회 실패: ${error.message}`);
+
+  return text((data as JsonRecord | null)?.name || (data as JsonRecord | null)?.instructor_name);
+}
+
+function sameAircraftText(a: unknown, b: unknown) {
+  const left = text(a).toLowerCase().replace(/[\s_\-()]/g, "");
+  const right = text(b).toLowerCase().replace(/[\s_\-()]/g, "");
+  if (!left || !right) return false;
+  return left === right || left.includes(right) || right.includes(left);
+}
+
+async function resolveAssignedAircraft(input: JsonRecord, context: MobileAuthContext) {
+  const requestedAircraftId = nullableText(input.aircraftId || input.aircraft_id);
+  const requestedAircraftName = nullableText(input.aircraftName || input.aircraft_name || input.aircraft);
+  const assignedIds = getAssignedAircraftIds(context);
+
+  if (assignedIds.length === 0) {
+    throw new Error("예약 가능한 배정 항공기가 없습니다. 관리자에서 회원에게 항공기를 먼저 배정해주세요.");
+  }
+
+  const supabase = mobileSupabase();
+  const { data, error } = await supabase.from("aircraft").select("*").order("aircraft_id", { ascending: true });
+  if (error) throw new Error(`항공기 조회 실패: ${error.message}`);
+
+  const aircraftRows = mapRows(data as JsonRecord[]);
+  const assignedAircraft = aircraftRows.filter((row) => isAircraftAssignedToContext(context, row));
+
+  if (assignedAircraft.length === 0) {
+    throw new Error("배정된 항공기가 항공기 목록에 없습니다. 관리자에서 배정 항공기 ID를 확인해주세요.");
+  }
+
+  if (!requestedAircraftId && !requestedAircraftName && assignedAircraft.length === 1) {
+    return assignedAircraft[0];
+  }
+
+  const matched = assignedAircraft.find((row) => {
+    return (
+      sameAircraftText(row.aircraftId, requestedAircraftId) ||
+      sameAircraftText(row.registrationNo, requestedAircraftId) ||
+      sameAircraftText(row.aircraftName, requestedAircraftId) ||
+      sameAircraftText(row.aircraftId, requestedAircraftName) ||
+      sameAircraftText(row.registrationNo, requestedAircraftName) ||
+      sameAircraftText(row.aircraftName, requestedAircraftName)
+    );
+  });
+
+  if (!matched) {
+    throw new Error("배정되지 않은 항공기는 예약할 수 없습니다. 관리자에서 배정 항공기를 확인해주세요.");
+  }
+
+  return matched;
+}
+
+async function normalizeMobileBooking(input: JsonRecord, context: MobileAuthContext) {
   const now = nowIso();
   const bookingDate = text(input.bookingDate || input.booking_date || input.requestDate || input.request_date);
   const startTime = timeText(input.startTime || input.start_time);
   const endTime = timeText(input.endTime || input.end_time);
   const bookingType = text(input.bookingType || input.booking_type || input.type || "교육비행");
-  const userName = text(input.userName || input.user_name || input.name || context.user?.name || context.student?.name);
-  const phone = text(input.phone || context.user?.phone || context.student?.phone);
+  const userName = text(input.userName || input.user_name || input.name || context.user?.name || context.student?.name || context.rentalPilot?.name);
+  const phone = text(input.phone || context.user?.phone || context.student?.phone || context.rentalPilot?.phone);
+  const assignedInstructorId = nullableText(
+    context.student?.assignedInstructorId || context.student?.assigned_instructor_id,
+  );
+  const assignedInstructorName = text(
+    context.student?.assignedInstructorName || context.student?.assigned_instructor_name,
+  );
+  const instructorId = nullableText(input.instructorId || input.instructor_id) || assignedInstructorId;
+  const inputInstructorName = text(input.instructorName || input.instructor_name);
+  const instructorNameById = await resolveInstructorName(instructorId);
+  const instructorName = isPlaceholderName(inputInstructorName)
+    ? instructorNameById || assignedInstructorName
+    : inputInstructorName;
+  const studentId = nullableText(context.student?.studentId || context.student?.student_id);
+  const pilotId = nullableText(context.rentalPilot?.pilotId || context.rentalPilot?.pilot_id);
+  const aircraft = await resolveAssignedAircraft(input, context);
 
   if (!bookingDate) throw new Error("예약일이 필요합니다.");
   if (!startTime) throw new Error("시작시간이 필요합니다.");
@@ -39,18 +149,20 @@ function normalizeMobileBooking(input: JsonRecord, context: MobileAuthContext) {
     reservation_type: text(input.reservationType || input.reservation_type || bookingType),
     course_name: text(input.courseName || input.course_name || context.student?.course),
     user_id: context.userId,
+    student_id: studentId,
+    pilot_id: pilotId,
     user_name: userName,
     phone,
-    instructor_id: text(input.instructorId || input.instructor_id || context.student?.assignedInstructorId),
-    instructor_name: text(input.instructorName || input.instructor_name || context.student?.assignedInstructorName),
-    aircraft_id: text(input.aircraftId || input.aircraft_id),
-    aircraft_name: text(input.aircraftName || input.aircraft_name || input.aircraft),
+    instructor_id: instructorId,
+    instructor_name: instructorName,
+    aircraft_id: text(aircraft.aircraftId || aircraft.aircraft_id),
+    aircraft_name: text(aircraft.aircraftName || aircraft.aircraft_name || aircraft.registrationNo || aircraft.registration_no),
     status: text(input.status || "요청"),
     payment_status: text(input.paymentStatus || input.payment_status),
     memo: text(input.memo),
     request_date: bookingDate,
     duration_minutes: Number(input.durationMinutes || input.duration_minutes || 0) || null,
-    buffer_end_time: timeText(input.bufferEndTime || input.buffer_end_time),
+    buffer_end_time: timeText(input.bufferEndTime || input.buffer_end_time) || null,
     created_at: now,
     updated_at: now,
   };
@@ -73,7 +185,6 @@ async function getMyBookings(userId: string, fromDate: string, toDate: string) {
   return mapRows(data as JsonRecord[]);
 }
 
-
 async function getAllVisibleBookings(fromDate: string, toDate: string) {
   const supabase = mobileSupabase();
 
@@ -91,7 +202,7 @@ async function getAllVisibleBookings(fromDate: string, toDate: string) {
 }
 
 async function requestBooking(data: JsonRecord, context: MobileAuthContext) {
-  const row = normalizeMobileBooking(data, context);
+  const row = await normalizeMobileBooking(data, context);
   const supabase = mobileSupabase();
 
   const { data: saved, error } = await supabase

@@ -3,6 +3,7 @@ import {
   JsonRecord,
   addDaysText,
   getMobileAuthContext,
+  isAircraftAssignedToContext,
   mapRows,
   mobileSupabase,
   text,
@@ -50,19 +51,15 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const context = await getMobileAuthContext(request, searchParams.get("userId"));
 
-    const [
-      bookings,
-      aircraft,
-      instructors,
-      settings,
-      courseCatalog,
-    ] = await Promise.all([
+    const [bookings, allAircraft, instructors, settings, courseCatalog] = await Promise.all([
       selectMyBookings(context.userId),
       selectRows("aircraft", "aircraft_id"),
       selectRows("instructors", "instructor_id"),
-      selectRows("settings", "id"),
+      selectRows("settings", "key"),
       selectRows("course_catalog", "course_id"),
     ]);
+
+    const aircraft = allAircraft.filter((item) => isAircraftAssignedToContext(context, item));
 
     return NextResponse.json({
       ok: true,

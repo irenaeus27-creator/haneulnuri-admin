@@ -536,7 +536,7 @@ function isCancelledStatus(value: unknown) {
 
 function isFinalHiddenStatus(value: unknown) {
   const status = normalizeBookingStatusForDisplay(value).replace(/\s/g, "");
-  return ["완료", "취소", "반려", "노쇼", "기상취소", "cancelled", "rejected"].includes(status);
+  return ["취소", "반려", "노쇼", "기상취소", "cancelled", "rejected"].includes(status);
 }
 
 function isConfirmedStatus(value: unknown) {
@@ -980,7 +980,7 @@ function actionButtonTitle(nextStatus: string) {
   if (nextStatus === "노쇼") return "노쇼: 예약자가 나타나지 않은 경우에만 사용합니다.";
   if (nextStatus === "취소") return "취소: 관리자 또는 취소요청 승인으로 예약을 취소합니다.";
   if (nextStatus === "반려") return "반려: 예약 요청을 승인하지 않습니다.";
-  if (nextStatus === "확정") return "확정: 요청을 승인하여 운항 예정 예약으로 전환합니다.";
+  if (nextStatus === "확정") return "확정: 요청 승인, 완료/취소/노쇼 처리 취소, 또는 운항 예정 상태로 복구합니다.";
 
   return "예약 상태 처리";
 }
@@ -995,7 +995,7 @@ function displayFilterSummary(showFinal: boolean, statusFilter: string, typeFilt
   if (dateFilter) parts.push(`${formatCompactBookingDate(dateFilter)} 선택`);
   if (keyword.trim()) parts.push("검색 적용");
 
-  parts.push(showFinal ? "종료 상태 포함" : "종료 상태 숨김");
+  parts.push(showFinal ? "취소/반려 포함" : "취소/반려 숨김");
 
   return parts.join(" · ");
 }
@@ -1176,11 +1176,11 @@ function normalizeBookingStatusForDisplay(status: unknown) {
   const value = text(status, "").replace(/\s/g, "");
 
   if (!value) return "확정";
-  if (["confirmed", "confirm", "approved", "approve", "예약확정", "승인"].includes(value.toLowerCase())) return "확정";
-  if (["pending", "request", "requested", "예약요청", "승인대기"].includes(value.toLowerCase())) return "요청";
-  if (["done", "complete", "completed", "운항완료", "비행완료"].includes(value.toLowerCase())) return "완료";
-  if (["cancelrequest", "cancelrequested", "취소신청", "취소대기"].includes(value.toLowerCase())) return "취소요청";
-  if (["cancelled", "canceled", "예약취소"].includes(value.toLowerCase())) return "취소";
+  if (["confirmed", "confirm", "approved", "approve", "scheduled", "reserved", "예약확정", "승인", "승인완료", "예정"].includes(value.toLowerCase())) return "확정";
+  if (["pending", "request", "requested", "requesting", "예약요청", "예약신청", "승인대기", "요청대기"].includes(value.toLowerCase())) return "요청";
+  if (["done", "complete", "completed", "finish", "finished", "운항완료", "비행완료", "차감완료"].includes(value.toLowerCase())) return "완료";
+  if (["cancelrequest", "cancelrequested", "cancel_requested", "취소신청", "취소대기", "취소요청"].includes(value.toLowerCase())) return "취소요청";
+  if (["cancelled", "canceled", "cancel", "예약취소"].includes(value.toLowerCase())) return "취소";
 
   return text(status, "확정");
 }
@@ -1205,6 +1205,7 @@ function statusActionButtons(status: string) {
     return [
       { label: "승인", nextStatus: "확정", actionLabel: "예약 요청 승인", tone: "primary" },
       { label: "반려", nextStatus: "반려", actionLabel: "예약 요청 반려", tone: "danger" },
+      { label: "취소", nextStatus: "취소", actionLabel: "관리자 취소", tone: "danger" },
     ] as const;
   }
 
@@ -1217,13 +1218,30 @@ function statusActionButtons(status: string) {
 
   if (status === "확정" || status === "예정") {
     return [
+      { label: "완료", nextStatus: "완료", actionLabel: "예약 완료", tone: "primary" },
       { label: "기상", nextStatus: "기상취소", actionLabel: "기상취소", tone: "secondary" },
       { label: "노쇼", nextStatus: "노쇼", actionLabel: "노쇼 처리", tone: "danger" },
       { label: "취소", nextStatus: "취소", actionLabel: "관리자 취소", tone: "danger" },
     ] as const;
   }
 
-  return [] as const;
+  if (status === "완료") {
+    return [
+      { label: "확정복구", nextStatus: "확정", actionLabel: "완료 처리 취소", tone: "secondary" },
+      { label: "취소", nextStatus: "취소", actionLabel: "완료 예약 관리자 취소", tone: "danger" },
+    ] as const;
+  }
+
+  if (["취소", "기상취소", "노쇼", "반려"].includes(status)) {
+    return [
+      { label: "확정복구", nextStatus: "확정", actionLabel: `${status} 처리 취소`, tone: "secondary" },
+    ] as const;
+  }
+
+  return [
+    { label: "확정", nextStatus: "확정", actionLabel: "상태 확정 처리", tone: "primary" },
+    { label: "취소", nextStatus: "취소", actionLabel: "관리자 취소", tone: "danger" },
+  ] as const;
 }
 
 function sortRowsByOrder<T extends AnyRow>(rows: T[]) {
@@ -1238,6 +1256,11 @@ function sortRowsByOrder<T extends AnyRow>(rows: T[]) {
       "ko"
     );
   });
+}
+
+function notifyPendingApprovalsChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("skynuri:pending-approvals-refresh"));
 }
 
 export default function BookingsPage() {
@@ -3647,7 +3670,7 @@ export default function BookingsPage() {
     if (["취소", "기상취소", "노쇼", "반려"].includes(nextStatus)) {
       const caution = nextStatus === "노쇼"
         ? "\n노쇼 처리는 운영 기록에 남습니다. 교육생 노쇼 차감은 비행기록에서 차감 기록으로 저장하세요."
-        : "\n처리 후 기본 목록과 캘린더에서 숨김 처리될 수 있습니다.";
+        : "\n취소·반려·노쇼·기상취소는 기본 보기에서 숨김 처리될 수 있습니다. 완료 예약은 일정표에 남습니다.";
 
       const ok = window.confirm(`${text(booking.userName, "예약자")} / ${bookingDisplayTitle(booking)}\n${nextStatus} 처리할까요?${caution}`);
       if (!ok) return;
@@ -3701,6 +3724,7 @@ export default function BookingsPage() {
       }
 
       await loadData(true, true);
+      notifyPendingApprovalsChanged();
       if (selectedBooking && text(selectedBooking.bookingId, "") === bookingId) {
         setSelectedBooking((prev) =>
           prev
@@ -3785,6 +3809,7 @@ export default function BookingsPage() {
             : item
         )
       );
+      notifyPendingApprovalsChanged();
 
       setForm({ ...emptyForm });
       setDurationMinutes(60);
@@ -4724,7 +4749,7 @@ export default function BookingsPage() {
             <div>
               <h2 className="text-[14px] font-semibold text-[#10213f]">예약 목록 필터</h2>
               <p className="hidden text-[#61758f]">
-                유형, 상태, 날짜, 검색어를 조합해 예약 목록을 빠르게 좁힙니다. 취소·기상취소·노쇼·반려는 목록/캘린더에서 기본 숨김입니다. 실제 완료는 비행기록 저장 기준으로 관리합니다.
+                유형, 상태, 날짜, 검색어를 조합해 예약 목록을 빠르게 좁힙니다. 완료 예약은 하루 일과 확인을 위해 목록/캘린더에 계속 표시하고, 취소·기상취소·노쇼·반려만 기본 숨김 처리합니다.
               </p>
             </div>
             <button
@@ -4771,7 +4796,7 @@ export default function BookingsPage() {
                   : "border-[#d3ddeb] bg-white text-[#6b7f99] hover:bg-[#f7faff]"
               }`}
             >
-              {showCancelledBookings ? "종료 포함" : "종료 숨김"}
+              {showCancelledBookings ? "취소/반려 포함" : "취소/반려 숨김"}
             </button>
           </div>
 

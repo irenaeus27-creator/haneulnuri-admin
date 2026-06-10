@@ -55,6 +55,13 @@ let cachedAt = 0;
 let pendingPromise: Promise<PendingState> | null = null;
 
 const PENDING_CACHE_MS = 10000;
+export const PENDING_APPROVALS_REFRESH_EVENT = "skynuri:pending-approvals-refresh";
+
+export function clearPendingApprovalsCache() {
+  cachedPendingState = null;
+  cachedAt = 0;
+  pendingPromise = null;
+}
 
 function text(value: unknown, fallback = "") {
   if (value === null || value === undefined) return fallback;
@@ -154,19 +161,37 @@ export function usePendingApprovals() {
     let cancelled = false;
 
     async function load(force = false) {
+      if (force) clearPendingApprovalsCache();
       const nextState = await fetchPendingApprovals(force);
       if (!cancelled) setPendingState(nextState);
     }
 
-    void load();
+    function refreshNow() {
+      void load(true);
+    }
+
+    function refreshWhenVisible() {
+      if (document.visibilityState === "visible") {
+        void load(true);
+      }
+    }
+
+    void load(true);
+
+    window.addEventListener(PENDING_APPROVALS_REFRESH_EVENT, refreshNow);
+    window.addEventListener("focus", refreshNow);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
 
     const timer = window.setInterval(() => {
       void load(true);
-    }, 60000);
+    }, 15000);
 
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      window.removeEventListener(PENDING_APPROVALS_REFRESH_EVENT, refreshNow);
+      window.removeEventListener("focus", refreshNow);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, []);
 
