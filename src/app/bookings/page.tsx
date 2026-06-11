@@ -3282,7 +3282,7 @@ export default function BookingsPage() {
     const nextAircraftName = aircraftChanged ? formValue(dragSnapshot.targetAircraftName) : formValue(booking.aircraftName);
     const moveLabel = aircraftChanged && deltaSteps ? "예약 시간/항공기 이동" : aircraftChanged ? "예약 항공기 이동" : "예약 시간 이동";
     const aircraftMemo = aircraftChanged
-      ? changeMemoText("항공기", aircraftDisplay(booking), "", nextAircraftName || nextAircraftId)
+      ? `항공기: ${aircraftDisplay(booking)} → ${nextAircraftName || nextAircraftId}`
       : "";
     const timeMemo = deltaSteps ? changeMemoText("시간", originalStartTime, originalEndTime, newStart, newEnd) : "";
     const confirmMessage =
