@@ -23,6 +23,8 @@ function safePathPart(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "unknown";
 }
 
+type JsonRecord = Record<string, unknown>;
+
 async function updateInstructorPhoto(instructorId: string, photoUrl: string | null) {
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase
@@ -33,7 +35,54 @@ async function updateInstructorPhoto(instructorId: string, photoUrl: string | nu
     .single();
 
   if (error) throw error;
-  return data;
+  return data as JsonRecord;
+}
+
+async function syncUserPhotoFromInstructor(instructor: JsonRecord, photoUrl: string | null) {
+  const supabase = getSupabaseServerClient();
+  const now = new Date().toISOString();
+  const email = text(instructor.email).toLowerCase();
+  const phone = text(instructor.phone);
+  const name = text(instructor.name);
+
+  const payload = { photo_url: photoUrl, updated_at: now };
+
+  async function updateBy(column: string, value: string) {
+    if (!value) return 0;
+    const { data, error } = await supabase
+      .from("users")
+      .update(payload)
+      .eq(column, value)
+      .select("user_id");
+
+    if (error) {
+      const message = error.message || "";
+      if (message.includes("photo_url") || message.includes("schema cache") || message.includes("Could not find")) return 0;
+      throw error;
+    }
+    return Array.isArray(data) ? data.length : 0;
+  }
+
+  let updatedCount = 0;
+  updatedCount += await updateBy("email", email);
+  if (updatedCount === 0) updatedCount += await updateBy("phone", phone);
+  if (updatedCount === 0 && name) {
+    const { data, error } = await supabase
+      .from("users")
+      .update(payload)
+      .eq("name", name)
+      .or("role.eq.교관,member_type.eq.교관")
+      .select("user_id");
+
+    if (error) {
+      const message = error.message || "";
+      if (!(message.includes("photo_url") || message.includes("schema cache") || message.includes("Could not find"))) throw error;
+    } else {
+      updatedCount += Array.isArray(data) ? data.length : 0;
+    }
+  }
+
+  return updatedCount;
 }
 
 export async function POST(request: NextRequest) {
@@ -67,6 +116,7 @@ export async function POST(request: NextRequest) {
     const { data: publicData } = supabase.storage.from(BUCKET).getPublicUrl(path);
     const photoUrl = publicData.publicUrl;
     const instructor = await updateInstructorPhoto(instructorId, photoUrl);
+    const syncedUsers = await syncUserPhotoFromInstructor(instructor, photoUrl);
 
     return NextResponse.json({
       ok: true,
@@ -75,6 +125,7 @@ export async function POST(request: NextRequest) {
       photoUrl,
       path,
       data: instructor,
+      syncedUsers,
       elapsedMs: Date.now() - startedAt,
     });
   } catch (error) {
@@ -97,6 +148,7 @@ export async function DELETE(request: NextRequest) {
     const instructorId = text(body.instructorId || body.instructor_id);
     if (!instructorId) throw new Error("교관 ID가 없습니다.");
     const instructor = await updateInstructorPhoto(instructorId, null);
+    const syncedUsers = await syncUserPhotoFromInstructor(instructor, null);
 
     return NextResponse.json({
       ok: true,
@@ -104,6 +156,7 @@ export async function DELETE(request: NextRequest) {
       message: "사진을 제거했습니다.",
       photoUrl: "",
       data: instructor,
+      syncedUsers,
       elapsedMs: Date.now() - startedAt,
     });
   } catch (error) {
