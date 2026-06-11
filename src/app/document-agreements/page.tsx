@@ -224,38 +224,38 @@ export default function DocumentAgreementsPage() {
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #f3f6fb; color: #122033; font-family: Pretendard, "Noto Sans KR", Arial, sans-serif; }
     body { padding: 24px; }
-    .toolbar { width: 100%; max-width: 190mm; margin: 0 auto 12px; display: flex; justify-content: flex-end; gap: 8px; }
+    .toolbar { width: 100%; max-width: 188mm; margin: 0 auto 10px; display: flex; justify-content: flex-end; gap: 8px; }
     .toolbar button { border: 1px solid #c7d7f2; background: #2563eb; color: #fff; border-radius: 12px; padding: 10px 16px; font-weight: 700; cursor: pointer; }
     .toolbar button.secondary { background: #fff; color: #334155; }
-    .sheet { width: 100%; max-width: 190mm; min-height: 277mm; margin: 0 auto; background: #fff; border: 1px solid #d9e3f5; border-radius: 24px; padding: 20mm 14mm 14mm; box-shadow: 0 18px 50px rgba(18, 58, 114, 0.10); position: relative; overflow: hidden; }
-    .accent { position: absolute; inset: 0 0 auto 0; height: 10mm; background: linear-gradient(90deg, #2563eb 0%, #60a5fa 55%, #dbeafe 100%); }
-    .brand { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
+    .sheet { width: 100%; max-width: 188mm; min-height: 0; height: auto; margin: 0 auto; background: #fff; border: 1px solid #d9e3f5; border-radius: 20px; padding: 14mm 10mm 10mm; box-shadow: 0 18px 50px rgba(18, 58, 114, 0.10); position: relative; overflow: hidden; }
+    .accent { position: absolute; inset: 0 0 auto 0; height: 7mm; background: linear-gradient(90deg, #2563eb 0%, #60a5fa 55%, #dbeafe 100%); }
+    .brand { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
     .kicker { color: #2563eb; font-size: 11px; letter-spacing: 0.28em; font-weight: 800; margin-bottom: 8px; }
-    h1 { margin: 0; font-size: 31px; line-height: 1.2; letter-spacing: -0.04em; color: #0f172a; }
-    .lead { margin: 12px 0 0; color: #5f718b; font-size: 14px; line-height: 1.75; }
-    .badge { border: 1px solid #bfdbfe; background: #eff6ff; color: #123a72; font-weight: 800; border-radius: 999px; padding: 10px 16px; font-size: 13px; white-space: nowrap; }
-    .hero { display: grid; grid-template-columns: 1.06fr 0.94fr; gap: 16px; align-items: stretch; }
-    .card, .qr-card { border: 1px solid #dbe6f8; border-radius: 24px; background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%); padding: 20px; }
-    h2 { margin: 0; font-size: 23px; letter-spacing: -0.035em; color: #0f172a; }
-    .steps { display: grid; gap: 12px; margin-top: 18px; }
-    .step { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; border: 1px solid #e7eefb; background: #f9fbff; border-radius: 18px; padding: 14px; }
-    .num { width: 36px; height: 36px; border-radius: 999px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 15px; }
-    .step strong { display: block; font-size: 15px; margin-bottom: 4px; color: #0f172a; }
-    .step p { margin: 0; color: #64748b; font-size: 13px; line-height: 1.6; }
-    .notice { margin-top: 18px; border-radius: 20px; background: #f8fbff; border: 1px solid #dfe9f8; padding: 16px 18px; }
-    .notice h3 { margin: 0 0 8px; font-size: 15px; color: #0f172a; }
-    .notice ul { margin: 0; padding-left: 18px; color: #64748b; font-size: 13px; line-height: 1.75; }
+    h1 { margin: 0; font-size: 25px; line-height: 1.18; letter-spacing: -0.04em; color: #0f172a; }
+    .lead { margin: 8px 0 0; color: #5f718b; font-size: 12px; line-height: 1.55; }
+    .badge { border: 1px solid #bfdbfe; background: #eff6ff; color: #123a72; font-weight: 800; border-radius: 999px; padding: 8px 12px; font-size: 12px; white-space: nowrap; }
+    .hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 12px; align-items: start; }
+    .card, .qr-card { border: 1px solid #dbe6f8; border-radius: 20px; background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%); padding: 14px; }
+    h2 { margin: 0; font-size: 18px; letter-spacing: -0.035em; color: #0f172a; }
+    .steps { display: grid; gap: 8px; margin-top: 12px; }
+    .step { display: grid; grid-template-columns: 28px 1fr; gap: 9px; align-items: start; border: 1px solid #e7eefb; background: #f9fbff; border-radius: 14px; padding: 9px 10px; }
+    .num { width: 28px; height: 28px; border-radius: 999px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; }
+    .step strong { display: block; font-size: 12px; margin-bottom: 2px; color: #0f172a; }
+    .step p { margin: 0; color: #64748b; font-size: 10.5px; line-height: 1.45; }
+    .notice { margin-top: 10px; border-radius: 16px; background: #f8fbff; border: 1px solid #dfe9f8; padding: 10px 12px; }
+    .notice h3 { margin: 0 0 5px; font-size: 12px; color: #0f172a; }
+    .notice ul { margin: 0; padding-left: 15px; color: #64748b; font-size: 10.5px; line-height: 1.45; }
     .qr-card { text-align: center; }
-    .qr-title { margin: 0; color: #2563eb; font-size: 11px; letter-spacing: 0.24em; font-weight: 800; }
+    .qr-title { margin: 0; color: #2563eb; font-size: 9px; letter-spacing: 0.22em; font-weight: 800; }
     .qr-card h2 { margin-top: 8px; }
-    .qr-card .desc { margin: 8px 0 0; color: #64748b; font-size: 13px; line-height: 1.65; }
-    .qr-wrap { margin: 18px auto 14px; width: min(100%, 250px); aspect-ratio: 1 / 1; border-radius: 28px; background: #fff; border: 1px solid #dbe6f8; display: flex; align-items: center; justify-content: center; padding: 14px; }
+    .qr-card .desc { margin: 6px 0 0; color: #64748b; font-size: 10.5px; line-height: 1.45; }
+    .qr-wrap { margin: 12px auto 10px; width: min(100%, 210px); aspect-ratio: 1 / 1; border-radius: 22px; background: #fff; border: 1px solid #dbe6f8; display: flex; align-items: center; justify-content: center; padding: 10px; }
     .qr-wrap img { width: 100%; height: 100%; object-fit: contain; }
-    .url { word-break: break-all; border: 1px dashed #c8d8f1; background: #f7faff; border-radius: 16px; padding: 12px 14px; color: #58708d; font-size: 11px; line-height: 1.55; }
-    .footer { margin-top: 22px; display: flex; justify-content: space-between; gap: 12px; align-items: center; color: #64748b; font-size: 12px; }
-    .footer strong { color: #123a72; font-size: 13px; }
-    @page { size: A4 portrait; margin: 10mm; }
-    @media print { body { background: #fff; padding: 0; } .toolbar { display: none; } .sheet { width: 190mm; min-height: 277mm; margin: 0 auto; box-shadow: none; border-radius: 0; border: none; } }
+    .url { word-break: break-all; border: 1px dashed #c8d8f1; background: #f7faff; border-radius: 12px; padding: 8px 10px; color: #58708d; font-size: 9px; line-height: 1.35; }
+    .footer { margin-top: 12px; display: flex; justify-content: space-between; gap: 12px; align-items: center; color: #64748b; font-size: 10px; }
+    .footer strong { color: #123a72; font-size: 11px; }
+    @page { size: A4 portrait; margin: 8mm; }
+    @media print { body { background: #fff; padding: 0; } .toolbar { display: none; } .sheet { width: 194mm; height: auto; max-height: 281mm; margin: 0 auto; padding: 12mm 9mm 8mm; box-shadow: none; border-radius: 0; border: none; page-break-after: avoid; overflow: hidden; } }
   </style>
 </head>
 <body>
@@ -300,7 +300,7 @@ export default function DocumentAgreementsPage() {
     </section>
     <footer class="footer">
       <div><strong>하늘누리 비행교육원</strong><br/>체험비행 전 서약서 작성용 안내물</div>
-      <div>QR 스캔 후 모바일에서 작성 · 제출<br/><span style="font-size:11px; color:#8a98ac;">Scan QR and submit on mobile · Scan QR code and submit on your phone</span></div>
+      <div>QR 스캔 후 모바일에서 작성 · 제출<br/><span style="font-size:10px; color:#8a98ac;">Scan the QR code and submit on your phone</span></div>
     </footer>
   </main>
 </body>
