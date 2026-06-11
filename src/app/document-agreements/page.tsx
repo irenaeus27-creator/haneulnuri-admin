@@ -62,6 +62,10 @@ export default function DocumentAgreementsPage() {
   const [keyword, setKeyword] = useState("");
   const [origin, setOrigin] = useState("");
   const [selected, setSelected] = useState<Row | null>(null);
+  const [verificationMethod, setVerificationMethod] = useState("");
+  const [verifiedBy, setVerifiedBy] = useState("");
+  const [verificationMemo, setVerificationMemo] = useState("");
+  const [savingVerification, setSavingVerification] = useState(false);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -88,6 +92,13 @@ export default function DocumentAgreementsPage() {
 
   useEffect(() => { loadData(); }, []);
 
+  useEffect(() => {
+    if (!selected) return;
+    setVerificationMethod(text(selected.verificationMethod));
+    setVerifiedBy(text(selected.verifiedBy));
+    setVerificationMemo(text(selected.verificationMemo));
+  }, [selected]);
+
   const filtered = rows.filter((row) => {
     const q = keyword.trim().toLowerCase();
     if (!q) return true;
@@ -101,6 +112,44 @@ export default function DocumentAgreementsPage() {
     if (!publicUrl) return;
     await navigator.clipboard.writeText(publicUrl);
     setMessage("QR 서약서 링크를 복사했습니다.");
+  }
+
+  async function saveVerification() {
+    if (!selected) return;
+    const consentId = text(selected.consentId);
+    if (!consentId) return;
+    if (!verificationMethod) {
+      setMessage("본인확인 방식을 선택해주세요.");
+      return;
+    }
+    if (!verifiedBy.trim()) {
+      setMessage("현장 확인자를 입력해주세요.");
+      return;
+    }
+    try {
+      setSavingVerification(true);
+      setMessage("");
+      const response = await fetch("/api/experience-consents", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          consentId,
+          verificationMethod,
+          verifiedBy,
+          verificationMemo,
+        }),
+      });
+      const data = (await response.json()) as { ok?: boolean; message?: string; data?: Row; experienceConsent?: Row };
+      if (!response.ok || !data.ok) throw new Error(data.message || "현장 본인확인 저장에 실패했습니다.");
+      const updated = (data.experienceConsent || data.data || {}) as Row;
+      setRows((prev) => prev.map((row) => text(row.consentId) === consentId ? { ...row, ...updated } : row));
+      setSelected((prev) => prev ? { ...prev, ...updated } : prev);
+      setMessage("현장 본인확인을 저장했습니다.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "현장 본인확인 저장에 실패했습니다.");
+    } finally {
+      setSavingVerification(false);
+    }
   }
 
   return (
@@ -207,6 +256,65 @@ export default function DocumentAgreementsPage() {
               <Info label="서약서 버전" value={text(selected.agreementVersion) || "-"} />
               <Info label="제출 IP" value={text(selected.ipAddress) || "-"} />
               <div className="sm:col-span-2"><Info label="기기 정보" value={text(selected.userAgent) || "-"} /></div>
+              <div className="sm:col-span-2 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-500">ON-SITE VERIFICATION</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">현장 본인확인</div>
+                    <div className="mt-1 text-xs leading-5 text-slate-500">전자서약 제출자와 실제 탑승자가 같은 사람인지 현장에서 확인한 기록입니다.</div>
+                  </div>
+                  <div className={`rounded-full px-3 py-1 text-xs font-semibold ${text(selected.verifiedAt) ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                    {text(selected.verifiedAt) ? "확인완료" : "미확인"}
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="text-xs font-medium text-slate-500">본인확인 방식</span>
+                    <select
+                      value={verificationMethod}
+                      onChange={(event) => setVerificationMethod(event.target.value)}
+                      className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                    >
+                      <option value="">선택</option>
+                      <option value="phone">전화번호 확인</option>
+                      <option value="id_card">신분증 확인</option>
+                      <option value="guardian">보호자 확인</option>
+                      <option value="other">기타</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium text-slate-500">현장 확인자</span>
+                    <input
+                      value={verifiedBy}
+                      onChange={(event) => setVerifiedBy(event.target.value)}
+                      placeholder="예: 김교관"
+                      className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                    />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="text-xs font-medium text-slate-500">확인 메모</span>
+                    <input
+                      value={verificationMemo}
+                      onChange={(event) => setVerificationMemo(event.target.value)}
+                      placeholder="예: 탑승 전 전화번호와 생년월일 확인"
+                      className="mt-1 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                    />
+                  </label>
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  <Info label="저장된 확인 방식" value={verificationMethodText(selected.verificationMethod)} />
+                  <Info label="저장된 확인자" value={text(selected.verifiedBy) || "-"} />
+                  <Info label="확인 시각" value={dateTimeText(selected.verifiedAt)} />
+                </div>
+                <button
+                  type="button"
+                  onClick={saveVerification}
+                  disabled={savingVerification}
+                  className="mt-3 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingVerification ? "저장 중..." : "현장 본인확인 저장"}
+                </button>
+              </div>
               {text(selected.signatureImageUrl) ? (
                 <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <div className="text-xs font-medium text-slate-500">자필 서명 이미지</div>
@@ -222,12 +330,22 @@ export default function DocumentAgreementsPage() {
                 <div className="sm:col-span-2"><Info label="자필 서명 이미지" value="저장된 서명 이미지 없음" /></div>
               )}
               <div className="sm:col-span-2"><Info label="주소" value={text(selected.address) || "-"} /></div>
+              <div className="sm:col-span-2"><Info label="서약서 원문 스냅샷" value={text(selected.agreementSnapshot) || text(selected.agreementText) || "-"} /></div>
             </div>
           </div>
         </div>
       ) : null}
     </PageContainer>
   );
+}
+
+function verificationMethodText(value: unknown) {
+  const raw = text(value);
+  if (raw === "phone") return "전화번호 확인";
+  if (raw === "id_card") return "신분증 확인";
+  if (raw === "guardian") return "보호자 확인";
+  if (raw === "other") return "기타";
+  return raw || "-";
 }
 
 function MarketingBadge({ row }: { row: Row }) {

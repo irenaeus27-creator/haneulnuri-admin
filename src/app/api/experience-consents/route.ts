@@ -224,3 +224,63 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  const startedAt = Date.now();
+  try {
+    const body = (await request.json()) as JsonRecord;
+    const consentId = text(body.consentId || body.consent_id);
+    if (!consentId) throw new Error("접수번호가 필요합니다.");
+
+    const verificationMethod = text(
+      body.verificationMethod || body.verification_method,
+    );
+    const verifiedBy = text(body.verifiedBy || body.verified_by);
+    const verificationMemo = text(body.verificationMemo || body.verification_memo);
+
+    if (!verificationMethod) throw new Error("본인확인 방식을 선택해주세요.");
+    if (!verifiedBy) throw new Error("현장 확인자를 입력해주세요.");
+
+    const supabase = getSupabaseServerClient();
+    const updateRow = {
+      verification_method: verificationMethod,
+      verified_by: verifiedBy,
+      verified_at: text(body.verifiedAt || body.verified_at) || nowIso(),
+      verification_memo: verificationMemo,
+      updated_at: nowIso(),
+    };
+
+    const { data, error } = await supabase
+      .from(TABLE)
+      .update(updateRow)
+      .eq("consent_id", consentId)
+      .select("*")
+      .single();
+
+    if (error) throw new Error(`현장 본인확인 저장 실패: ${error.message}`);
+
+    return NextResponse.json({
+      ok: true,
+      success: true,
+      source: "supabase",
+      service: SERVICE,
+      message: "현장 본인확인을 저장했습니다.",
+      experienceConsent: data,
+      data,
+      elapsedMs: Date.now() - startedAt,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "현장 본인확인 저장에 실패했습니다.",
+        elapsedMs: Date.now() - startedAt,
+      },
+      { status: 500 },
+    );
+  }
+}
