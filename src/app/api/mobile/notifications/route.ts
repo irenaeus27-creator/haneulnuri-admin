@@ -34,15 +34,41 @@ function retentionCutoffIso() {
 
 async function pruneExpiredNotifications() {
   const supabase = mobileSupabase();
-  const { error } = await supabase
+  const cutoff = retentionCutoffIso();
+
+  // 예약 2시간 전 알림처럼 scheduled_at이 미래인 알림은 created_at이 오래되어도 지우면 안 됩니다.
+  // 따라서 실제 표시/발송 기준일을 scheduled_at 우선, 없으면 created_at으로 보고 14일 보관합니다.
+  const { error: unscheduledError } = await supabase
     .from("notifications")
     .delete()
-    .lt("created_at", retentionCutoffIso());
+    .is("scheduled_at", null)
+    .lt("created_at", cutoff);
 
-  if (error) {
-    // 알림 보관 정리 실패가 알림 조회 자체를 막지 않도록 로그만 남깁니다.
-    console.warn("알림 14일 보관 정리 실패", error.message);
+  if (unscheduledError) {
+    console.warn("알림 14일 보관 정리 실패(일반 알림)", unscheduledError.message);
   }
+
+  const { error: scheduledError } = await supabase
+    .from("notifications")
+    .delete()
+    .not("scheduled_at", "is", null)
+    .lt("scheduled_at", cutoff);
+
+  if (scheduledError) {
+    console.warn("알림 14일 보관 정리 실패(예약 알림)", scheduledError.message);
+  }
+}
+
+function notificationEffectiveAt(row: JsonRecord) {
+  return text(row.scheduledAt || row.scheduled_at || row.createdAt || row.created_at);
+}
+
+function isWithinRetention(row: JsonRecord) {
+  const value = notificationEffectiveAt(row);
+  if (!value) return true;
+  const time = new Date(value).getTime();
+  const cutoff = new Date(retentionCutoffIso()).getTime();
+  return Number.isFinite(time) ? time >= cutoff : true;
 }
 
 function parseLimit(value: unknown) {
@@ -221,9 +247,16 @@ function mergeExplicitUserId(target: NotificationQueryTarget, explicitUserId: un
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const explicitUserId = text(searchParams.get("userId"));
+    const explicit = {
+      userId: searchParams.get("userId"),
+      authUserId: searchParams.get("authUserId"),
+      email: searchParams.get("email"),
+      phone: searchParams.get("phone"),
+      phoneDigits: searchParams.get("phoneDigits"),
+    };
+    const explicitUserId = text(explicit.userId);
     const context = await getMobileAuthContext(request, explicitUserId);
-    const target = mergeExplicitUserId(await buildNotificationTarget(context), explicitUserId);
+    const target = mergeExplicitUserId(await buildNotificationTarget(context, explicit), explicitUserId);
     await pruneExpiredNotifications();
     const supabase = mobileSupabase();
     const limit = parseLimit(searchParams.get("limit"));
@@ -234,10 +267,9 @@ export async function GET(request: NextRequest) {
       .from("notifications")
       .select("*")
       .or(buildTargetOrCondition(target))
-      .gte("created_at", retentionCutoffIso())
       .or(`scheduled_at.is.null,scheduled_at.lte.${nowIso()}`)
       .order("created_at", { ascending: false })
-      .limit(limit);
+      .limit(Math.min(limit * 3, 300));
 
     if (unreadOnly) {
       query = query.or("read_at.is.null,status.eq.unread,status.eq.미확인,status.eq.대기,status.eq.pending,status.eq.queued,status.is.null");
@@ -246,11 +278,15 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
     if (error) throw new Error(`알림 조회 실패: ${error.message}`);
 
-    let notifications = ((data || []) as NotificationRow[]).map(enrichNotification);
+    let notifications = ((data || []) as NotificationRow[])
+      .filter(isWithinRetention)
+      .map(enrichNotification);
 
     if (filter !== "all") {
       notifications = notifications.filter((item) => text(item.group) === filter);
     }
+
+    notifications = notifications.slice(0, limit);
 
     const unreadCount = notifications.filter((item) => item.isUnread === true).length;
 
@@ -270,9 +306,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json().catch(() => ({}))) as JsonRecord;
-    const explicitUserId = text(body.userId || body.user_id);
+    const explicit = {
+      userId: body.userId || body.user_id,
+      authUserId: body.authUserId || body.auth_user_id,
+      email: body.email,
+      phone: body.phone,
+      phoneDigits: body.phoneDigits || body.phone_digits,
+    };
+    const explicitUserId = text(explicit.userId);
     const context = await getMobileAuthContext(request, explicitUserId);
-    const target = mergeExplicitUserId(await buildNotificationTarget(context), explicitUserId);
+    const target = mergeExplicitUserId(await buildNotificationTarget(context, explicit), explicitUserId);
     await pruneExpiredNotifications();
     const supabase = mobileSupabase();
     const action = text(body.action || body.type, "markRead");
