@@ -259,14 +259,16 @@ export async function PATCH(request: NextRequest) {
 
     if (error) throw new Error(`현장 본인확인 저장 실패: ${error.message}`);
 
+    const mapped = mapRows([data as JsonRecord])[0] || data;
+
     return NextResponse.json({
       ok: true,
       success: true,
       source: "supabase",
       service: SERVICE,
-      message: "현장 본인확인을 저장했습니다.",
-      experienceConsent: data,
-      data,
+      message: "서약서 제출 확인을 저장했습니다.",
+      experienceConsent: mapped,
+      data: mapped,
       elapsedMs: Date.now() - startedAt,
     });
   } catch (error) {

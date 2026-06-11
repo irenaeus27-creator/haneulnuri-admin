@@ -38,6 +38,22 @@ function boolText(value: unknown) {
   return text(value) || "-";
 }
 
+function verifiedAtOf(row: Row) {
+  return text(row.verifiedAt || row.verified_at);
+}
+
+function verificationMethodOf(row: Row) {
+  return text(row.verificationMethod || row.verification_method);
+}
+
+function verifiedByOf(row: Row) {
+  return text(row.verifiedBy || row.verified_by);
+}
+
+function verificationMemoOf(row: Row) {
+  return text(row.verificationMemo || row.verification_memo);
+}
+
 function isSelected(value: unknown) {
   const raw = text(value).toUpperCase();
   return (
@@ -173,15 +189,30 @@ export default function DocumentAgreementsPage() {
         throw new Error(
           data.message || "서약서 제출 확인 저장에 실패했습니다.",
         );
-      const updated = (data.experienceConsent || data.data || {}) as Row;
+      const updatedRaw = (data.experienceConsent || data.data || {}) as Row;
+      const nowText = new Date().toISOString();
+      const updated: Row = {
+        ...updatedRaw,
+        verificationMethod:
+          text(updatedRaw.verificationMethod || updatedRaw.verification_method) ||
+          "submission_checked",
+        verifiedBy:
+          text(updatedRaw.verifiedBy || updatedRaw.verified_by) || "현장 확인",
+        verifiedAt: text(updatedRaw.verifiedAt || updatedRaw.verified_at) || nowText,
+        verificationMemo:
+          text(updatedRaw.verificationMemo || updatedRaw.verification_memo) ||
+          "동의서 목록에서 서약서 제출 여부 확인",
+      };
       setRows((prev) =>
         prev.map((item) =>
-          text(item.consentId) === consentId ? { ...item, ...updated } : item,
+          text(item.consentId) === consentId
+            ? { ...item, ...updated, verifiedAt: text(updated.verifiedAt) }
+            : item,
         ),
       );
       setSelected((prev) =>
         prev && text(prev.consentId) === consentId
-          ? { ...prev, ...updated }
+          ? { ...prev, ...updated, verifiedAt: text(updated.verifiedAt) }
           : prev,
       );
       setMessage("서약서 제출 확인을 저장했습니다.");
@@ -349,7 +380,7 @@ export default function DocumentAgreementsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {text(row.verifiedAt) ? (
+                        {verifiedAtOf(row) ? (
                           <span className="whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                             확인됨
                           </span>
@@ -451,14 +482,14 @@ export default function DocumentAgreementsPage() {
               <Info
                 label="서약 제출 확인"
                 value={
-                  text(selected.verifiedAt)
-                    ? `확인됨 · ${dateTimeText(selected.verifiedAt)}`
+                  verifiedAtOf(selected)
+                    ? `확인됨 · ${dateTimeText(verifiedAtOf(selected))}`
                     : "미확인"
                 }
               />
               <Info
                 label="확인 방식"
-                value={verificationMethodText(selected.verificationMethod)}
+                value={verificationMethodText(verificationMethodOf(selected))}
               />
               {text(selected.signatureImageUrl) ? (
                 <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
