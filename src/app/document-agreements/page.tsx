@@ -386,29 +386,29 @@ export default function DocumentAgreementsPage() {
               <p className="mt-4 break-all rounded-2xl bg-white px-4 py-3 text-xs leading-5 text-slate-500">
                 {publicUrl || "링크 생성 중"}
               </p>
-              <div className="mt-4 grid w-full grid-cols-2 gap-2">
+              <div className="mt-5 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={copyLink}
-                  className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700"
+                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium tracking-[-0.01em] text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                 >
                   링크 복사
                 </button>
                 <a
                   href={publicUrl || "#"}
                   target="_blank"
-                  className="rounded-2xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-blue-600/20"
+                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-blue-600 bg-blue-600 px-4 text-center text-[15px] font-medium tracking-[-0.01em] text-white shadow-sm transition hover:bg-blue-700"
                 >
                   작성 페이지 열기
                 </a>
+                <button
+                  type="button"
+                  onClick={handlePrintQrPoster}
+                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-4 text-[15px] font-medium tracking-[-0.01em] text-blue-700 transition hover:bg-blue-100"
+                >
+                  QR 인쇄
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handlePrintQrPoster}
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
-              >
-                QR 인쇄
-              </button>
             </div>
           </div>
           <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
@@ -486,7 +486,7 @@ export default function DocumentAgreementsPage() {
                         {dateText(row.flightDate) || "-"}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {text(row.phone) || "-"}
+                        {formatPhone(row.phone)}
                       </td>
                       <td className="px-4 py-3">
                         <ProductBadges row={row} />
@@ -568,7 +568,7 @@ export default function DocumentAgreementsPage() {
               <Info label="접수번호" value={text(selected.consentId)} />
               <Info label="제출일시" value={dateTimeText(selected.createdAt)} />
               <Info label="생년월일" value={dateText(selected.birthDate)} />
-              <Info label="전화번호" value={text(selected.phone)} />
+              <Info label="전화번호" value={formatPhone(selected.phone)} />
               <Info label="탑승일" value={dateText(selected.flightDate)} />
               <Info label="예약경로" value={text(selected.reservationSource)} />
               <Info label="선택 추가상품" value={productText(selected)} />
@@ -586,7 +586,7 @@ export default function DocumentAgreementsPage() {
               <Info label="혈액형" value={text(selected.bloodType) || "-"} />
               <Info
                 label="비상연락처"
-                value={`${text(selected.emergencyContactName) || "-"} / ${text(selected.emergencyContactPhone) || "-"}`}
+                value={`${text(selected.emergencyContactName) || "-"} / ${formatPhone(selected.emergencyContactPhone)}`}
               />
               <Info label="서명자" value={text(selected.signatureName)} />
               <Info label="서명일시" value={dateTimeText(selected.signedAt)} />
