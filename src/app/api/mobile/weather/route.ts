@@ -435,19 +435,20 @@ function weeklyForecastFromMetNorway(data: JsonRecord) {
 async function loadCurrentWeather(errors: WeatherError[]) {
   const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${SKY_NURI_LAT}&longitude=${SKY_NURI_LON}&current_weather=true&hourly=temperature_2m,relative_humidity_2m,pressure_msl,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m&forecast_days=2&past_days=1&wind_speed_unit=kn&timezone=Asia%2FSeoul`;
 
-  // Open-Meteo가 일부 환경에서 TLS 연결이 끊기는 문제가 있어 MET Norway를 우선 사용합니다.
-  try {
-    const data = await fetchMetNorway();
-    return currentWeatherFromMetNorway(data);
-  } catch (error) {
-    errors.push({ provider: "MET Norway", message: error instanceof Error ? error.message : String(error) });
-  }
-
+  // 하늘누리 현장 기준으로 Open-Meteo가 더 잘 맞는 것으로 확인되어 1순위로 사용합니다.
+  // Open-Meteo 연결 실패 시에만 MET Norway로 fallback합니다.
   try {
     const data = await fetchOpenMeteo(openMeteoUrl);
     return currentWeatherFromOpenMeteo(data);
   } catch (error) {
     errors.push({ provider: "Open-Meteo", message: error instanceof Error ? error.message : String(error) });
+  }
+
+  try {
+    const data = await fetchMetNorway();
+    return currentWeatherFromMetNorway(data);
+  } catch (error) {
+    errors.push({ provider: "MET Norway", message: error instanceof Error ? error.message : String(error) });
   }
 
   throw new Error(errors.map((item) => `${item.provider}: ${item.message}`).join(" / "));
@@ -457,17 +458,17 @@ async function loadWeeklyForecast(errors: WeatherError[]) {
   const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${SKY_NURI_LAT}&longitude=${SKY_NURI_LON}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max&hourly=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&wind_speed_unit=kn&timezone=Asia%2FSeoul&forecast_days=7`;
 
   try {
-    const data = await fetchMetNorway();
-    return weeklyForecastFromMetNorway(data);
-  } catch (error) {
-    errors.push({ provider: "MET Norway", message: error instanceof Error ? error.message : String(error) });
-  }
-
-  try {
     const data = await fetchOpenMeteo(openMeteoUrl);
     return weeklyForecastFromOpenMeteo(data);
   } catch (error) {
     errors.push({ provider: "Open-Meteo", message: error instanceof Error ? error.message : String(error) });
+  }
+
+  try {
+    const data = await fetchMetNorway();
+    return weeklyForecastFromMetNorway(data);
+  } catch (error) {
+    errors.push({ provider: "MET Norway", message: error instanceof Error ? error.message : String(error) });
   }
 
   throw new Error(errors.map((item) => `${item.provider}: ${item.message}`).join(" / "));
