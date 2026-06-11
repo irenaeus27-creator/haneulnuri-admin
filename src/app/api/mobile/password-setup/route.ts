@@ -52,6 +52,41 @@ function validatePassword(password: string) {
   return "";
 }
 
+function normalizeSetupCode(value: unknown) {
+  return text(value).replace(/\D/g, "");
+}
+
+function isSetupCodeValid(user: JsonRecord, setupCode: string) {
+  const savedCode = normalizeSetupCode(user.password_setup_code);
+  const usedAt = text(user.password_setup_code_used_at);
+  const expiresAt = text(user.password_setup_code_expires_at);
+
+  if (!savedCode || !setupCode || savedCode !== setupCode) return false;
+  if (usedAt) return false;
+  if (!expiresAt) return false;
+
+  const expiresMs = Date.parse(expiresAt);
+  if (!Number.isFinite(expiresMs)) return false;
+
+  return expiresMs >= Date.now();
+}
+
+async function markSetupCodeUsed(userId: string) {
+  if (!userId) return;
+
+  const supabase = getSupabaseServerClient();
+  const { error } = await supabase
+    .from("users")
+    .update({
+      password_setup_code: null,
+      password_setup_code_used_at: nowIso(),
+      updated_at: nowIso(),
+    })
+    .eq("user_id", userId);
+
+  if (error) throw new Error(`비밀번호 설정코드 사용 처리 실패: ${error.message}`);
+}
+
 function isSamePhone(a: unknown, b: unknown) {
   const aDigits = phoneDigits(a);
   const bDigits = phoneDigits(b);
@@ -183,6 +218,7 @@ export async function POST(request: NextRequest) {
     const phone = formatPhone(body.phone);
     const password = safePassword(body.password);
     const passwordConfirm = safePassword(body.passwordConfirm || body.password_confirm || body.confirmPassword);
+    const setupCode = normalizeSetupCode(body.setupCode || body.setup_code || body.code);
 
     if (!email) {
       return NextResponse.json(
@@ -222,6 +258,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!setupCode) {
+      return NextResponse.json(
+        { ok: false, success: false, message: "관리자에게 받은 6자리 설정코드를 입력해주세요." },
+        { status: 400 },
+      );
+    }
+
+    if (!isSetupCodeValid(user, setupCode)) {
+      return NextResponse.json(
+        { ok: false, success: false, message: "설정코드가 일치하지 않거나 만료되었습니다. 관리자에게 새 코드를 요청해주세요." },
+        { status: 403 },
+      );
+    }
+
     const userEmail = normalizeEmail(user.email || email);
     if (!userEmail) {
       return NextResponse.json(
@@ -231,6 +281,7 @@ export async function POST(request: NextRequest) {
     }
 
     const authUserId = await createOrUpdateAuthUser(user, userEmail, password);
+    await markSetupCodeUsed(text(user.user_id));
 
     return NextResponse.json({
       ok: true,
