@@ -70,6 +70,7 @@ type StudentRow = {
 
 type InstructorRow = { instructorId?: string; name?: string; [key: string]: unknown };
 type AircraftRow = { aircraftId?: string; aircraftName?: string; registrationNo?: string; [key: string]: unknown };
+type UserRow = { userId?: string; user_id?: string; name?: string; phone?: string; email?: string; photoUrl?: string; photo_url?: string; profilePhotoUrl?: string; profile_photo_url?: string; [key: string]: unknown };
 type TrainingLogRow = { trainingLogId?: string; studentId?: string; userId?: string; studentName?: string; trainingDate?: string; [key: string]: unknown };
 
 type StudentForm = {
@@ -347,6 +348,50 @@ function studentInitial(name: unknown) {
   return raw ? raw.slice(0, 1) : "?";
 }
 
+function studentPhotoUrl(row: StudentRow, users: UserRow[]) {
+  const direct = text(row.photoUrl || row.photo_url || row.profilePhotoUrl || row.profile_photo_url, "");
+  if (direct) return direct;
+
+  const userId = text(row.userId || row.user_id, "");
+  const email = text(row.email, "").toLowerCase();
+  const phone = text(row.phone, "").replace(/\D/g, "");
+
+  const user = users.find((item) => {
+    const itemUserId = text(item.userId || item.user_id, "");
+    const itemEmail = text(item.email, "").toLowerCase();
+    const itemPhone = text(item.phone, "").replace(/\D/g, "");
+
+    return (
+      (userId && itemUserId && userId === itemUserId) ||
+      (email && itemEmail && email === itemEmail) ||
+      (phone && itemPhone && phone === itemPhone)
+    );
+  });
+
+  return user ? text(user.photoUrl || user.photo_url || user.profilePhotoUrl || user.profile_photo_url, "") : "";
+}
+
+function StudentAvatar({ row, users }: { row: StudentRow; users: UserRow[] }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const src = studentPhotoUrl(row, users);
+  const showImage = src.length > 0 && !imageFailed;
+
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#1264f4] text-[14px] font-semibold text-white shadow-sm">
+      {showImage ? (
+        <img
+          src={src}
+          alt={`${text(row.name, "교육생")} 사진`}
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        studentInitial(row.name)
+      )}
+    </div>
+  );
+}
+
 function progressPercent(row: StudentRow) {
   const charged = studentChargedMinutes(row);
   if (!charged) return 0;
@@ -469,6 +514,7 @@ function SummaryCard({ title, value, suffix = "", subtitle, tone, icon = "user" 
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<StudentRow[]>([]);
+  const [users, setUsers] = useState<UserRow[]>([]);
   const [instructors, setInstructors] = useState<InstructorRow[]>([]);
   const [aircraft, setAircraft] = useState<AircraftRow[]>([]);
   const [trainingLogs, setTrainingLogs] = useState<TrainingLogRow[]>([]);
@@ -496,15 +542,17 @@ export default function StudentsPage() {
       const response = await fetch(`/api/students?${forceFresh ? "noCache=1&" : ""}_ts=${Date.now()}`, { method: "GET", cache: "no-store" });
       const rawText = await response.text();
       if (!rawText.trim()) throw new Error("서버 응답이 비어 있습니다.");
-      const data = JSON.parse(rawText) as { ok?: boolean; message?: string; students?: StudentRow[]; instructors?: InstructorRow[]; aircraft?: AircraftRow[]; trainingLogs?: TrainingLogRow[] };
+      const data = JSON.parse(rawText) as { ok?: boolean; message?: string; students?: StudentRow[]; users?: UserRow[]; instructors?: InstructorRow[]; aircraft?: AircraftRow[]; trainingLogs?: TrainingLogRow[] };
       if (!response.ok || !data.ok) throw new Error(data.message || "교육생 데이터를 불러오지 못했습니다.");
       setStudents(Array.isArray(data.students) ? data.students : []);
+      setUsers(Array.isArray(data.users) ? data.users : []);
       setInstructors(Array.isArray(data.instructors) ? data.instructors : []);
       setAircraft(Array.isArray(data.aircraft) ? data.aircraft : []);
       setTrainingLogs(Array.isArray(data.trainingLogs) ? data.trainingLogs : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "교육생 데이터를 불러오지 못했습니다.");
       setStudents([]);
+      setUsers([]);
       setInstructors([]);
       setAircraft([]);
       setTrainingLogs([]);
@@ -858,9 +906,7 @@ initialChargeHours: editing ? undefined : Number(form.chargeHours || 0),
                     <tr key={`${text(item.studentId, "student")}-${index}`} className="align-middle hover:bg-[#fbfdff]">
                       <td>
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#1264f4] text-[14px] font-semibold text-white shadow-sm">
-                            {studentInitial(item.name)}
-                          </div>
+                          <StudentAvatar row={item} users={users} />
                           <div>
                             <div className="text-[14px] font-semibold text-[#07172f]">{text(item.name)}</div>
                             <div className="mt-1 text-[12px] font-medium leading-5 text-[#6f8199]">{formatPhone(item.phone)}<br />교육 시작일 {formatDateOnly(item.trainingStartDate)}</div>
