@@ -16,6 +16,8 @@ type UserRow = JsonRow & {
   status?: string;
   memberType?: string;
   member_type?: string;
+  photoUrl?: string;
+  photo_url?: string;
   requestedAt?: string;
   requested_at?: string;
   createdAt?: string;
@@ -681,12 +683,20 @@ export default function UsersPage() {
                   const rejected = normalized === "반려";
                   const pending = isPending(item.status);
                   const roleLabel = getRoleLabel(item.memberType || item.member_type || item.role);
+                  const photoUrl = text(item.photoUrl || item.photo_url);
 
                   return (
                     <tr key={`${userId || "user"}-${index}`} className="align-middle hover:bg-[#fbfdff]">
                       <td>
-                        <div className="text-[14px] font-medium text-[#10213f]">{text(item.name)}</div>
-                        <div className="mt-1 text-[12px] font-normal text-[#6f8199]">{userId || "-"}</div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#dbeafe] bg-[#eaf4ff] text-[13px] font-medium text-[#0b47b7]">
+                            {photoUrl ? <img src={photoUrl} alt={`${text(item.name) || "회원"} 사진`} className="h-full w-full object-cover" /> : (text(item.name).slice(0, 1) || "회")}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="truncate text-[14px] font-medium text-[#10213f]">{text(item.name)}</div>
+                            <div className="mt-1 truncate text-[12px] font-normal text-[#6f8199]">{userId || "-"}</div>
+                          </div>
+                        </div>
                       </td>
 
                       <td>
@@ -759,9 +769,18 @@ export default function UsersPage() {
               {drawerMode === "detail" ? (
                 <div className="space-y-5">
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-[#dbe5f1] bg-[#f8fbff] p-5">
-                    <div>
-                      <div className="text-[20px] font-medium text-[#10213f]">{text(selectedUser.name)}</div>
-                      <div className="mt-1 text-[13px] font-normal text-[#6f8199]">{getUserId(selectedUser) || "-"}</div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-[#dbeafe] bg-[#eaf4ff] text-[18px] font-medium text-[#0b47b7]">
+                        {text(selectedUser.photoUrl || selectedUser.photo_url) ? (
+                          <img src={text(selectedUser.photoUrl || selectedUser.photo_url)} alt={`${text(selectedUser.name) || "회원"} 사진`} className="h-full w-full object-cover" />
+                        ) : (
+                          text(selectedUser.name).slice(0, 1) || "회"
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-[20px] font-medium text-[#10213f]">{text(selectedUser.name)}</div>
+                        <div className="mt-1 text-[13px] font-normal text-[#6f8199]">{getUserId(selectedUser) || "-"}</div>
+                      </div>
                     </div>
                     <span className={`ui-badge ${getStatusBadgeClass(selectedUser.status)}`}>{normalizeStatus(selectedUser.status)}</span>
                   </div>
