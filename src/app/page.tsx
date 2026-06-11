@@ -19,6 +19,8 @@ type DashboardApiResponse = {
   notifications?: Row[];
   instructorSchedules?: Row[];
   trainingCharges?: Row[];
+  trainingLogs?: Row[];
+  flightRecords?: Row[];
   logs?: Row[];
 };
 
@@ -58,6 +60,17 @@ type DonutItem = {
   label: string;
   value: number;
   color: string;
+};
+
+type MissingFlightLogItem = {
+  id: string;
+  href: string;
+  date: string;
+  time: string;
+  userName: string;
+  aircraftName: string;
+  instructorName: string;
+  bookingType: string;
 };
 
 type WeatherData = {
@@ -350,6 +363,8 @@ async function safeFetchAppsScriptDashboardData(): Promise<Partial<DashboardApiR
       notifications: extractDashboardRows(parsed, "notifications"),
       instructorSchedules: extractDashboardRows(parsed, "instructorSchedules"),
       trainingCharges: extractDashboardRows(parsed, "trainingCharges"),
+      trainingLogs: extractDashboardRows(parsed, "trainingLogs"),
+      flightRecords: extractDashboardRows(parsed, "flightRecords"),
       logs: extractDashboardRows(parsed, "logs"),
       settings: extractDashboardRows(parsed, "settings"),
       courseCatalog: extractDashboardRows(parsed, "courseCatalog"),
@@ -519,6 +534,8 @@ async function fetchDashboardDataDirect(): Promise<Required<DashboardApiResponse
     notifications,
     logs,
     trainingCharges,
+    trainingLogs,
+    flightRecords,
   ] = await Promise.all([
     selectDashboardBookings(fromDate, toDate),
     selectDashboardPendingUsers(),
@@ -528,6 +545,8 @@ async function fetchDashboardDataDirect(): Promise<Required<DashboardApiResponse
     selectDashboardTable("notifications", { orderColumn: "created_at", ascending: false, limit: 8 }),
     selectDashboardTable("logs", { orderColumn: "created_at", ascending: false, limit: 20 }),
     selectDashboardTable("training_charges", { orderColumn: "charge_date", ascending: false, limit: 12 }),
+    selectDashboardTable("training_logs", { orderColumn: "created_at", ascending: false, limit: 500 }),
+    selectDashboardTable("flight_records", { orderColumn: "created_at", ascending: false, limit: 500 }),
   ]);
 
   return {
@@ -539,6 +558,8 @@ async function fetchDashboardDataDirect(): Promise<Required<DashboardApiResponse
     notifications,
     instructorSchedules,
     trainingCharges,
+    trainingLogs,
+    flightRecords,
     logs,
   };
 }
@@ -558,6 +579,8 @@ async function fetchDashboardDataFromApi(): Promise<Required<DashboardApiRespons
     notifications: normalizeRows(dashboardData.notifications),
     instructorSchedules: normalizeRows(dashboardData.instructorSchedules),
     trainingCharges: normalizeRows(dashboardData.trainingCharges),
+    trainingLogs: normalizeRows(dashboardData.trainingLogs),
+    flightRecords: normalizeRows(dashboardData.flightRecords),
     logs: normalizeRows(dashboardData.logs),
   };
 }
@@ -572,6 +595,8 @@ async function safeGetDashboardData(): Promise<Required<DashboardApiResponse>> {
     notifications: [],
     instructorSchedules: [],
     trainingCharges: [],
+    trainingLogs: [],
+    flightRecords: [],
     logs: [],
   };
 
@@ -1383,6 +1408,107 @@ function isCancelledStatus(value: unknown) {
 function isConfirmedStatus(value: unknown) {
   const status = text(value).replace(/\s/g, "");
   return status === "확정" || status === "승인완료" || status.toLowerCase() === "approved";
+}
+
+function isFinalStatusForMissingFlightLog(value: unknown) {
+  const status = text(value).replace(/\s/g, "").toLowerCase();
+
+  if (!status) return false;
+  if (isCancelRequestStatus(status)) return true;
+  if (isCancelledStatus(status)) return true;
+
+  return [
+    "완료",
+    "done",
+    "complete",
+    "completed",
+    "finish",
+    "finished",
+    "비행완료",
+    "운항완료",
+    "차감완료",
+  ].includes(status);
+}
+
+function isFlightLogTargetBooking(row: Row) {
+  const status = getBookingStatus(row);
+  const typeText = `${text(row.bookingType || row.reservationType || row.type)} ${text(row.courseName || row.course)}`.replace(/\s/g, "");
+
+  if (!isConfirmedStatus(status)) return false;
+  if (isFinalStatusForMissingFlightLog(status)) return false;
+  if (typeText.includes("PFI")) return false;
+  if (typeText.includes("정비") || typeText.includes("점검")) return false;
+
+  return true;
+}
+
+function logBookingId(row: Row) {
+  return text(row.bookingId || row.booking_id || row.sourceBookingId || row.source_booking_id || row.reservationId || row.reservation_id);
+}
+
+function bookingLogFallbackKey(row: Row, aircraftLookup?: Map<string, string>) {
+  const date = normalizeDate(getBookingDateValue(row));
+  const start = normalizeTime(getBookingStartValue(row));
+  const userName = text(row.userName || row.name || row.customerName || row.memberName).replace(/\s/g, "");
+  const aircraftName = aircraftLookup ? getBookingAircraftName(row, aircraftLookup) : text(row.aircraftName || row.aircraft || row.registrationNo || row.aircraftId);
+
+  return [date, start, userName, text(aircraftName).replace(/\s/g, "")].join("|");
+}
+
+function isPastBookingEnd(row: Row, today: string, currentMinutes: number) {
+  const date = normalizeDate(getBookingDateValue(row));
+  if (!date) return false;
+  if (date < today) return true;
+  if (date > today) return false;
+
+  const end = normalizeTime(getBookingEndValue(row) || getBookingStartValue(row));
+  return timeToMinutes(end) <= currentMinutes;
+}
+
+function buildMissingFlightLogItems(
+  bookings: Row[],
+  trainingLogs: Row[],
+  flightRecords: Row[],
+  aircraftLookup: Map<string, string>,
+  today: string,
+  currentMinutes: number,
+): MissingFlightLogItem[] {
+  const loggedBookingIds = new Set<string>();
+  const loggedFallbackKeys = new Set<string>();
+
+  [...trainingLogs, ...flightRecords].forEach((row) => {
+    const bookingId = logBookingId(row);
+    if (bookingId) loggedBookingIds.add(bookingId);
+    loggedFallbackKeys.add(bookingLogFallbackKey(row, aircraftLookup));
+  });
+
+  return bookings
+    .filter((booking) => isFlightLogTargetBooking(booking))
+    .filter((booking) => isPastBookingEnd(booking, today, currentMinutes))
+    .filter((booking) => {
+      const bookingId = text(booking.bookingId || booking.booking_id || booking.id);
+      if (bookingId && loggedBookingIds.has(bookingId)) return false;
+      return !loggedFallbackKeys.has(bookingLogFallbackKey(booking, aircraftLookup));
+    })
+    .sort((a, b) => `${normalizeDate(getBookingDateValue(a))} ${normalizeTime(getBookingStartValue(a))}`.localeCompare(`${normalizeDate(getBookingDateValue(b))} ${normalizeTime(getBookingStartValue(b))}`))
+    .slice(0, 8)
+    .map((booking, index) => {
+      const bookingId = text(booking.bookingId || booking.booking_id || booking.id, `missing-${index}`);
+      const date = normalizeDate(getBookingDateValue(booking));
+      const start = normalizeTime(getBookingStartValue(booking));
+      const end = normalizeTime(getBookingEndValue(booking));
+
+      return {
+        id: bookingId,
+        href: `/training-logs?bookingId=${encodeURIComponent(bookingId)}`,
+        date,
+        time: `${start || "-"}${end ? `~${end}` : ""}`,
+        userName: text(booking.userName || booking.name || booking.customerName || booking.memberName, "예약자 미입력"),
+        aircraftName: getBookingAircraftName(booking, aircraftLookup),
+        instructorName: text(getBookingInstructorName(booking), "미배정"),
+        bookingType: getBookingType(booking),
+      };
+    });
 }
 
 function calendarPersonLabel(row: Row) {
@@ -2700,15 +2826,18 @@ function OperationChecklist({
   cancelRequests,
   pendingUsers,
   todayBookings,
+  missingFlightLogs,
 }: {
   pendingRequests: number;
   cancelRequests: number;
   pendingUsers: number;
   todayBookings: number;
+  missingFlightLogs: number;
 }) {
   const items = [
     { label: "예약 승인 대기", value: pendingRequests, href: "/bookings?status=요청", tone: "amber" },
     { label: "취소 요청", value: cancelRequests, href: "/bookings?status=취소요청", tone: "rose" },
+    { label: "비행일지 미작성", value: missingFlightLogs, href: "/training-logs", tone: "violet" },
     { label: "회원 승인 대기", value: pendingUsers, href: "/users?status=승인대기", tone: "blue" },
     { label: "오늘 확정 운항", value: todayBookings, href: "/bookings?status=확정", tone: "emerald" },
   ];
@@ -2719,6 +2848,7 @@ function OperationChecklist({
     blue: "bg-[#f4f8ff] text-[#31547c] border-[#d9e4f2]",
     emerald: "bg-[#f5fbf8] text-[#315f50] border-[#d7e9df]",
     sky: "bg-[#f4f9fc] text-[#315d76] border-[#d8e8f2]",
+    violet: "bg-[#f8f5ff] text-[#5b4a7a] border-[#e0d8f1]",
   };
 
   return (
@@ -2726,9 +2856,9 @@ function OperationChecklist({
       <div className="mb-4 flex items-center justify-between">
         <div>
           <span className="block text-[14px] font-medium leading-none tracking-[-0.01em] text-[#10213f]">오늘 처리할 일</span>
-          <p className="mt-1 text-xs font-semibold text-[#6f8199]">승인·취소·운항 전 확인 항목</p>
+          <p className="mt-1 text-xs font-medium text-[#6f8199]">승인·취소·운항 전 확인 항목</p>
         </div>
-        <span className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-semibold text-[#526a89]">
+        <span className="rounded-full bg-[#eef4fb] px-3 py-1 text-xs font-medium text-[#526a89]">
           운영 체크
         </span>
       </div>
@@ -2740,8 +2870,8 @@ function OperationChecklist({
             href={item.href}
             className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 transition hover:bg-white hover:shadow-sm ${toneClass[item.tone]}`}
           >
-            <span className="text-sm font-semibold">{item.label}</span>
-            <span className="flex items-center gap-2 text-lg font-semibold">
+            <span className="text-sm font-medium">{item.label}</span>
+            <span className="flex items-center gap-2 text-lg font-medium">
               {item.value}건
               <span className="text-xs opacity-50">›</span>
             </span>
@@ -2752,6 +2882,46 @@ function OperationChecklist({
   );
 }
 
+
+
+function MissingFlightLogPanel({ items }: { items: MissingFlightLogItem[] }) {
+  return (
+    <ContentCard className="rounded-[22px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_18px_50px_rgba(20,46,80,0.08)]">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <span className="block text-[14px] font-medium leading-none tracking-[-0.01em] text-[#10213f]">비행일지 미작성</span>
+          <p className="mt-1 text-xs font-medium text-[#61758f]">시간이 지난 확정 운항 중 기록이 없는 항목</p>
+        </div>
+        <Link href="/training-logs" className="shrink-0 text-xs font-medium text-[#1264f4]">작성 화면 ›</Link>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[#dbe5f1] bg-[#f8fbff] px-3 py-4 text-center text-sm font-medium text-[#6f8199]">
+          미작성 비행일지가 없습니다.
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {items.map((item) => (
+            <Link
+              key={item.id}
+              href={item.href}
+              className="block rounded-xl border border-[#e5edf7] bg-white px-3 py-2 transition hover:border-blue-200 hover:bg-blue-50/40"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-[#10213f]">{item.userName} · {item.bookingType}</p>
+                  <p className="mt-0.5 truncate text-xs font-medium text-[#61758f]">{item.date.slice(5)} {item.time}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-[#f3f7fb] px-2 py-0.5 text-[11px] font-medium text-[#526a89]">작성</span>
+              </div>
+              <p className="mt-1 truncate text-xs font-medium text-[#6f8199]">{item.aircraftName} · 담당 {item.instructorName}</p>
+            </Link>
+          ))}
+        </div>
+      )}
+    </ContentCard>
+  );
+}
 
 
 function WeatherSummaryCard({ weather }: { weather: WeatherData }) {
@@ -3384,11 +3554,15 @@ function DashboardSidePanel({
   cancelRequests,
   pendingUsers,
   todayBookings,
+  missingFlightLogs,
+  missingFlightLogItems,
 }: {
   pendingRequests: number;
   cancelRequests: number;
   pendingUsers: number;
   todayBookings: number;
+  missingFlightLogs: number;
+  missingFlightLogItems: MissingFlightLogItem[];
 }) {
   return (
     <div className="grid gap-2.5">
@@ -3397,7 +3571,9 @@ function DashboardSidePanel({
         cancelRequests={cancelRequests}
         pendingUsers={pendingUsers}
         todayBookings={todayBookings}
+        missingFlightLogs={missingFlightLogs}
       />
+      <MissingFlightLogPanel items={missingFlightLogItems} />
     </div>
   );
 }
@@ -3416,9 +3592,12 @@ export default async function DashboardPage({
     instructors,
     notifications,
     instructorSchedules,
+    trainingLogs,
+    flightRecords,
     logs,
   } = await safeGetDashboardData();
   const today = todayText();
+  const nowMinutes = currentKstMinutes();
   const dateOptions = createDateOptions(today);
   const requestedDate = firstParam(params.date);
   const selectedDate = dateOptions.some((option) => option.value === requestedDate) ? requestedDate : today;
@@ -3458,7 +3637,8 @@ export default async function DashboardPage({
     .sort((a, b) => `${normalizeDate(getBookingDateValue(a))} ${normalizeTime(getBookingStartValue(a))}`.localeCompare(`${normalizeDate(getBookingDateValue(b))} ${normalizeTime(getBookingStartValue(b))}`))
     .slice(0, 5);
   const recentActivities = buildRecentActivities(logs, notifications, bookings);
-  const instructorAssignmentSummary = buildInstructorAssignmentSummary(activeInstructors, todayScheduleItems, instructorSchedules, today, currentKstMinutes());
+  const instructorAssignmentSummary = buildInstructorAssignmentSummary(activeInstructors, todayScheduleItems, instructorSchedules, today, nowMinutes);
+  const missingFlightLogItems = buildMissingFlightLogItems(bookings, trainingLogs, flightRecords, aircraftLookup, today, nowMinutes);
 
   return (
     <PageContainer title="관리자 대시보드" description="하늘누리 비행교육원의 운영 현황을 한눈에 확인하세요.">
@@ -3474,7 +3654,7 @@ export default async function DashboardPage({
             selectedInstructor={selectedInstructor}
             instructorOptions={instructorOptions}
             today={today}
-            currentTimeMinutes={currentKstMinutes()}
+            currentTimeMinutes={nowMinutes}
           />
 
           <div className="grid min-h-0 items-stretch gap-2.5 grid-cols-[520px_778px]">
@@ -3537,6 +3717,8 @@ export default async function DashboardPage({
             cancelRequests={cancelRequestBookings.length}
             pendingUsers={pendingUsers.length}
             todayBookings={todayBookings.filter((booking) => getDisplayBookingStatus(booking) === "확정").length}
+            missingFlightLogs={missingFlightLogItems.length}
+            missingFlightLogItems={missingFlightLogItems}
           />
           <RecentActivityPanel activities={recentActivities} className="h-full min-h-[360px]" />
         </div>

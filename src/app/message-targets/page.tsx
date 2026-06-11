@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPhone, formatAircraft } from "@/lib/display-formatters";
+
 import { useEffect, useMemo, useState } from "react";
 import ContentCard from "@/components/ContentCard";
 import PageContainer from "@/components/PageContainer";
@@ -91,7 +93,7 @@ export default function MessageTargetsPage() {
         .map((row) => ({
           id: text(row.bookingId),
           name: text(row.userName || row.name),
-          phone: text(row.phone),
+          phone: formatPhone(row.phone),
           category: text(row.bookingType || row.courseName || "예약"),
           status: text(row.status),
           date: displayTargetDate(row.bookingDate),
@@ -105,7 +107,7 @@ export default function MessageTargetsPage() {
       .map((row) => ({
         id: text(row.bookingId),
         name: text(row.userName || row.name),
-        phone: text(row.phone),
+        phone: formatPhone(row.phone),
         category: text(row.bookingType || row.courseName || "예약"),
         status: text(row.status),
         date: displayTargetDate(row.bookingDate),
@@ -188,7 +190,7 @@ export default function MessageTargetsPage() {
                   <tr key={`${target.id}-${target.name}-${displayTargetDate(target.date)}`}>
                     <td><input type="checkbox" checked={selectedIds.includes(target.id)} onChange={() => toggleOne(target.id)} /></td>
                     <td>{target.category || "-"}</td>
-                    <td><div className="font-black text-[#10213f]">{target.name || "-"}</div><div className="mt-1 text-xs font-bold text-[#6f8199]">{target.phone || "-"}</div></td>
+                    <td><div className="font-black text-[#10213f]">{target.name || "-"}</div><div className="mt-1 text-xs font-bold text-[#6f8199]">{formatPhone(target.phone) || "-"}</div></td>
                     <td><span className={`ui-badge ${badgeClass(target.status || "-")}`}>{target.status || "-"}</span></td>
                     <td>{displayTargetDate(target.date)}</td>
                     <td>{target.detail || "-"}</td>

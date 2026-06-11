@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPhone, formatAircraft } from "@/lib/display-formatters";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import TopAlertBell from "@/components/TopAlertBell";
@@ -1264,6 +1266,7 @@ function notifyPendingApprovalsChanged() {
 }
 
 export default function BookingsPage() {
+  const alertFocusKeyRef = useRef("");
   const formRef = useRef<HTMLDivElement | null>(null);
   const calendarDragClickBlockRef = useRef(false);
   const calendarBlockDragClickBlockRef = useRef(false);
@@ -1357,6 +1360,39 @@ export default function BookingsPage() {
       calendarSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
   }
+
+  useEffect(() => {
+    if (loading || bookings.length === 0) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const alertType = text(params.get("alert"));
+    if (alertType !== "booking") return;
+
+    const bookingId = text(params.get("bookingId"));
+    const statusParam = text(params.get("status"));
+    const focusKey = `${alertType}:${bookingId}:${statusParam}:${bookings.length}`;
+
+    if (alertFocusKeyRef.current === focusKey) return;
+    alertFocusKeyRef.current = focusKey;
+
+    const normalizedStatus = normalizeBookingStatusForDisplay(statusParam || "요청");
+    if (normalizedStatus) setStatusFilter(normalizedStatus);
+
+    const target = bookingId
+      ? bookings.find((item) => text(item.bookingId) === bookingId)
+      : bookings.find((item) => normalizeBookingStatusForDisplay(item.status) === normalizedStatus);
+
+    if (target) {
+      focusBookingInCalendar(target);
+      const statusLabel = normalizeBookingStatusForDisplay(target.status);
+      setOperationMessage(`${statusLabel} 알림 항목을 열었습니다. 오른쪽 상세 패널에서 처리할 수 있습니다.`);
+      window.setTimeout(() => setOperationMessage(""), 4500);
+      return;
+    }
+
+    setOperationMessage("알림 항목을 불러왔지만 해당 예약을 찾지 못했습니다. 새로고침 후 다시 확인해 주세요.");
+    window.setTimeout(() => setOperationMessage(""), 4500);
+  }, [bookings, loading]);
 
   function isPendingBooking(item: BookingRow) {
     return normalizedStatusOf(item) === "요청";
@@ -4303,7 +4339,7 @@ export default function BookingsPage() {
                           <span className="text-[13px] font-medium text-[#163255]">{normalizeDate(item.bookingDate)} {normalizeTime(item.startTime)}~{normalizeTime(item.endTime)}</span>
                         </div>
                         <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{pendingRequestSummary(item)}</p>
-                        <p className="mt-0.5 truncate text-[13px] font-normal text-[#6d7f96]">{text(item.phone, "-")} · 담당 {text(item.instructorName, "-")}</p>
+                        <p className="mt-0.5 truncate text-[13px] font-normal text-[#6d7f96]">{formatPhone(item.phone) || "-"} · 담당 {text(item.instructorName, "-")}</p>
                       </div>
 
                       <div className="flex shrink-0 flex-wrap gap-1.5">
@@ -4678,7 +4714,7 @@ export default function BookingsPage() {
                 <div className="rounded-lg bg-white px-2.5 py-1.5">
                   <p className="text-[13px] font-semibold text-[#8292a8]">연락처</p>
                   {isExperienceForm ? (
-                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="010-0000-0000" className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]" />
+                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="01000000000" className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]" />
                   ) : isOtherUseForm ? (
                     <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="담당자 연락처 선택" className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]" />
                   ) : (
@@ -4906,7 +4942,7 @@ export default function BookingsPage() {
                         </td>
                         <td className="px-2 py-1.5 align-top">
                           <div className="font-semibold text-[#102544]">{text(item.userName)}</div>
-                          <div className="mt-1 text-[13px] font-semibold text-[#8ca0b7]">{text(item.phone)}</div>
+                          <div className="mt-1 text-[13px] font-semibold text-[#8ca0b7]">{formatPhone(item.phone)}</div>
                         </td>
                         <td className="px-2 py-1.5 align-top">
                           <div className="font-semibold text-[#23415f]">{text(item.instructorName, "-")}</div>

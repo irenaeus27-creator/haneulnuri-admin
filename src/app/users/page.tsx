@@ -917,7 +917,7 @@ export default function UsersPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="block">
                       <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">전화번호</span>
-                      <input value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value.replace(/\D/g, "") }))} className="ui-input" placeholder="숫자만 입력" />
+                      <input value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value.replace(/\D/g, "") }))} className="ui-input" placeholder="01000000000" />
                     </label>
                     <label className="block">
                       <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">이메일</span>

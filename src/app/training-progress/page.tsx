@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPhone, formatAircraft } from "@/lib/display-formatters";
+
 import { useEffect, useMemo, useState } from "react";
 import ContentCard from "@/components/ContentCard";
 import PageContainer from "@/components/PageContainer";
@@ -321,7 +323,7 @@ export default function TrainingProgressPage() {
                 <tr key={`${row.id || "student"}-${row.studentId || row.name || "row"}-${rowIndex}`}>
                   <td>
                     <div className="font-black text-[#10213f]">{row.name || "-"}</div>
-                    <div className="mt-1 text-xs font-bold text-[#6f8199]">{row.phone || row.studentId || "-"}</div>
+                    <div className="mt-1 text-xs font-bold text-[#6f8199]">{formatPhone(row.phone) || row.studentId || "-"}</div>
                   </td>
                   <td>{row.stage}</td>
                   <td><span className={`ui-badge ${badgeClass(row.status)}`}>{row.status}</span></td>

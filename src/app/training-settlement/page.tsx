@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPhone, formatAircraft } from "@/lib/display-formatters";
+
 import { useEffect, useMemo, useState } from "react";
 import { formatKstDate, formatKstDateTime } from "@/lib/formatDateTime";
 
@@ -279,7 +281,7 @@ export default function TrainingSettlementPage() {
                   <tr key={`${row.studentId || row.name || "settlement"}-${index}`} className="cursor-pointer hover:bg-slate-50" onClick={() => setSelectedStudentId(row.studentId || row.name)}>
                     <td className="px-4 py-3">
                       <p className="font-semibold text-slate-900">{row.name || "-"}</p>
-                      <p className="mt-1 text-xs text-slate-500">{row.phone || row.studentId || "-"}</p>
+                      <p className="mt-1 text-xs text-slate-500">{formatPhone(row.phone) || row.studentId || "-"}</p>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`rounded-full px-3 py-1 text-xs font-bold ${row.unpaidAmount > 0 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"}`}>

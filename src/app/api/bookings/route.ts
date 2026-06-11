@@ -12,6 +12,71 @@ function text(value: unknown, fallback = "") {
   return result || fallback;
 }
 
+function normalizePhoneText(value: unknown) {
+  return text(value).replace(/[^0-9]/g, "");
+}
+
+async function resolveBookingNotificationUserId(booking: JsonRecord) {
+  const supabase = getSupabaseServerClient();
+  const candidates = new Set<string>();
+
+  const directUserId = text(booking.userId || booking.user_id);
+  if (directUserId) candidates.add(directUserId);
+
+  const studentId = text(booking.studentId || booking.student_id);
+  if (studentId) {
+    const { data } = await supabase
+      .from("students")
+      .select("user_id")
+      .eq("student_id", studentId)
+      .maybeSingle();
+    const value = text((data as JsonRecord | null)?.user_id);
+    if (value) candidates.add(value);
+  }
+
+  const rentalPilotId = text(booking.rentalPilotId || booking.rental_pilot_id || booking.pilotId || booking.pilot_id);
+  if (rentalPilotId) {
+    const { data } = await supabase
+      .from("rental_pilots")
+      .select("user_id")
+      .eq("rental_pilot_id", rentalPilotId)
+      .maybeSingle();
+    const value = text((data as JsonRecord | null)?.user_id);
+    if (value) candidates.add(value);
+  }
+
+  const email = text(booking.email).toLowerCase();
+  const rawPhone = text(booking.phone || booking.userPhone || booking.user_phone);
+  const phone = normalizePhoneText(rawPhone);
+  const userName = text(booking.userName || booking.user_name || booking.name);
+
+  const filters: string[] = [];
+  if (email) filters.push(`email.eq.${email}`);
+  if (rawPhone) filters.push(`phone.eq.${rawPhone}`);
+  if (phone && phone !== rawPhone) filters.push(`phone.eq.${phone}`);
+  if (userName) filters.push(`name.eq.${userName}`);
+
+  if (filters.length > 0) {
+    const { data } = await supabase
+      .from("users")
+      .select("user_id,status,approved_at,updated_at,created_at")
+      .or(filters.join(","));
+
+    const rows = ((data || []) as JsonRecord[]).filter((row) => text(row.user_id));
+    rows.sort((a, b) => {
+      const approvedA = text(a.approved_at) ? 1 : 0;
+      const approvedB = text(b.approved_at) ? 1 : 0;
+      const timeA = Date.parse(text(a.updated_at || a.created_at)) || 0;
+      const timeB = Date.parse(text(b.updated_at || b.created_at)) || 0;
+      return approvedB - approvedA || timeB - timeA;
+    });
+    const value = text(rows[0]?.user_id);
+    if (value) candidates.add(value);
+  }
+
+  return Array.from(candidates).find(Boolean) || directUserId;
+}
+
 function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
@@ -345,7 +410,7 @@ async function loadBookingsPageData(fromDate: string, toDate: string) {
 async function recordBookingAudit(action: string, booking: JsonRecord) {
   const label = bookingActionLabel(action);
   const bookingId = text(booking.bookingId || booking.booking_id || booking.id);
-  const userId = text(booking.userId || booking.user_id);
+  const userId = await resolveBookingNotificationUserId(booking);
   const userName = text(booking.userName || booking.user_name || booking.name);
   const status = text(booking.status);
 
@@ -376,7 +441,9 @@ async function recordBookingAudit(action: string, booking: JsonRecord) {
       body: message,
       targetType: "booking",
       targetUserId: userId,
+      userId,
       targetUserName: userName,
+      relatedId: bookingId,
       status: "대기",
       memo: bookingId,
     });

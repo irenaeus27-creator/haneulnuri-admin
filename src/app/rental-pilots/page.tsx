@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPhone, formatAircraft } from "@/lib/display-formatters";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import ContentCard from "@/components/ContentCard";
 import PageContainer from "@/components/PageContainer";
@@ -120,7 +122,7 @@ function toForm(row: Row): PilotForm {
     pilotId: text(row.pilotId || row.pilot_id),
     userId: text(row.userId || row.user_id),
     name: text(row.name),
-    phone: text(row.phone),
+    phone: formatPhone(row.phone),
     email: text(row.email),
     licenseNo: text(row.licenseNo || row.license_no || row.licenseNumber),
     status: text(row.status || "활성"),
@@ -527,7 +529,7 @@ export default function RentalPilotsPage() {
                       <div className="font-semibold text-[#10213f]">{text(row.name, "-")}</div>
                       <div className="mt-1 text-xs text-[#7a8ba3]">{text(row.pilotId || row.pilot_id, "-")}</div>
                     </td>
-                    <td>{text(row.phone, "-")}</td>
+                    <td>{formatPhone(row.phone) || "-"}</td>
                     <td>{text(row.licenseNo || row.license_no || row.licenseNumber, "-")}</td>
                     <td>
                       <div className="font-semibold text-[#10213f]">총 {formatHours(stats.totalMinutes)}</div>

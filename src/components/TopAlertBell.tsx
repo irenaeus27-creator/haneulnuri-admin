@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatBookingDate as sharedFormatBookingDate, formatBookingTime as sharedFormatBookingTime } from "@/lib/formatDateTime";
 
@@ -205,24 +206,31 @@ export function usePendingApprovals() {
       const label = text(item.courseName) || text(item.bookingType) || "예약";
       const date = normalizeDate(item.bookingDate);
       const start = normalizeTime(item.startTime);
+      const bookingId = text(item.bookingId, String(index));
+      const statusParam = encodeURIComponent(status || "요청");
+      const bookingParam = bookingId ? `&bookingId=${encodeURIComponent(bookingId)}` : "";
       return {
-        id: `booking-${text(item.bookingId, String(index))}`,
+        id: `booking-${bookingId}`,
         type: "booking",
-        href: "/bookings",
+        href: `/bookings?alert=booking&status=${statusParam}${bookingParam}`,
         title: `${status === "취소요청" ? "취소 요청" : "예약 요청"} · ${name}`,
         description: [label, date && start ? `${date} ${start}` : date].filter(Boolean).join(" / "),
         badge: status === "취소요청" ? "취소" : "승인",
       };
     });
 
-    const userItems = pendingUsers.slice(0, 4).map((item, index): ApprovalItem => ({
-      id: `user-${text(item.userId, String(index))}`,
+    const userItems = pendingUsers.slice(0, 4).map((item, index): ApprovalItem => {
+      const userId = text(item.userId, String(index));
+      const userParam = userId ? `&userId=${encodeURIComponent(userId)}` : "";
+      return {
+      id: `user-${userId}`,
       type: "user",
-      href: "/users",
+      href: `/users?alert=user&status=pending${userParam}`,
       title: `회원 승인 대기 · ${text(item.name, "이름 미입력")}`,
       description: [roleLabel(item.role), text(item.requestedAt)].filter(Boolean).join(" / "),
       badge: "회원",
-    }));
+    };
+    });
 
     return [...bookingItems, ...userItems];
   }, [pendingBookings, pendingUsers]);
@@ -245,6 +253,7 @@ function BellIcon() {
 }
 
 export default function TopAlertBell({ className = "" }: { className?: string }) {
+  const router = useRouter();
   const { totalCount, pendingBookingCount, pendingUserCount, items } = usePendingApprovals();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -258,17 +267,29 @@ export default function TopAlertBell({ className = "" }: { className?: string })
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  const primaryActionHref = items[0]?.href || (pendingBookingCount > 0 ? "/bookings?alert=booking&status=%EC%9A%94%EC%B2%AD" : pendingUserCount > 0 ? "/users?alert=user&status=pending" : "");
+
+  function handleBellClick() {
+    if (totalCount > 0 && primaryActionHref) {
+      setOpen(false);
+      router.push(primaryActionHref);
+      return;
+    }
+
+    setOpen((prev) => !prev);
+  }
+
   return (
     <div ref={ref} className={`relative ${className}`}>
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={handleBellClick}
         className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[#d8e2ef] bg-white text-[#385273] shadow-sm transition hover:bg-[#f7faff]"
         aria-label="승인 대기 알림"
       >
         <BellIcon />
         {totalCount > 0 ? (
-          <span className="absolute -right-1 -top-1 min-w-[20px] rounded-full bg-[#ff4d5e] px-1.5 py-0.5 text-[11px] font-black leading-none text-white">
+          <span className="absolute -right-1 -top-1 min-w-[20px] rounded-full bg-[#ff4d5e] px-1.5 py-0.5 text-[11px] font-medium leading-none text-white">
             {totalCount}
           </span>
         ) : null}
@@ -278,22 +299,22 @@ export default function TopAlertBell({ className = "" }: { className?: string })
         <div className="absolute right-0 z-50 mt-3 w-[360px] rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-[0_24px_60px_rgba(15,23,42,0.16)]">
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <p className="text-sm font-black text-[#102544]">승인 대기 알림</p>
+              <p className="text-sm font-medium text-[#102544]">승인 대기 알림</p>
               <p className="mt-1 text-xs font-medium text-[#6d7f96]">예약 요청과 회원 승인 대기를 간단히 확인합니다.</p>
             </div>
-            <span className="rounded-full bg-[#eef4fb] px-2.5 py-1 text-xs font-black text-[#34527a]">
+            <span className="rounded-full bg-[#eef4fb] px-2.5 py-1 text-xs font-medium text-[#34527a]">
               총 {totalCount}건
             </span>
           </div>
 
           <div className="mb-3 grid grid-cols-2 gap-2">
             <Link href="/bookings" prefetch={false} className="rounded-2xl border border-[#e5edf7] bg-[#fbfdff] px-3 py-2 text-left hover:bg-[#f4f8fd]">
-              <p className="text-xs font-bold text-[#6d7f96]">예약 승인</p>
-              <p className="mt-1 text-xl font-black text-[#102544]">{pendingBookingCount}</p>
+              <p className="text-xs font-medium text-[#6d7f96]">예약 승인</p>
+              <p className="mt-1 text-xl font-semibold text-[#102544]">{pendingBookingCount}</p>
             </Link>
             <Link href="/users" prefetch={false} className="rounded-2xl border border-[#e5edf7] bg-[#fbfdff] px-3 py-2 text-left hover:bg-[#f4f8fd]">
-              <p className="text-xs font-bold text-[#6d7f96]">회원 승인</p>
-              <p className="mt-1 text-xl font-black text-[#102544]">{pendingUserCount}</p>
+              <p className="text-xs font-medium text-[#6d7f96]">회원 승인</p>
+              <p className="mt-1 text-xl font-semibold text-[#102544]">{pendingUserCount}</p>
             </Link>
           </div>
 
@@ -311,10 +332,10 @@ export default function TopAlertBell({ className = "" }: { className?: string })
                   className="flex items-start justify-between gap-3 rounded-2xl border border-[#e8eef7] bg-white px-3 py-3 hover:bg-[#f8fbff]"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-[#102544]">{item.title}</p>
+                    <p className="truncate text-sm font-medium text-[#102544]">{item.title}</p>
                     <p className="mt-1 truncate text-xs font-medium text-[#71829a]">{item.description || "상세 내용 없음"}</p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-[#fff5e8] px-2.5 py-1 text-[11px] font-black text-[#d97706]">
+                  <span className="shrink-0 rounded-full bg-[#fff5e8] px-2.5 py-1 text-[11px] font-medium text-[#d97706]">
                     {item.badge}
                   </span>
                 </Link>

@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPhone, formatAircraft } from "@/lib/display-formatters";
+
 import { useMemo, useState } from "react";
 
 type AnyRow = Record<string, unknown>;
@@ -181,7 +183,7 @@ export default function StudentTrainingLogDrawer({ student, trainingLogs, onClos
               <div className="text-[12px] font-semibold text-[#1264f4]">교육생 비행일지</div>
               <h2 className="mt-1 text-[20px] font-semibold tracking-[-0.025em] text-[#07172f]">{studentName}</h2>
               <p className="mt-1 text-[13px] font-medium text-[#6f8199]">
-                {text(student.phone || student.studentId, "기본정보 없음")} · {studentLogs.length}건 기록
+                {formatPhone(student.phone) || text(student.studentId, "기본정보 없음")} · {studentLogs.length}건 기록
               </p>
             </div>
             <button type="button" onClick={onClose} className="ui-btn ui-btn-outline h-10">닫기</button>

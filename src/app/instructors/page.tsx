@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPhone, formatAircraft } from "@/lib/display-formatters";
+
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import PageContainer from "@/components/PageContainer";
 import ContentCard from "@/components/ContentCard";
@@ -390,7 +392,7 @@ export default function InstructorsPage() {
       instructorId,
       userId: text(row.userId || row.user_id),
       name: text(row.name),
-      phone: text(row.phone),
+      phone: formatPhone(row.phone),
       email: text(row.email),
       password: "",
       licenseNo: text(row.licenseNo || row.license_no),
@@ -957,7 +959,7 @@ export default function InstructorsPage() {
                     onChange={(event) =>
                       setForm({ ...form, phone: event.target.value })
                     }
-                    placeholder="010-0000-0000"
+                    placeholder="01000000000"
                   />
                 </Field>
                 <Field label="이메일" required>

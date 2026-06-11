@@ -1,5 +1,7 @@
 "use client";
 
+import { formatPhone, formatAircraft } from "@/lib/display-formatters";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   formatKstDate as sharedFormatKstDate,
@@ -1788,7 +1790,7 @@ export default function TrainingLogsPage() {
                             if (!id) return null;
                             return (
                               <option key={`${id}-${index}`} value={id}>
-                                {text(item.name || item.studentName)} / {text(item.phone)}
+                                {text(item.name || item.studentName)} / {formatPhone(item.phone)}
                               </option>
                             );
                           },

@@ -10,6 +10,7 @@ import {
   todayText,
   toCamelObject,
 } from "@/lib/supabase/mobile-helpers";
+import { formatAircraft } from "@/lib/display-formatters";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -252,7 +253,7 @@ function mapFlightRecord(row: JsonRecord, source: "flight_record" | "training_lo
     flightDate: date,
     flightType: text(camel.flightType || camel.flight_type || camel.bookingType || camel.booking_type || camel.reservationType || camel.reservation_type),
     aircraftId: text(camel.aircraftId || camel.aircraft_id),
-    aircraftName: text(camel.aircraftName || camel.aircraft_name || camel.aircraft),
+    aircraftName: formatAircraft(camel.aircraftName || camel.aircraft_name || camel.aircraft || camel.aircraftId || camel.aircraft_id),
     instructorId: text(camel.instructorId || camel.instructor_id),
     instructorName: text(camel.instructorName || camel.instructor_name),
     customerName: text(camel.customerName || camel.customer_name || camel.userName || camel.user_name || camel.name),
@@ -293,7 +294,7 @@ function mapTrainingLog(row: JsonRecord) {
     flightDate: date,
     flightType: text(camel.trainingType || camel.training_type || "교육비행"),
     aircraftId: text(camel.aircraftId || camel.aircraft_id),
-    aircraftName: text(camel.aircraftName || camel.aircraft_name || camel.aircraft),
+    aircraftName: formatAircraft(camel.aircraftName || camel.aircraft_name || camel.aircraft || camel.aircraftId || camel.aircraft_id),
     instructorId: text(camel.instructorId || camel.instructor_id),
     instructorName: text(camel.instructorName || camel.instructor_name),
     customerName: text(camel.studentName || camel.student_name || camel.customerName || camel.customer_name || camel.userName || camel.user_name || camel.name),
@@ -321,26 +322,17 @@ function belongsToMe(row: JsonRecord, my: {
   userId: string;
   studentId: string;
   pilotId: string;
-  name: string;
-  email: string;
-  phone: string;
   bookingIds: Set<string>;
 }) {
   const userId = text(row.userId || row.user_id);
   const studentId = text(row.studentId || row.student_id);
-  const pilotId = text(row.pilotId || row.pilot_id);
+  const pilotId = text(row.pilotId || row.pilot_id || row.rentalPilotId || row.rental_pilot_id);
   const bookingId = bookingIdOf(row);
-  const email = text(row.email).toLowerCase();
-  const phone = text(row.phone).replace(/[^0-9]/g, "");
-  const name = text(row.customerName || row.customer_name || row.studentName || row.student_name || row.userName || row.user_name || row.name);
 
   if (userId && userId === my.userId) return true;
   if (studentId && my.studentId && studentId === my.studentId) return true;
   if (pilotId && my.pilotId && pilotId === my.pilotId) return true;
   if (bookingId && my.bookingIds.has(bookingId)) return true;
-  if (email && my.email && email === my.email) return true;
-  if (phone && my.phone && phone === my.phone) return true;
-  if (name && my.name && name.replace(/\s/g, "") === my.name.replace(/\s/g, "")) return true;
 
   return false;
 }
@@ -458,10 +450,7 @@ export async function GET(request: NextRequest) {
     const my = {
       userId: context.userId,
       studentId: text(student.studentId || student.student_id),
-      pilotId: text(rentalPilot.pilotId || rentalPilot.pilot_id),
-      name: text(user.name || student.name || rentalPilot.name),
-      email: text(user.email).toLowerCase(),
-      phone: text(user.phone).replace(/[^0-9]/g, ""),
+      pilotId: text(rentalPilot.pilotId || rentalPilot.pilot_id || rentalPilot.rental_pilot_id),
       bookingIds,
     };
 

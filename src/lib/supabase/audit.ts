@@ -61,6 +61,8 @@ export type NotificationInput = {
   targetType?: string;
   targetUserId?: string | null;
   targetUserName?: string | null;
+  relatedId?: string | null;
+  userId?: string | null;
   status?: string;
   memo?: string;
 };
@@ -76,8 +78,10 @@ export async function writeNotification(input: NotificationInput) {
       title: text(input.title),
       body: text(input.body),
       target_type: text(input.targetType, "user"),
-      target_user_id: text(input.targetUserId),
+      target_user_id: text(input.targetUserId || input.userId),
+      user_id: text(input.userId || input.targetUserId),
       target_user_name: text(input.targetUserName),
+      related_id: text(input.relatedId || input.memo),
       status: text(input.status, "대기"),
       sent_at: null,
       memo: text(input.memo),
