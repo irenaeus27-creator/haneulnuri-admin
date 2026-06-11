@@ -56,338 +56,6 @@ function verificationMemoOf(row: Row) {
 
 function isSelected(value: unknown) {
   const raw = text(value).toUpperCase();
-  function handlePrintQrPoster() {
-    if (!publicUrl) {
-      setMessage("QR 링크를 준비하는 중입니다. 잠시 후 다시 시도해주세요.");
-      return;
-    }
-
-    const printWindow = window.open("", "_blank", "width=980,height=1280");
-    if (!printWindow) {
-      setMessage("인쇄 창을 열지 못했습니다. 팝업 차단을 확인해주세요.");
-      return;
-    }
-
-    const safeUrl = escapeHtml(publicUrl);
-    const qrImage = qrUrl(publicUrl);
-
-    const html = `<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>하늘누리 체험비행 서약서 QR</title>
-  <style>
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #f3f6fb;
-      color: #122033;
-      font-family: Pretendard, "Noto Sans KR", Arial, sans-serif;
-    }
-    body { padding: 24px; }
-    .toolbar {
-      width: 210mm;
-      margin: 0 auto 12px;
-      display: flex;
-      justify-content: flex-end;
-      gap: 8px;
-    }
-    .toolbar button {
-      border: 1px solid #c7d7f2;
-      background: #2563eb;
-      color: #fff;
-      border-radius: 12px;
-      padding: 10px 16px;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    .toolbar button.secondary {
-      background: #fff;
-      color: #334155;
-    }
-    .sheet {
-      width: 210mm;
-      min-height: 297mm;
-      margin: 0 auto;
-      background: #fff;
-      border: 1px solid #d9e3f5;
-      border-radius: 24px;
-      padding: 24mm 18mm 18mm;
-      box-shadow: 0 18px 50px rgba(18, 58, 114, 0.10);
-      position: relative;
-      overflow: hidden;
-    }
-    .accent {
-      position: absolute;
-      inset: 0 0 auto 0;
-      height: 10mm;
-      background: linear-gradient(90deg, #2563eb 0%, #60a5fa 55%, #dbeafe 100%);
-    }
-    .brand {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 18px;
-      margin-bottom: 22px;
-    }
-    .kicker {
-      color: #2563eb;
-      font-size: 11px;
-      letter-spacing: 0.28em;
-      font-weight: 800;
-      margin-bottom: 8px;
-    }
-    h1 {
-      margin: 0;
-      font-size: 31px;
-      line-height: 1.2;
-      letter-spacing: -0.04em;
-      color: #0f172a;
-    }
-    .lead {
-      margin: 12px 0 0;
-      color: #5f718b;
-      font-size: 14px;
-      line-height: 1.75;
-    }
-    .badge {
-      border: 1px solid #bfdbfe;
-      background: #eff6ff;
-      color: #123a72;
-      font-weight: 800;
-      border-radius: 999px;
-      padding: 10px 16px;
-      font-size: 13px;
-      white-space: nowrap;
-    }
-    .hero {
-      display: grid;
-      grid-template-columns: 1.08fr 0.92fr;
-      gap: 18px;
-      align-items: stretch;
-    }
-    .card, .qr-card {
-      border: 1px solid #dbe6f8;
-      border-radius: 24px;
-      background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-      padding: 20px;
-    }
-    h2 {
-      margin: 0;
-      font-size: 23px;
-      letter-spacing: -0.035em;
-      color: #0f172a;
-    }
-    .steps {
-      display: grid;
-      gap: 12px;
-      margin-top: 18px;
-    }
-    .step {
-      display: grid;
-      grid-template-columns: 36px 1fr;
-      gap: 12px;
-      align-items: start;
-      border: 1px solid #e7eefb;
-      background: #f9fbff;
-      border-radius: 18px;
-      padding: 14px;
-    }
-    .num {
-      width: 36px;
-      height: 36px;
-      border-radius: 999px;
-      background: #eff6ff;
-      color: #2563eb;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 900;
-      font-size: 15px;
-    }
-    .step strong {
-      display: block;
-      font-size: 15px;
-      margin-bottom: 4px;
-      color: #0f172a;
-    }
-    .step p {
-      margin: 0;
-      color: #64748b;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-    .notice {
-      margin-top: 18px;
-      border-radius: 20px;
-      background: #f8fbff;
-      border: 1px solid #dfe9f8;
-      padding: 16px 18px;
-    }
-    .notice h3 {
-      margin: 0 0 8px;
-      font-size: 15px;
-      color: #0f172a;
-    }
-    .notice ul {
-      margin: 0;
-      padding-left: 18px;
-      color: #64748b;
-      font-size: 13px;
-      line-height: 1.75;
-    }
-    .qr-card {
-      text-align: center;
-    }
-    .qr-title {
-      margin: 0;
-      color: #2563eb;
-      font-size: 11px;
-      letter-spacing: 0.24em;
-      font-weight: 800;
-    }
-    .qr-card h2 {
-      margin-top: 8px;
-    }
-    .qr-card .desc {
-      margin: 8px 0 0;
-      color: #64748b;
-      font-size: 13px;
-      line-height: 1.65;
-    }
-    .qr-wrap {
-      margin: 18px auto 14px;
-      width: 300px;
-      height: 300px;
-      border-radius: 28px;
-      background: #fff;
-      border: 1px solid #dbe6f8;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 14px;
-    }
-    .qr-wrap img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-    .url {
-      word-break: break-all;
-      border: 1px dashed #c8d8f1;
-      background: #f7faff;
-      border-radius: 16px;
-      padding: 12px 14px;
-      color: #58708d;
-      font-size: 11px;
-      line-height: 1.55;
-    }
-    .footer {
-      margin-top: 22px;
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: center;
-      color: #64748b;
-      font-size: 12px;
-    }
-    .footer strong {
-      color: #123a72;
-      font-size: 13px;
-    }
-    @page { size: A4 portrait; margin: 10mm; }
-    @media print {
-      body { background: #fff; padding: 0; }
-      .toolbar { display: none; }
-      .sheet {
-        margin: 0 auto;
-        box-shadow: none;
-        border-radius: 0;
-        border: none;
-        min-height: auto;
-      }
-    }
-  </style>
-</head>
-<body>
-  <div class="toolbar">
-    <button class="secondary" onclick="window.close()">닫기</button>
-    <button onclick="window.print()">인쇄하기</button>
-  </div>
-  <main class="sheet">
-    <div class="accent"></div>
-    <section class="brand">
-      <div>
-        <div class="kicker">SKYNURI FLIGHT</div>
-        <h1>하늘누리 비행교육원</h1>
-        <p class="lead">체험비행 탑승 전 모바일 서약서 작성<br/>스마트폰 카메라로 QR을 스캔한 뒤 안내에 따라 작성해주세요.</p>
-      </div>
-      <div class="badge">체험객 안내용</div>
-    </section>
-
-    <section class="hero">
-      <article class="card">
-        <h2>서약서 작성 방법</h2>
-        <div class="steps">
-          <div class="step">
-            <div class="num">1</div>
-            <div>
-              <strong>QR 코드 스캔</strong>
-              <p>스마트폰 카메라 또는 QR 스캔 앱으로 오른쪽 QR 코드를 스캔해주세요.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div class="num">2</div>
-            <div>
-              <strong>탑승자 정보 입력</strong>
-              <p>성명, 생년월일, 연락처, 탑승일과 추가 상품 선택 항목을 정확히 작성해주세요.</p>
-            </div>
-          </div>
-          <div class="step">
-            <div class="num">3</div>
-            <div>
-              <strong>자필 서명 후 제출</strong>
-              <p>안내문 확인 후 자필 서명을 완료하고 제출해주세요. 제출 후 직원에게 제출 여부를 보여주세요.</p>
-            </div>
-          </div>
-        </div>
-        <div class="notice">
-          <h3>작성 전 확인해주세요</h3>
-          <ul>
-            <li>탑승자 본인의 정보로 작성해주세요.</li>
-            <li>제출 완료 후에는 현장 직원에게 제출 여부를 보여주세요.</li>
-            <li>문제가 있으면 안내 데스크 또는 담당 교관에게 문의해주세요.</li>
-          </ul>
-        </div>
-      </article>
-
-      <aside class="qr-card">
-        <p class="qr-title">MOBILE CONSENT</p>
-        <h2>탑승자 서약서</h2>
-        <p class="desc">아래 QR을 스캔하면 모바일 작성 페이지로 이동합니다.</p>
-        <div class="qr-wrap">
-          <img src="${qrImage}" alt="체험 동의서 QR 코드" />
-        </div>
-        <div class="url">${safeUrl}</div>
-      </aside>
-    </section>
-
-    <footer class="footer">
-      <div><strong>하늘누리 비행교육원</strong><br/>체험비행 전 서약서 작성용 안내물</div>
-      <div>QR 스캔 후 모바일에서 작성 · 제출</div>
-    </footer>
-  </main>
-</body>
-</html>`;
-
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-    setMessage("QR 인쇄용 안내 페이지를 열었습니다.");
-  }
-
   return (
     value === true ||
     raw === "O" ||
@@ -502,6 +170,119 @@ export default function DocumentAgreementsPage() {
     if (!publicUrl) return;
     await navigator.clipboard.writeText(publicUrl);
     setMessage("QR 서약서 링크를 복사했습니다.");
+  }
+
+  function handlePrintQrPoster() {
+    if (!publicUrl) {
+      setMessage("QR 링크를 준비하는 중입니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "width=980,height=1280");
+    if (!printWindow) {
+      setMessage("인쇄 창을 열지 못했습니다. 팝업 차단을 확인해주세요.");
+      return;
+    }
+
+    const safeUrl = escapeHtml(publicUrl);
+    const qrImage = qrUrl(publicUrl);
+
+    const html = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>하늘누리 체험비행 서약서 QR</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #f3f6fb; color: #122033; font-family: Pretendard, "Noto Sans KR", Arial, sans-serif; }
+    body { padding: 24px; }
+    .toolbar { width: 210mm; margin: 0 auto 12px; display: flex; justify-content: flex-end; gap: 8px; }
+    .toolbar button { border: 1px solid #c7d7f2; background: #2563eb; color: #fff; border-radius: 12px; padding: 10px 16px; font-weight: 700; cursor: pointer; }
+    .toolbar button.secondary { background: #fff; color: #334155; }
+    .sheet { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; border: 1px solid #d9e3f5; border-radius: 24px; padding: 24mm 18mm 18mm; box-shadow: 0 18px 50px rgba(18, 58, 114, 0.10); position: relative; overflow: hidden; }
+    .accent { position: absolute; inset: 0 0 auto 0; height: 10mm; background: linear-gradient(90deg, #2563eb 0%, #60a5fa 55%, #dbeafe 100%); }
+    .brand { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
+    .kicker { color: #2563eb; font-size: 11px; letter-spacing: 0.28em; font-weight: 800; margin-bottom: 8px; }
+    h1 { margin: 0; font-size: 31px; line-height: 1.2; letter-spacing: -0.04em; color: #0f172a; }
+    .lead { margin: 12px 0 0; color: #5f718b; font-size: 14px; line-height: 1.75; }
+    .badge { border: 1px solid #bfdbfe; background: #eff6ff; color: #123a72; font-weight: 800; border-radius: 999px; padding: 10px 16px; font-size: 13px; white-space: nowrap; }
+    .hero { display: grid; grid-template-columns: 1.08fr 0.92fr; gap: 18px; align-items: stretch; }
+    .card, .qr-card { border: 1px solid #dbe6f8; border-radius: 24px; background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%); padding: 20px; }
+    h2 { margin: 0; font-size: 23px; letter-spacing: -0.035em; color: #0f172a; }
+    .steps { display: grid; gap: 12px; margin-top: 18px; }
+    .step { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; border: 1px solid #e7eefb; background: #f9fbff; border-radius: 18px; padding: 14px; }
+    .num { width: 36px; height: 36px; border-radius: 999px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 15px; }
+    .step strong { display: block; font-size: 15px; margin-bottom: 4px; color: #0f172a; }
+    .step p { margin: 0; color: #64748b; font-size: 13px; line-height: 1.6; }
+    .notice { margin-top: 18px; border-radius: 20px; background: #f8fbff; border: 1px solid #dfe9f8; padding: 16px 18px; }
+    .notice h3 { margin: 0 0 8px; font-size: 15px; color: #0f172a; }
+    .notice ul { margin: 0; padding-left: 18px; color: #64748b; font-size: 13px; line-height: 1.75; }
+    .qr-card { text-align: center; }
+    .qr-title { margin: 0; color: #2563eb; font-size: 11px; letter-spacing: 0.24em; font-weight: 800; }
+    .qr-card h2 { margin-top: 8px; }
+    .qr-card .desc { margin: 8px 0 0; color: #64748b; font-size: 13px; line-height: 1.65; }
+    .qr-wrap { margin: 18px auto 14px; width: 300px; height: 300px; border-radius: 28px; background: #fff; border: 1px solid #dbe6f8; display: flex; align-items: center; justify-content: center; padding: 14px; }
+    .qr-wrap img { width: 100%; height: 100%; object-fit: contain; }
+    .url { word-break: break-all; border: 1px dashed #c8d8f1; background: #f7faff; border-radius: 16px; padding: 12px 14px; color: #58708d; font-size: 11px; line-height: 1.55; }
+    .footer { margin-top: 22px; display: flex; justify-content: space-between; gap: 12px; align-items: center; color: #64748b; font-size: 12px; }
+    .footer strong { color: #123a72; font-size: 13px; }
+    @page { size: A4 portrait; margin: 10mm; }
+    @media print { body { background: #fff; padding: 0; } .toolbar { display: none; } .sheet { margin: 0 auto; box-shadow: none; border-radius: 0; border: none; min-height: auto; } }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button class="secondary" onclick="window.close()">닫기</button>
+    <button onclick="window.print()">인쇄하기</button>
+  </div>
+  <main class="sheet">
+    <div class="accent"></div>
+    <section class="brand">
+      <div>
+        <div class="kicker">SKYNURI FLIGHT</div>
+        <h1>하늘누리 비행교육원</h1>
+        <p class="lead">체험비행 탑승 전 모바일 서약서 작성<br/>스마트폰 카메라로 QR을 스캔한 뒤 안내에 따라 작성해주세요.</p>
+      </div>
+      <div class="badge">체험객 안내용</div>
+    </section>
+    <section class="hero">
+      <article class="card">
+        <h2>서약서 작성 방법</h2>
+        <div class="steps">
+          <div class="step"><div class="num">1</div><div><strong>QR 코드 스캔</strong><p>스마트폰 카메라 또는 QR 스캔 앱으로 오른쪽 QR 코드를 스캔해주세요.</p></div></div>
+          <div class="step"><div class="num">2</div><div><strong>탑승자 정보 입력</strong><p>성명, 생년월일, 연락처, 탑승일과 추가 상품 선택 항목을 정확히 작성해주세요.</p></div></div>
+          <div class="step"><div class="num">3</div><div><strong>자필 서명 후 제출</strong><p>안내문 확인 후 자필 서명을 완료하고 제출해주세요. 제출 후 직원에게 제출 여부를 보여주세요.</p></div></div>
+        </div>
+        <div class="notice">
+          <h3>작성 전 확인해주세요</h3>
+          <ul>
+            <li>탑승자 본인의 정보로 작성해주세요.</li>
+            <li>제출 완료 후에는 현장 직원에게 제출 여부를 보여주세요.</li>
+            <li>문제가 있으면 안내 데스크 또는 담당 교관에게 문의해주세요.</li>
+          </ul>
+        </div>
+      </article>
+      <aside class="qr-card">
+        <p class="qr-title">MOBILE CONSENT</p>
+        <h2>탑승자 서약서</h2>
+        <p class="desc">아래 QR을 스캔하면 모바일 작성 페이지로 이동합니다.</p>
+        <div class="qr-wrap"><img src="${qrImage}" alt="체험 동의서 QR 코드" /></div>
+        <div class="url">${safeUrl}</div>
+      </aside>
+    </section>
+    <footer class="footer">
+      <div><strong>하늘누리 비행교육원</strong><br/>체험비행 전 서약서 작성용 안내물</div>
+      <div>QR 스캔 후 모바일에서 작성 · 제출</div>
+    </footer>
+  </main>
+</body>
+</html>`;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    setMessage("QR 인쇄용 안내 페이지를 열었습니다.");
   }
 
   async function confirmSubmitted(row: Row) {
