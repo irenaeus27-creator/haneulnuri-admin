@@ -161,10 +161,6 @@ type CalendarMoveDrag = {
   deltaSteps: number;
   originalStartTime: string;
   originalEndTime: string;
-  originalResourceKey?: string;
-  targetResourceKey?: string;
-  targetAircraftId?: string;
-  targetAircraftName?: string;
 } | null;
 
 type CalendarResizeDrag = {
@@ -2144,11 +2140,11 @@ export default function BookingsPage() {
 
     function handleWindowMouseUp(event: MouseEvent) {
       event.preventDefault();
-      void finishActiveCalendarBlockDrag(event.clientX, event.clientY);
+      void finishActiveCalendarBlockDrag(event.clientX);
     }
 
     function handleWindowPointerUp(event: PointerEvent) {
-      void finishActiveCalendarBlockDrag(event.clientX, event.clientY);
+      void finishActiveCalendarBlockDrag(event.clientX);
     }
 
     function handleWindowCancel() {
@@ -2646,32 +2642,6 @@ export default function BookingsPage() {
       : text((resource as AircraftRow).aircraftId || (resource as AircraftRow).aircraftName || (resource as AircraftRow).registrationNo, "");
   }
 
-  function canMoveBookingAcrossAircraft(booking: BookingRow) {
-    return calendarResourceMode === "aircraft" && text(booking.bookingType, "").includes("체험");
-  }
-
-  function aircraftDragTargetFromPoint(clientX?: number, clientY?: number) {
-    if (typeof clientX !== "number" || typeof clientY !== "number") return null;
-    if (typeof document === "undefined") return null;
-
-    const element = document.elementFromPoint(clientX, clientY);
-    const timeline = element?.closest("[data-calendar-resource-key='true']") as HTMLElement | null;
-
-    if (!timeline) return null;
-
-    const targetResourceKey = timeline.dataset.resourceKey || "";
-    const targetAircraftId = timeline.dataset.aircraftId || "";
-    const targetAircraftName = timeline.dataset.aircraftName || "";
-
-    if (!targetResourceKey) return null;
-
-    return {
-      targetResourceKey,
-      targetAircraftId,
-      targetAircraftName,
-    };
-  }
-
   function dragRange(selection: CalendarDragSelection) {
     if (!selection) return { from: -1, to: -1 };
 
@@ -3122,7 +3092,7 @@ export default function BookingsPage() {
   }
 
 
-  async function finishActiveCalendarBlockDrag(clientX?: number, clientY?: number) {
+  async function finishActiveCalendarBlockDrag(clientX?: number) {
     if (calendarBlockDragFinishingRef.current) return;
 
     const resizeSnapshot = calendarResizeDrag
@@ -3131,7 +3101,7 @@ export default function BookingsPage() {
           deltaSteps: typeof clientX === "number" ? calendarResizeStepsFromClientX(calendarResizeDrag, clientX) : calendarResizeDrag.deltaSteps,
         }
       : null;
-    let moveSnapshot = calendarMoveDrag
+    const moveSnapshot = calendarMoveDrag
       ? {
           ...calendarMoveDrag,
           deltaSteps: typeof clientX === "number" ? calendarMoveStepsFromClientX(calendarMoveDrag, clientX) : calendarMoveDrag.deltaSteps,
@@ -3150,17 +3120,6 @@ export default function BookingsPage() {
       setCalendarResizeDrag(null);
       calendarBlockDragFinishingRef.current = false;
       return;
-    }
-
-    if (moveSnapshot && canMoveBookingAcrossAircraft(activeBooking)) {
-      const target = aircraftDragTargetFromPoint(clientX, clientY);
-
-      if (target) {
-        moveSnapshot = {
-          ...moveSnapshot,
-          ...target,
-        };
-      }
     }
 
     try {
@@ -3185,7 +3144,7 @@ export default function BookingsPage() {
     calendarBlockDragFinishingRef.current = false;
   }
 
-  function beginCalendarMoveDrag(event: React.MouseEvent, booking: BookingRow, resource?: AircraftRow | InstructorRow) {
+  function beginCalendarMoveDrag(event: React.MouseEvent, booking: BookingRow) {
     if (event.button !== 0) return;
 
     event.preventDefault();
@@ -3203,8 +3162,6 @@ export default function BookingsPage() {
     const originalEndTime = normalizeTime(booking.endTime);
     const timelineMetrics = calendarTimelineMetricsFromEvent(event);
 
-    const originalResourceKey = resource && calendarResourceMode === "aircraft" ? calendarResourceKey(resource) : "";
-
     setCalendarMoveDrag({
       bookingId,
       startX: event.clientX,
@@ -3214,10 +3171,6 @@ export default function BookingsPage() {
       deltaSteps: 0,
       originalStartTime,
       originalEndTime,
-      originalResourceKey,
-      targetResourceKey: originalResourceKey,
-      targetAircraftId: resource && calendarResourceMode === "aircraft" ? formValue((resource as AircraftRow).aircraftId) : "",
-      targetAircraftName: resource && calendarResourceMode === "aircraft" ? aircraftDisplay(resource as AircraftRow) : "",
     });
   }
 
@@ -3225,30 +3178,12 @@ export default function BookingsPage() {
     if (!calendarMoveDrag) return;
 
     const deltaSteps = calendarMoveStepsFromClientX(calendarMoveDrag, event.clientX);
-    const booking = bookings.find((item) => formValue(item.bookingId) === calendarMoveDrag.bookingId);
-    const target =
-      booking && canMoveBookingAcrossAircraft(booking)
-        ? aircraftDragTargetFromPoint(event.clientX, event.clientY)
-        : null;
-    const nextTargetResourceKey = target?.targetResourceKey || calendarMoveDrag.targetResourceKey || calendarMoveDrag.originalResourceKey || "";
-    const nextTargetAircraftId = target?.targetAircraftId || calendarMoveDrag.targetAircraftId || "";
-    const nextTargetAircraftName = target?.targetAircraftName || calendarMoveDrag.targetAircraftName || "";
 
-    if (
-      deltaSteps === calendarMoveDrag.deltaSteps &&
-      nextTargetResourceKey === (calendarMoveDrag.targetResourceKey || "") &&
-      nextTargetAircraftId === (calendarMoveDrag.targetAircraftId || "") &&
-      nextTargetAircraftName === (calendarMoveDrag.targetAircraftName || "")
-    ) {
-      return;
-    }
+    if (deltaSteps === calendarMoveDrag.deltaSteps) return;
 
     setCalendarMoveDrag({
       ...calendarMoveDrag,
       deltaSteps,
-      targetResourceKey: nextTargetResourceKey,
-      targetAircraftId: nextTargetAircraftId,
-      targetAircraftName: nextTargetAircraftName,
     });
   }
 
@@ -3268,37 +3203,16 @@ export default function BookingsPage() {
     setCalendarMoveDrag(null);
     setCalendarResizeDrag(null);
 
-    const targetResourceKey = formValue(dragSnapshot.targetResourceKey);
-    const originalResourceKey = formValue(dragSnapshot.originalResourceKey);
-    const canMoveAircraft = canMoveBookingAcrossAircraft(booking);
-    const aircraftChanged = canMoveAircraft && !!targetResourceKey && !!originalResourceKey && targetResourceKey !== originalResourceKey;
-
-    if (!deltaSteps && !aircraftChanged) return;
+    if (!deltaSteps) return;
 
     const bookingId = formValue(booking.bookingId);
     const newStart = addMinutes(originalStartTime, deltaSteps * RESERVATION_SLOT_MINUTES);
     const newEnd = addMinutes(originalEndTime, deltaSteps * RESERVATION_SLOT_MINUTES);
-    const nextAircraftId = aircraftChanged ? formValue(dragSnapshot.targetAircraftId) : formValue(booking.aircraftId);
-    const nextAircraftName = aircraftChanged ? formValue(dragSnapshot.targetAircraftName) : formValue(booking.aircraftName);
-    const moveLabel = aircraftChanged && deltaSteps ? "예약 시간/항공기 이동" : aircraftChanged ? "예약 항공기 이동" : "예약 시간 이동";
-    const aircraftMemo = aircraftChanged
-      ? `항공기: ${aircraftDisplay(booking)} → ${nextAircraftName || nextAircraftId}`
-      : "";
-    const timeMemo = deltaSteps ? changeMemoText("시간", originalStartTime, originalEndTime, newStart, newEnd) : "";
-    const confirmMessage =
-      `${calendarChangeConfirmMessage(moveLabel, booking, originalStartTime, originalEndTime, newStart, newEnd)}` +
-      (aircraftChanged ? `\n항공기: ${aircraftDisplay(booking)} → ${nextAircraftName || nextAircraftId}` : "");
 
-    const ok = window.confirm(confirmMessage);
+    const ok = window.confirm(calendarChangeConfirmMessage("예약 시간 이동", booking, originalStartTime, originalEndTime, newStart, newEnd));
     if (!ok) return;
 
-    const candidateBooking = {
-      ...booking,
-      aircraftId: nextAircraftId || formValue(booking.aircraftId),
-      aircraftName: nextAircraftName || formValue(booking.aircraftName),
-    };
-
-    const mergeResult = mergeOrBlockCalendarChange(candidateBooking, newStart, newEnd);
+    const mergeResult = mergeOrBlockCalendarChange(booking, newStart, newEnd);
 
     if (mergeResult.blocked) {
       alert(mergeResult.message || "다른 예약과 시간이 겹칩니다.");
@@ -3306,13 +3220,13 @@ export default function BookingsPage() {
     }
 
     const updatedBooking = {
-      ...candidateBooking,
+      ...booking,
       startTime: newStart,
       endTime: newEnd,
       memo: buildActionMemo(
         text(booking.memo, ""),
-        moveLabel,
-        [timeMemo, aircraftMemo].filter(Boolean).join(" / ")
+        "예약 시간 이동",
+        changeMemoText("시간", originalStartTime, originalEndTime, newStart, newEnd)
       ),
     };
 
@@ -4150,10 +4064,6 @@ export default function BookingsPage() {
                         <div
                           ref={calendarTimelineRef}
                           data-calendar-timeline="true"
-                          data-calendar-resource-key="true"
-                          data-resource-key={calendarResourceKey(resource)}
-                          data-aircraft-id={calendarResourceMode === "aircraft" ? formValue((resource as AircraftRow).aircraftId) : ""}
-                          data-aircraft-name={calendarResourceMode === "aircraft" ? aircraftDisplay(resource as AircraftRow) : ""}
                           className="relative min-w-[980px] min-h-[86px] border-l border-[#dce7f3]"
                           onMouseMove={(event) => {
                             if ((calendarMoveDrag || calendarResizeDrag) && event.buttons !== 1) {
@@ -4249,7 +4159,7 @@ export default function BookingsPage() {
                                   } ${calendarBookingCardClass(booking)} ${isUnpaidExperience(booking) ? "ring-2 ring-amber-200" : ""} ${isSelectedBooking(booking) ? "ring-2 ring-blue-500 shadow-[0_0_0_4px_rgba(37,99,235,0.16),0_12px_24px_rgba(37,99,235,0.22)]" : ""}`}
                                   style={calendarBlockStyleByTime(previewTimes.startTime, previewTimes.endTime)}
                                   title={bookingTooltip(booking)}
-                                  onMouseDown={(event) => beginCalendarMoveDrag(event, booking, resource)}
+                                  onMouseDown={(event) => beginCalendarMoveDrag(event, booking)}
                                   onMouseUp={(event) => {
                                     event.stopPropagation();
                                   }}
