@@ -792,14 +792,6 @@ export default function UsersPage() {
                       <td className="text-right">
                         <div className="flex flex-wrap justify-end gap-2">
                           <button type="button" onClick={() => openDetail(item)} className="ui-btn h-9 border border-[#dbe5f1] bg-white px-3 text-[12px] text-[#243b63] hover:bg-[#f4f8fd]">자세히</button>
-                          <button
-                            type="button"
-                            disabled={issuingCodeId === (userId || raw(item.email) || raw(item.phone) || text(item.name, ""))}
-                            onClick={() => void issuePasswordSetupCode(item)}
-                            className="ui-btn h-9 border border-sky-200 bg-sky-50 px-3 text-[12px] text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {issuingCodeId === (userId || raw(item.email) || raw(item.phone) || text(item.name, "")) ? "발급 중" : "비번코드"}
-                          </button>
                           {pending ? (
                             <>
                               <button type="button" disabled={savingId === userId} onClick={() => openApproval(item)} className="ui-btn h-9 bg-emerald-600 px-3 text-[12px] text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
@@ -999,42 +991,92 @@ export default function UsersPage() {
                   </label>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <label className="block">
-                    <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">이름</span>
-                    <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} className="ui-input" />
-                  </label>
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,0.95fr)]">
+                  <div className="space-y-5">
+                    <div className="rounded-3xl border border-[#dbe5f1] bg-white p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="text-[15px] font-medium text-[#10213f]">기본 정보</div>
+                          <p className="mt-1 text-[13px] font-normal leading-6 text-[#6f8199]">이름, 연락처, 이메일, 역할, 상태를 한 번에 정리해서 수정할 수 있습니다.</p>
+                        </div>
+                        <div className="rounded-2xl border border-[#e3ebf6] bg-[#f8fbff] px-3 py-2 text-right">
+                          <div className="text-[11px] font-medium tracking-[0.18em] text-[#7d8faa]">MEMBER TYPE</div>
+                          <div className="mt-1 text-[14px] font-semibold text-[#10213f]">{normalizeMemberType(form.role || selectedUser.memberType || selectedUser.member_type || selectedUser.role)}</div>
+                        </div>
+                      </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="block">
-                      <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">전화번호</span>
-                      <input value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value.replace(/\D/g, "") }))} className="ui-input" placeholder="01000000000" />
-                    </label>
-                    <label className="block">
-                      <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">이메일</span>
-                      <input value={form.email} onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))} className="ui-input" />
-                    </label>
+                      <div className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                        <label className="block md:col-span-2 2xl:col-span-1">
+                          <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">이름</span>
+                          <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} className="ui-input" />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">역할</span>
+                          <select value={form.role} onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value }))} className="ui-input">
+                            {ROLE_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+                          </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">상태</span>
+                          <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} className="ui-input">
+                            {STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+                          </select>
+                        </label>
+                      </div>
+
+                      <div className="mt-4 grid gap-4 md:grid-cols-2">
+                        <label className="block">
+                          <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">전화번호</span>
+                          <input value={form.phone} onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value.replace(/\D/g, "") }))} className="ui-input" placeholder="01000000000" />
+                        </label>
+                        <label className="block">
+                          <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">이메일</span>
+                          <input value={form.email} onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))} className="ui-input" />
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-[#dbe5f1] bg-white p-5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-[15px] font-medium text-[#10213f]">관리 메모</div>
+                        <div className="text-[12px] font-normal text-[#7d8faa]">운영 메모, 회원 특이사항, 내부 기록용</div>
+                      </div>
+                      <label className="mt-4 block">
+                        <span className="sr-only">메모</span>
+                        <textarea value={form.memo} onChange={(event) => setForm((prev) => ({ ...prev, memo: event.target.value }))} className="ui-input min-h-[220px] resize-y py-3 leading-6" placeholder="관리자 메모" />
+                      </label>
+                    </div>
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="block">
-                      <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">역할</span>
-                      <select value={form.role} onChange={(event) => setForm((prev) => ({ ...prev, role: event.target.value }))} className="ui-input">
-                        {ROLE_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
-                      </select>
-                    </label>
-                    <label className="block">
-                      <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">상태</span>
-                      <select value={form.status} onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value }))} className="ui-input">
-                        {STATUS_OPTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
-                      </select>
-                    </label>
-                  </div>
+                  <div className="space-y-5">
+                    <div className="rounded-3xl border border-[#dbe5f1] bg-[#f8fbff] p-5">
+                      <div className="text-[15px] font-medium text-[#10213f]">계정 요약</div>
+                      <p className="mt-1 text-[13px] font-normal leading-6 text-[#6f8199]">회원 식별 정보와 처리 이력을 확인하면서 수정할 수 있습니다.</p>
 
-                  <label className="block">
-                    <span className="mb-1.5 block text-[12px] font-medium text-[#526a89]">메모</span>
-                    <textarea value={form.memo} onChange={(event) => setForm((prev) => ({ ...prev, memo: event.target.value }))} className="ui-input min-h-[140px] resize-y py-3" placeholder="관리자 메모" />
-                  </label>
+                      <div className="mt-4 space-y-3">
+                        <DetailItem label="회원 ID" value={getUserId(selectedUser)} />
+                        <DetailItem label="회원 유형" value={normalizeMemberType(form.role || selectedUser.memberType || selectedUser.member_type || selectedUser.role)} />
+                        <DetailItem label="신청일" value={formatDateTime(getRequestedAt(selectedUser))} />
+                        <DetailItem label="승인일" value={formatDateTime(getApprovedAt(selectedUser))} />
+                        <DetailItem label="반려일" value={formatDateTime(getRejectedAt(selectedUser))} />
+                        <DetailItem label="최근 수정일" value={formatDateTime(getUpdatedAt(selectedUser))} />
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl border border-[#dbe5f1] bg-white p-5">
+                      <div className="text-[15px] font-medium text-[#10213f]">현재 상태</div>
+                      <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-[#e3ebf6] bg-[#f8fbff] px-4 py-3">
+                        <div>
+                          <div className="text-[12px] font-medium text-[#7d8faa]">선택된 상태</div>
+                          <div className="mt-1 text-[14px] font-semibold text-[#10213f]">{normalizeStatus(form.status || selectedUser.status)}</div>
+                        </div>
+                        <span className={`ui-badge ${getStatusBadgeClass(form.status || selectedUser.status)}`}>{normalizeStatus(form.status || selectedUser.status)}</span>
+                      </div>
+                      <div className="mt-4 text-[12px] font-normal leading-6 text-[#7d8faa]">
+                        역할과 상태를 변경할 때는 실제 운영 권한, 승인 여부, 앱 사용 가능 상태를 함께 확인해주세요.
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -1042,6 +1084,14 @@ export default function UsersPage() {
             <div className="border-t border-[#dbe5f1] bg-[#f8fbff] px-6 py-4">
               {drawerMode === "detail" ? (
                 <div className="flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={issuingCodeId === (getUserId(selectedUser) || raw(selectedUser.email) || raw(selectedUser.phone) || text(selectedUser.name, ""))}
+                    onClick={() => void issuePasswordSetupCode(selectedUser)}
+                    className="ui-btn border border-sky-200 bg-sky-50 px-4 text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {issuingCodeId === (getUserId(selectedUser) || raw(selectedUser.email) || raw(selectedUser.phone) || text(selectedUser.name, "")) ? "발급 중" : "비번코드 발급"}
+                  </button>
                   <button type="button" onClick={closeDrawer} className="ui-btn border border-[#dbe5f1] bg-white px-4 text-[#243b63] hover:bg-[#f4f8fd]">닫기</button>
                   {isPending(selectedUser.status) ? (
                     <>
@@ -1063,6 +1113,14 @@ export default function UsersPage() {
                 </div>
               ) : (
                 <div className="flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={issuingCodeId === (getUserId(selectedUser) || raw(selectedUser.email) || raw(selectedUser.phone) || text(selectedUser.name, ""))}
+                    onClick={() => void issuePasswordSetupCode(selectedUser)}
+                    className="ui-btn border border-sky-200 bg-sky-50 px-4 text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {issuingCodeId === (getUserId(selectedUser) || raw(selectedUser.email) || raw(selectedUser.phone) || text(selectedUser.name, "")) ? "발급 중" : "비번코드 발급"}
+                  </button>
                   <button type="button" onClick={closeDrawer} className="ui-btn border border-[#dbe5f1] bg-white px-4 text-[#243b63] hover:bg-[#f4f8fd]">취소</button>
                   <button type="button" disabled={savingId === getUserId(selectedUser)} onClick={() => void saveUser()} className="ui-btn ui-btn-primary px-5 disabled:cursor-not-allowed disabled:opacity-60">
                     {savingId === getUserId(selectedUser) ? "저장 중" : "저장"}
