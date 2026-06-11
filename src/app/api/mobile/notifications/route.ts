@@ -334,6 +334,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    if (["deleteAllVisible", "clearAll", "deleteAll"].includes(action)) {
+      // 앱 알림함에서 현재 보이는 알림만 삭제합니다.
+      // scheduled_at이 미래인 예약 2시간 전 알림은 아직 보일 시점이 아니므로 보존합니다.
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .or(targetOr)
+        .or(`scheduled_at.is.null,scheduled_at.lte.${now}`);
+
+      if (error) throw new Error(`알림 삭제 실패: ${error.message}`);
+      return NextResponse.json({ ok: true });
+    }
+
     if (action === "createTest") {
       const row = {
         notification_id: buildId("N"),
