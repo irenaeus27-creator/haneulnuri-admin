@@ -224,17 +224,17 @@ export default function DocumentAgreementsPage() {
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: #f3f6fb; color: #122033; font-family: Pretendard, "Noto Sans KR", Arial, sans-serif; }
     body { padding: 24px; }
-    .toolbar { width: 210mm; margin: 0 auto 12px; display: flex; justify-content: flex-end; gap: 8px; }
+    .toolbar { width: 100%; max-width: 190mm; margin: 0 auto 12px; display: flex; justify-content: flex-end; gap: 8px; }
     .toolbar button { border: 1px solid #c7d7f2; background: #2563eb; color: #fff; border-radius: 12px; padding: 10px 16px; font-weight: 700; cursor: pointer; }
     .toolbar button.secondary { background: #fff; color: #334155; }
-    .sheet { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; border: 1px solid #d9e3f5; border-radius: 24px; padding: 24mm 18mm 18mm; box-shadow: 0 18px 50px rgba(18, 58, 114, 0.10); position: relative; overflow: hidden; }
+    .sheet { width: 100%; max-width: 190mm; min-height: 277mm; margin: 0 auto; background: #fff; border: 1px solid #d9e3f5; border-radius: 24px; padding: 20mm 14mm 14mm; box-shadow: 0 18px 50px rgba(18, 58, 114, 0.10); position: relative; overflow: hidden; }
     .accent { position: absolute; inset: 0 0 auto 0; height: 10mm; background: linear-gradient(90deg, #2563eb 0%, #60a5fa 55%, #dbeafe 100%); }
     .brand { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
     .kicker { color: #2563eb; font-size: 11px; letter-spacing: 0.28em; font-weight: 800; margin-bottom: 8px; }
     h1 { margin: 0; font-size: 31px; line-height: 1.2; letter-spacing: -0.04em; color: #0f172a; }
     .lead { margin: 12px 0 0; color: #5f718b; font-size: 14px; line-height: 1.75; }
     .badge { border: 1px solid #bfdbfe; background: #eff6ff; color: #123a72; font-weight: 800; border-radius: 999px; padding: 10px 16px; font-size: 13px; white-space: nowrap; }
-    .hero { display: grid; grid-template-columns: 1.08fr 0.92fr; gap: 18px; align-items: stretch; }
+    .hero { display: grid; grid-template-columns: 1.06fr 0.94fr; gap: 16px; align-items: stretch; }
     .card, .qr-card { border: 1px solid #dbe6f8; border-radius: 24px; background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%); padding: 20px; }
     h2 { margin: 0; font-size: 23px; letter-spacing: -0.035em; color: #0f172a; }
     .steps { display: grid; gap: 12px; margin-top: 18px; }
@@ -249,13 +249,13 @@ export default function DocumentAgreementsPage() {
     .qr-title { margin: 0; color: #2563eb; font-size: 11px; letter-spacing: 0.24em; font-weight: 800; }
     .qr-card h2 { margin-top: 8px; }
     .qr-card .desc { margin: 8px 0 0; color: #64748b; font-size: 13px; line-height: 1.65; }
-    .qr-wrap { margin: 18px auto 14px; width: 300px; height: 300px; border-radius: 28px; background: #fff; border: 1px solid #dbe6f8; display: flex; align-items: center; justify-content: center; padding: 14px; }
+    .qr-wrap { margin: 18px auto 14px; width: min(100%, 250px); aspect-ratio: 1 / 1; border-radius: 28px; background: #fff; border: 1px solid #dbe6f8; display: flex; align-items: center; justify-content: center; padding: 14px; }
     .qr-wrap img { width: 100%; height: 100%; object-fit: contain; }
     .url { word-break: break-all; border: 1px dashed #c8d8f1; background: #f7faff; border-radius: 16px; padding: 12px 14px; color: #58708d; font-size: 11px; line-height: 1.55; }
     .footer { margin-top: 22px; display: flex; justify-content: space-between; gap: 12px; align-items: center; color: #64748b; font-size: 12px; }
     .footer strong { color: #123a72; font-size: 13px; }
     @page { size: A4 portrait; margin: 10mm; }
-    @media print { body { background: #fff; padding: 0; } .toolbar { display: none; } .sheet { margin: 0 auto; box-shadow: none; border-radius: 0; border: none; min-height: auto; } }
+    @media print { body { background: #fff; padding: 0; } .toolbar { display: none; } .sheet { width: 190mm; min-height: 277mm; margin: 0 auto; box-shadow: none; border-radius: 0; border: none; } }
   </style>
 </head>
 <body>
@@ -410,50 +410,50 @@ export default function DocumentAgreementsPage() {
                   <div className="h-[260px] w-[260px] animate-pulse rounded-2xl bg-slate-100" />
                 )}
               </div>
-              <div className="mt-5 w-full rounded-[22px] bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
-                <div className="flex items-center justify-center gap-2 text-center text-[13px] font-medium leading-5 text-slate-500">
-                  <svg className="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <div className="mt-5 w-full rounded-[22px] border border-slate-200 bg-slate-50/80 px-4 py-3">
+                <div className="flex items-start gap-2 text-[13px] font-medium leading-5 text-slate-500">
+                  <svg className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L10.5 5.43" />
                     <path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07l1.62-1.62" />
                   </svg>
                   <span className="break-all">{publicUrl || "링크 생성 중"}</span>
                 </div>
               </div>
-              <div className="mt-5 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="mt-5 grid w-full grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={copyLink}
-                  className="inline-flex h-14 items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 text-[15px] font-medium tracking-[-0.01em] text-slate-700 shadow-sm shadow-slate-200/40 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 text-[14px] font-medium tracking-[-0.01em] text-slate-700 shadow-sm shadow-slate-200/40 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                 >
-                  <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="h-4.5 w-4.5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="9" y="9" width="13" height="13" rx="2" />
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                   </svg>
-                  링크 복사
+                  <span className="whitespace-nowrap">링크 복사</span>
                 </button>
                 <a
                   href={publicUrl || "#"}
                   target="_blank"
-                  className="inline-flex h-14 items-center justify-center gap-2 rounded-[18px] border border-blue-600 bg-blue-600 px-4 text-center text-[15px] font-medium tracking-[-0.01em] text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-[18px] border border-blue-600 bg-blue-600 px-4 text-center text-[14px] font-medium tracking-[-0.01em] text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
                 >
-                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M7 17 17 7" />
                     <path d="M8 7h9v9" />
                     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
                   </svg>
-                  작성 페이지 열기
+                  <span className="whitespace-nowrap">작성 페이지</span>
                 </a>
                 <button
                   type="button"
                   onClick={handlePrintQrPoster}
-                  className="inline-flex h-14 items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 text-[15px] font-medium tracking-[-0.01em] text-slate-700 shadow-sm shadow-slate-200/40 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                  className="col-span-2 inline-flex h-12 items-center justify-center gap-2 rounded-[18px] border border-blue-200 bg-blue-50 px-4 text-[14px] font-medium tracking-[-0.01em] text-blue-700 shadow-sm shadow-blue-100/50 transition hover:bg-blue-100"
                 >
-                  <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M6 9V2h12v7" />
                     <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
                     <path d="M6 14h12v8H6z" />
                   </svg>
-                  QR 인쇄
+                  <span className="whitespace-nowrap">QR 인쇄</span>
                 </button>
               </div>
             </div>
