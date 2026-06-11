@@ -174,9 +174,9 @@ export default function DocumentAgreementsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           consentId,
-          verificationMethod: "submission_checked",
+          verificationMethod: "onsite_submission_checked",
           verifiedBy: "현장 확인",
-          verificationMemo: "동의서 목록에서 서약서 제출 여부 확인",
+          verificationMemo: "현장에서 서약서 제출 여부 확인",
         }),
       });
       const data = (await response.json()) as {
@@ -201,7 +201,7 @@ export default function DocumentAgreementsPage() {
         verifiedAt: text(updatedRaw.verifiedAt || updatedRaw.verified_at) || nowText,
         verificationMemo:
           text(updatedRaw.verificationMemo || updatedRaw.verification_memo) ||
-          "동의서 목록에서 서약서 제출 여부 확인",
+          "현장에서 서약서 제출 여부 확인",
       };
       setRows((prev) =>
         prev.map((item) =>
@@ -535,7 +535,8 @@ export default function DocumentAgreementsPage() {
 
 function verificationMethodText(value: unknown) {
   const raw = text(value);
-  if (raw === "submission_checked") return "서약 제출 확인";
+  if (raw === "onsite_submission_checked") return "현장 제출 확인";
+  if (raw === "submission_checked") return "현장 제출 확인";
   if (raw === "phone") return "전화번호 확인";
   if (raw === "id_card") return "신분증 확인";
   if (raw === "guardian") return "보호자 확인";

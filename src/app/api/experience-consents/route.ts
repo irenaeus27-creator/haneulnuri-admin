@@ -266,7 +266,7 @@ export async function PATCH(request: NextRequest) {
       success: true,
       source: "supabase",
       service: SERVICE,
-      message: "서약서 제출 확인을 저장했습니다.",
+      message: "현장 제출 확인을 저장했습니다.",
       experienceConsent: mapped,
       data: mapped,
       elapsedMs: Date.now() - startedAt,
