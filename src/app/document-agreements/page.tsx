@@ -219,43 +219,428 @@ export default function DocumentAgreementsPage() {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>하늘누리 체험비행 서약서 QR</title>
+  <title>하늘누리 비행교육원 탑승자 서약서 QR 안내</title>
   <style>
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: #f3f6fb; color: #122033; font-family: Pretendard, "Noto Sans KR", Arial, sans-serif; }
-    body { padding: 24px; }
-    .toolbar { width: 100%; max-width: 190mm; margin: 0 auto 10px; display: flex; justify-content: flex-end; gap: 8px; }
-    .toolbar button { border: 1px solid #c7d7f2; background: #2563eb; color: #fff; border-radius: 12px; padding: 10px 16px; font-weight: 700; cursor: pointer; }
-    .toolbar button.secondary { background: #fff; color: #334155; }
-    .sheet { width: 100%; max-width: 190mm; min-height: 270mm; height: auto; margin: 0 auto; background: #fff; border: 1px solid #d9e3f5; border-radius: 22px; padding: 19mm 13mm 13mm; box-shadow: 0 18px 50px rgba(18, 58, 114, 0.10); position: relative; overflow: hidden; }
-    .accent { position: absolute; inset: 0 0 auto 0; height: 9mm; background: linear-gradient(90deg, #2563eb 0%, #60a5fa 55%, #dbeafe 100%); }
-    .brand { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
-    .kicker { color: #2563eb; font-size: 11px; letter-spacing: 0.28em; font-weight: 800; margin-bottom: 8px; }
-    h1 { margin: 0; font-size: 31px; line-height: 1.18; letter-spacing: -0.04em; color: #0f172a; }
-    .lead { margin: 11px 0 0; color: #5f718b; font-size: 14px; line-height: 1.65; }
-    .badge { border: 1px solid #bfdbfe; background: #eff6ff; color: #123a72; font-weight: 800; border-radius: 999px; padding: 10px 16px; font-size: 13px; white-space: nowrap; }
-    .hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 17px; align-items: start; }
-    .card, .qr-card { border: 1px solid #dbe6f8; border-radius: 24px; background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%); padding: 20px; }
-    h2 { margin: 0; font-size: 23px; letter-spacing: -0.035em; color: #0f172a; }
-    .steps { display: grid; gap: 11px; margin-top: 16px; }
-    .step { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; border: 1px solid #e7eefb; background: #f9fbff; border-radius: 18px; padding: 13px 14px; }
-    .num { width: 34px; height: 34px; border-radius: 999px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 14px; }
-    .step strong { display: block; font-size: 14px; margin-bottom: 3px; color: #0f172a; }
-    .step p { margin: 0; color: #64748b; font-size: 12px; line-height: 1.55; }
-    .notice { margin-top: 14px; border-radius: 20px; background: #f8fbff; border: 1px solid #dfe9f8; padding: 14px 16px; }
-    .notice h3 { margin: 0 0 8px; font-size: 14px; color: #0f172a; }
-    .notice ul { margin: 0; padding-left: 18px; color: #64748b; font-size: 12px; line-height: 1.6; }
-    .qr-card { text-align: center; }
-    .qr-title { margin: 0; color: #2563eb; font-size: 11px; letter-spacing: 0.24em; font-weight: 800; }
-    .qr-card h2 { margin-top: 8px; }
-    .qr-card .desc { margin: 8px 0 0; color: #64748b; font-size: 12px; line-height: 1.55; }
-    .qr-wrap { margin: 16px auto 12px; width: min(100%, 260px); aspect-ratio: 1 / 1; border-radius: 26px; background: #fff; border: 1px solid #dbe6f8; display: flex; align-items: center; justify-content: center; padding: 12px; }
-    .qr-wrap img { width: 100%; height: 100%; object-fit: contain; }
-    .url { word-break: break-all; border: 1px dashed #c8d8f1; background: #f7faff; border-radius: 15px; padding: 10px 12px; color: #58708d; font-size: 10.5px; line-height: 1.45; }
-    .footer { margin-top: 18px; display: flex; justify-content: space-between; gap: 12px; align-items: center; color: #64748b; font-size: 11.5px; }
-    .footer strong { color: #123a72; font-size: 13px; }
-    @page { size: A4 portrait; margin: 8mm; }
-    @media print { body { background: #fff; padding: 0; } .toolbar { display: none; } .sheet { width: 194mm; min-height: 281mm; margin: 0 auto; padding: 18mm 12mm 10mm; box-shadow: none; border-radius: 0; border: none; page-break-after: avoid; overflow: hidden; } .card, .qr-card { padding: 18px; } .qr-wrap { width: min(100%, 245px); } }
+    html, body {
+      margin: 0;
+      padding: 0;
+      color: #0d1b35;
+      background: #eef4fb;
+      font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", Arial, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    body { padding: 22px; }
+    .toolbar {
+      width: 100%;
+      max-width: 202mm;
+      margin: 0 auto 12px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .toolbar button {
+      height: 42px;
+      border: 1px solid #bdd2ef;
+      border-radius: 14px;
+      padding: 0 18px;
+      background: #0b47a1;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .toolbar button.secondary {
+      background: #fff;
+      color: #243b63;
+    }
+    .sheet {
+      position: relative;
+      width: 100%;
+      max-width: 202mm;
+      min-height: 286mm;
+      margin: 0 auto;
+      padding: 18mm 14mm 12mm;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 78% 11%, rgba(69, 135, 213, 0.10), transparent 26%),
+        linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+      border: 1px solid #d8e5f5;
+      box-shadow: 0 24px 70px rgba(15, 38, 80, 0.14);
+    }
+    .kicker {
+      color: #125bc4;
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 0.36em;
+    }
+    .hero-top {
+      position: relative;
+      min-height: 82mm;
+      padding-right: 75mm;
+    }
+    h1 {
+      margin: 9px 0 0;
+      color: #081936;
+      font-size: 39px;
+      line-height: 1.04;
+      letter-spacing: -0.055em;
+      font-weight: 900;
+    }
+    .subtitle {
+      margin: 18px 0 0;
+      color: #0f203f;
+      font-size: 18px;
+      line-height: 1.45;
+      letter-spacing: -0.025em;
+      font-weight: 800;
+    }
+    .lead {
+      margin: 5px 0 0;
+      color: #263c5e;
+      font-size: 14.5px;
+      line-height: 1.7;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .lead-en {
+      margin-top: 13px;
+      color: #5d7190;
+      font-size: 13.2px;
+      line-height: 1.55;
+      font-weight: 500;
+    }
+    .badge {
+      position: absolute;
+      top: 1mm;
+      right: 0;
+      display: inline-flex;
+      height: 42px;
+      align-items: center;
+      justify-content: center;
+      padding: 0 22px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #0b3a78, #0c5dcc);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 850;
+      box-shadow: 0 10px 24px rgba(10, 82, 180, 0.20);
+    }
+    .plane {
+      position: absolute;
+      right: -2mm;
+      top: 34mm;
+      width: 94mm;
+      height: 40mm;
+      opacity: 0.50;
+      color: #8fb2dd;
+    }
+    .content {
+      display: grid;
+      grid-template-columns: minmax(0, 1.02fr) minmax(0, 1fr);
+      gap: 8mm;
+      align-items: stretch;
+      margin-top: 5mm;
+    }
+    .panel {
+      border: 1px solid #d7e5f6;
+      border-radius: 26px;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 10px 34px rgba(30, 62, 110, 0.06);
+    }
+    .steps-panel {
+      padding: 20px 20px 18px;
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+    .title-icon {
+      display: inline-flex;
+      width: 48px;
+      height: 48px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #236de0, #0b4cac);
+      color: #fff;
+      box-shadow: 0 10px 22px rgba(35, 109, 224, 0.18);
+    }
+    .section-title h2 {
+      margin: 0;
+      color: #07172f;
+      font-size: 25px;
+      line-height: 1.15;
+      letter-spacing: -0.045em;
+      font-weight: 900;
+    }
+    .step {
+      position: relative;
+      display: grid;
+      grid-template-columns: 36px 52px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      min-height: 33mm;
+      margin-top: 10px;
+      padding: 13px 14px;
+      border: 1px solid #dfeaf8;
+      border-radius: 18px;
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+    .num {
+      align-self: start;
+      display: inline-flex;
+      width: 28px;
+      height: 28px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: #1f68d5;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 900;
+    }
+    .step-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #07172f;
+    }
+    .step strong {
+      display: block;
+      color: #07172f;
+      font-size: 16px;
+      line-height: 1.25;
+      letter-spacing: -0.03em;
+      font-weight: 850;
+    }
+    .step p {
+      margin: 6px 0 0;
+      color: #304663;
+      font-size: 11.8px;
+      line-height: 1.48;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .step p span {
+      display: block;
+      margin-top: 4px;
+      color: #6c7f9a;
+      font-size: 10.9px;
+      line-height: 1.42;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+    .notice {
+      margin-top: 12px;
+      padding: 13px 15px 13px;
+      border: 1px solid #dfeaf8;
+      border-radius: 18px;
+      background: #f8fbff;
+    }
+    .notice-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 8px;
+      color: #07172f;
+      font-size: 14px;
+      font-weight: 850;
+      letter-spacing: -0.02em;
+    }
+    .notice ul {
+      margin: 0;
+      padding-left: 17px;
+      color: #243b63;
+      font-size: 11.2px;
+      line-height: 1.45;
+      font-weight: 600;
+    }
+    .notice li { margin-top: 5px; }
+    .notice span {
+      color: #7a8aa0;
+      font-weight: 500;
+    }
+    .qr-panel {
+      position: relative;
+      padding: 20px 22px 18px;
+      text-align: center;
+      overflow: hidden;
+    }
+    .qr-panel::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 7px;
+      background: linear-gradient(90deg, #0b3a78, #1769d8);
+    }
+    .qr-title {
+      margin: 19px 0 0;
+      color: #125bc4;
+      font-size: 13px;
+      letter-spacing: 0.36em;
+      font-weight: 900;
+    }
+    .qr-panel h2 {
+      margin: 10px 0 0;
+      color: #07172f;
+      font-size: 33px;
+      line-height: 1.05;
+      letter-spacing: -0.05em;
+      font-weight: 900;
+    }
+    .divider {
+      width: 44px;
+      height: 2px;
+      margin: 16px auto 15px;
+      border-radius: 99px;
+      background: #1f68d5;
+    }
+    .qr-desc {
+      margin: 0;
+      color: #314864;
+      font-size: 12.7px;
+      line-height: 1.6;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .qr-desc span {
+      display: block;
+      margin-top: 5px;
+      color: #6b7e97;
+      font-weight: 500;
+    }
+    .qr-wrap {
+      width: 78mm;
+      height: 78mm;
+      margin: 15px auto 11px;
+      padding: 11px;
+      border: 1px solid #d9e7f8;
+      border-radius: 24px;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 0 0 1px #f5f8fd;
+    }
+    .qr-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+    .url-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      min-height: 42px;
+      margin: 0 auto;
+      padding: 9px 12px;
+      border: 1px solid #d6e4f6;
+      border-radius: 16px;
+      background: #f8fbff;
+      color: #1664cd;
+      font-size: 12.1px;
+      font-weight: 700;
+      line-height: 1.35;
+      word-break: break-all;
+      text-align: left;
+    }
+    .qr-caption {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid #dbe7f7;
+      text-align: left;
+    }
+    .phone-icon {
+      display: flex;
+      width: 40px;
+      height: 40px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 16px;
+      background: #edf5ff;
+      color: #1f68d5;
+    }
+    .qr-caption strong {
+      display: block;
+      color: #10213f;
+      font-size: 13.4px;
+      letter-spacing: -0.02em;
+    }
+    .qr-caption span {
+      display: block;
+      margin-top: 4px;
+      color: #6b7e97;
+      font-size: 11.5px;
+      line-height: 1.4;
+    }
+    .footer {
+      position: absolute;
+      left: 14mm;
+      right: 14mm;
+      bottom: 11mm;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      padding-top: 11px;
+      border-top: 1.5px solid #173b70;
+      color: #64748b;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+    .footer strong {
+      display: block;
+      color: #0b47a1;
+      font-size: 16px;
+      line-height: 1.1;
+      letter-spacing: -0.025em;
+      font-weight: 900;
+    }
+    .footer .en {
+      color: #0b47a1;
+      font-size: 9.5px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+    }
+    .footer-mark {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+    .logo-mark {
+      display: inline-flex;
+      width: 42px;
+      height: 42px;
+      align-items: center;
+      justify-content: center;
+      border: 1.5px solid #0b47a1;
+      border-radius: 999px;
+      color: #0b47a1;
+    }
+    @page { size: A4 portrait; margin: 0; }
+    @media print {
+      body { padding: 0; background: #fff; }
+      .toolbar { display: none; }
+      .sheet {
+        width: 210mm;
+        max-width: none;
+        min-height: 297mm;
+        height: 297mm;
+        margin: 0;
+        padding: 18mm 14mm 12mm;
+        border: none;
+        box-shadow: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -263,44 +648,149 @@ export default function DocumentAgreementsPage() {
     <button class="secondary" onclick="window.close()">닫기</button>
     <button onclick="window.print()">인쇄하기</button>
   </div>
+
   <main class="sheet">
-    <div class="accent"></div>
-    <section class="brand">
-      <div>
-        <div class="kicker">SKYNURI FLIGHT</div>
-        <h1>하늘누리 비행교육원</h1>
-        <p class="lead">체험비행 탑승 전 모바일 서약서 작성<br/>스마트폰 카메라로 QR을 스캔한 뒤 안내에 따라 작성해주세요.<br/><span style="display:block; margin-top:8px; font-size:13px; line-height:1.7; color:#64748b;">Please scan the QR code and complete the consent form on your phone before boarding.</span></p>
-      </div>
+    <section class="hero-top">
+      <div class="kicker">SKYNURI FLIGHT</div>
+      <h1>하늘누리 비행교육원</h1>
+      <p class="subtitle">체험비행 탑승 전 모바일 서약서 작성</p>
+      <p class="lead">스마트폰 카메라로 QR을 스캔한 뒤 안내에 따라 작성해주세요.</p>
+      <p class="lead-en">Please scan the QR code and complete the consent form<br/>on your phone before boarding.</p>
       <div class="badge">체험객 안내용</div>
+      <svg class="plane" viewBox="0 0 520 210" fill="none" aria-hidden="true">
+        <path d="M60 118C120 91 206 65 300 50C361 40 420 42 480 61L321 100L214 164L184 157L263 107L133 127L88 153L60 118Z" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/>
+        <path d="M178 99L106 45L132 40L245 83" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+        <path d="M331 96L424 162L391 169L286 112" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+        <path d="M83 116C73 92 52 86 35 97C18 108 25 132 47 134C63 135 78 128 83 116Z" stroke="currentColor" stroke-width="4"/>
+        <path d="M86 117H126" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+        <path d="M150 134C159 150 180 155 197 145" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+        <path d="M246 129C255 145 276 150 293 140" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="192" cy="151" r="9" stroke="currentColor" stroke-width="4"/>
+        <circle cx="288" cy="146" r="9" stroke="currentColor" stroke-width="4"/>
+        <path d="M34 96L11 75M35 135L5 153M31 116H0" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+      </svg>
     </section>
-    <section class="hero">
-      <article class="card">
-        <h2>서약서 작성 방법</h2>
-        <div class="steps">
-          <div class="step"><div class="num">1</div><div><strong>QR 코드 스캔</strong><p>스마트폰 카메라 또는 QR 스캔 앱으로 오른쪽 QR 코드를 스캔해주세요.</p></div></div>
-          <div class="step"><div class="num">2</div><div><strong>탑승자 정보 입력</strong><p>성명, 생년월일, 연락처, 탑승일과 추가 상품 선택 항목을 정확히 작성해주세요.</p></div></div>
-          <div class="step"><div class="num">3</div><div><strong>자필 서명 후 제출</strong><p>안내문 확인 후 자필 서명을 완료하고 제출해주세요. 제출 후 직원에게 제출 여부를 보여주세요.</p></div></div>
+
+    <section class="content">
+      <article class="panel steps-panel">
+        <div class="section-title">
+          <div class="title-icon">
+            <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/>
+              <path d="M14 2v6h6"/>
+              <path d="M9 15l2 2 5-5"/>
+            </svg>
+          </div>
+          <h2>서약서 작성 방법</h2>
         </div>
+
+        <div class="step">
+          <div class="num">1</div>
+          <div class="step-icon">
+            <svg width="42" height="56" viewBox="0 0 42 56" fill="none" stroke="currentColor" stroke-width="2.8">
+              <rect x="8" y="2" width="26" height="52" rx="5"/>
+              <path d="M17 8h8"/>
+              <path d="M15 19h5v5h-5zM23 19h4v4h-4zM15 27h4v4h-4zM23 28h5v5h-5zM15 35h5v5h-5zM23 37h3v3h-3z"/>
+            </svg>
+          </div>
+          <div>
+            <strong>QR 코드 스캔</strong>
+            <p>스마트폰 카메라 또는 QR 스캔 앱으로 오른쪽 QR 코드를 스캔해주세요.<span>Scan the QR code with your phone camera or QR scanner.</span></p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="num">2</div>
+          <div class="step-icon">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.8">
+              <rect x="7" y="6" width="34" height="36" rx="4"/>
+              <circle cx="20" cy="20" r="6"/>
+              <path d="M12 35c2-7 14-7 16 0"/>
+              <path d="M31 18h6M31 26h6M31 34h4"/>
+            </svg>
+          </div>
+          <div>
+            <strong>탑승자 정보 입력</strong>
+            <p>성명, 생년월일, 연락처, 탑승일과 추가 상품 선택 항목을 정확히 작성해주세요.<span>Enter participant details such as name, birth date, contact information, flight date, and options.</span></p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="num">3</div>
+          <div class="step-icon">
+            <svg width="50" height="50" viewBox="0 0 50 50" fill="none" stroke="currentColor" stroke-width="2.8">
+              <path d="M31 7l12 12-23 23H8V30L31 7Z"/>
+              <path d="M27 11l12 12"/>
+              <path d="M7 44c8-5 13 2 21-3 4-2 6-5 11-4"/>
+            </svg>
+          </div>
+          <div>
+            <strong>자필 서명 후 제출</strong>
+            <p>안내에 따라 자필 서명을 완료하고 제출해주세요. 제출 후 직원에게 제출 여부를 보여주세요.<span>Complete your handwritten signature and show the completion screen to the staff.</span></p>
+          </div>
+        </div>
+
         <div class="notice">
-          <h3>작성 전 확인해주세요</h3>
+          <p class="notice-title">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#1f68d5" stroke-width="2.2">
+              <path d="M12 3l7 3v6c0 4.5-2.8 7.8-7 9-4.2-1.2-7-4.5-7-9V6l7-3Z"/>
+              <path d="m9 12 2 2 4-5"/>
+            </svg>
+            작성 전 확인해주세요
+          </p>
           <ul>
-            <li>탑승자 본인의 정보로 작성해주세요.<br/><span style="color:#7a8aa0;">Please enter the passenger's own information.</span></li>
-            <li>제출 완료 후에는 현장 직원에게 제출 여부를 보여주세요.<br/><span style="color:#7a8aa0;">After submitting, please show the completion screen to the staff.</span></li>
-            <li>문제가 있으면 안내 데스크 또는 담당 교관에게 문의해주세요.<br/><span style="color:#7a8aa0;">If you need help, please ask the front desk or your instructor.</span></li>
+            <li>탑승자 본인의 정보로 작성해주세요.<br/><span>Please enter the passenger's own information.</span></li>
+            <li>제출 완료 후에는 현장 직원에게 제출 여부를 보여주세요.<br/><span>After submitting, please show the completion screen to the staff.</span></li>
+            <li>문제가 있으면 안내 데스크 또는 담당 교관에게 문의해주세요.<br/><span>If you need help, please ask the front desk or your instructor.</span></li>
           </ul>
         </div>
       </article>
-      <aside class="qr-card">
+
+      <aside class="panel qr-panel">
         <p class="qr-title">MOBILE CONSENT</p>
         <h2>탑승자 서약서</h2>
-        <p class="desc">아래 QR을 스캔하면 모바일 작성 페이지로 이동합니다.<br/><span style="display:block; margin-top:6px;">Scan the QR code below to open the mobile consent page.</span></p>
+        <div class="divider"></div>
+        <p class="qr-desc">아래 QR을 스캔하면 모바일 작성 페이지로 이동합니다.<span>Scan the QR code below to open the mobile consent page.</span></p>
         <div class="qr-wrap"><img src="${qrImage}" alt="체험 동의서 QR 코드" /></div>
-        <div class="url">${safeUrl}</div>
+        <div class="url-chip">
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="#1f68d5" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M2 12h20M12 2c3 3 4 6 4 10s-1 7-4 10M12 2c-3 3-4 6-4 10s1 7 4 10"/>
+          </svg>
+          <span>${safeUrl}</span>
+        </div>
+        <div class="qr-caption">
+          <div class="phone-icon">
+            <svg width="21" height="25" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="2.2">
+              <rect x="5" y="2" width="14" height="24" rx="3"/>
+              <path d="M10 22h4"/>
+            </svg>
+          </div>
+          <div>
+            <strong>QR 스캔 후 모바일에서 작성 · 제출</strong>
+            <span>Scan the QR code and submit on your phone.</span>
+          </div>
+        </div>
       </aside>
     </section>
+
     <footer class="footer">
-      <div><strong>하늘누리 비행교육원</strong><br/>체험비행 전 서약서 작성용 안내물</div>
-      <div>QR 스캔 후 모바일에서 작성 · 제출<br/><span style="font-size:10px; color:#8a98ac;">Scan the QR code and submit on your phone</span></div>
+      <div class="footer-mark">
+        <div class="logo-mark">
+          <svg width="31" height="24" viewBox="0 0 60 42" fill="none" stroke="currentColor" stroke-width="3">
+            <path d="M4 27c15-2 30-10 50-23-10 14-23 25-42 32"/>
+            <path d="M13 25l17 3M23 20l20 1"/>
+          </svg>
+        </div>
+        <div>
+          <strong>하늘누리 비행교육원</strong>
+          <div class="en">SKYNURI FLIGHT ACADEMY</div>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        안전한 비행, 신뢰의 교육<br/>
+        <span style="font-size:10px; color:#7b8da6;">Safe Flight, Trusted Training</span>
+      </div>
     </footer>
   </main>
 </body>
