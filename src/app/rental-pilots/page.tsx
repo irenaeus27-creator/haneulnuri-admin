@@ -211,7 +211,6 @@ export default function RentalPilotsPage() {
   const [form, setForm] = useState<PilotForm>(emptyForm);
   const [editing, setEditing] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
-  const [issuingCodeId, setIssuingCodeId] = useState("");
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("전체");
   const [flightFilter, setFlightFilter] = useState("전체");
@@ -360,53 +359,6 @@ export default function RentalPilotsPage() {
       setError(e instanceof Error ? e.message : "렌탈 기장을 저장하지 못했습니다.");
     } finally {
       setSaving(false);
-    }
-  }
-
-
-  async function issuePasswordSetupCode(row: Row) {
-    const userId = text(row.userId || row.user_id);
-    const email = text(row.email);
-    const phone = text(row.phone);
-    const displayName = text(row.name, "렌탈회원");
-    const rowKey = userId || email || phone || displayName;
-
-    if (!email || !phone) {
-      alert("앱 비밀번호 설정코드 발급에는 이메일과 전화번호가 모두 필요합니다.");
-      return;
-    }
-
-    const ok = window.confirm(`${displayName} 회원에게 앱 비밀번호 설정/재설정 코드를 발급할까요?`);
-    if (!ok) return;
-
-    try {
-      setIssuingCodeId(rowKey);
-
-      const response = await fetch("/api/users/password-setup-code", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          email,
-          phone,
-        }),
-      });
-
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok || (!data.ok && !data.success)) {
-        throw new Error(data.message || "설정코드 발급에 실패했습니다.");
-      }
-
-      alert(
-        `앱 비밀번호 설정코드: ${data.code}\n\n` +
-        `${displayName} 회원에게 이 코드를 전달해주세요.\n` +
-        `유효시간: ${data.expiresInMinutes || 30}분`
-      );
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "설정코드 발급에 실패했습니다.");
-    } finally {
-      setIssuingCodeId("");
     }
   }
 
@@ -604,19 +556,7 @@ export default function RentalPilotsPage() {
                       )}
                     </td>
                     <td><span className={`ui-badge ${badgeClass(row.status)}`}>{text(row.status, "-")}</span></td>
-                    <td className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          className="ui-btn ui-btn-outline"
-                          onClick={() => issuePasswordSetupCode(row)}
-                          disabled={issuingCodeId === text(row.userId || row.user_id || row.email || row.phone || row.name)}
-                        >
-                          {issuingCodeId === text(row.userId || row.user_id || row.email || row.phone || row.name) ? "발급 중" : "비번코드"}
-                        </button>
-                        <button type="button" className="ui-btn ui-btn-outline" onClick={() => startEdit(row)}>수정</button>
-                      </div>
-                    </td>
+                    <td className="text-right"><button type="button" className="ui-btn ui-btn-outline" onClick={() => startEdit(row)}>수정</button></td>
                   </tr>
                 );
               })}

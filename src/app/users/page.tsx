@@ -322,6 +322,7 @@ export default function UsersPage() {
   const [instructors, setInstructors] = useState<InstructorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [issuingCodeId, setIssuingCodeId] = useState<string | null>(null);
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("전체");
   const [roleFilter, setRoleFilter] = useState("전체");
@@ -617,6 +618,49 @@ export default function UsersPage() {
     }
   }
 
+
+  async function issuePasswordSetupCode(item: UserRow) {
+    const userId = getUserId(item);
+    const email = raw(item.email);
+    const phone = raw(item.phone);
+    const displayName = text(item.name, "회원");
+    const rowKey = userId || email || phone || displayName;
+
+    if (!email || !phone) {
+      alert("앱 비밀번호 설정코드 발급에는 이메일과 전화번호가 모두 필요합니다.");
+      return;
+    }
+
+    const ok = window.confirm(`${displayName} 회원에게 앱 비밀번호 설정/재설정 코드를 발급할까요?`);
+    if (!ok) return;
+
+    try {
+      setIssuingCodeId(rowKey);
+
+      const response = await fetch("/api/users/password-setup-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, email, phone }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || (!data.ok && !data.success)) {
+        throw new Error(data.message || "설정코드 발급에 실패했습니다.");
+      }
+
+      alert(
+        `앱 비밀번호 설정코드: ${data.code}\n\n` +
+        `${displayName} 회원에게 이 코드를 전달해주세요.\n` +
+        `유효시간: ${data.expiresInMinutes || 30}분`
+      );
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "설정코드 발급에 실패했습니다.");
+    } finally {
+      setIssuingCodeId(null);
+    }
+  }
+
   return (
     <PageContainer title="회원관리" description="앱 가입 회원의 승인 상태와 계정 기본정보를 관리합니다.">
       {savingId || operationMessage ? (
@@ -748,6 +792,14 @@ export default function UsersPage() {
                       <td className="text-right">
                         <div className="flex flex-wrap justify-end gap-2">
                           <button type="button" onClick={() => openDetail(item)} className="ui-btn h-9 border border-[#dbe5f1] bg-white px-3 text-[12px] text-[#243b63] hover:bg-[#f4f8fd]">자세히</button>
+                          <button
+                            type="button"
+                            disabled={issuingCodeId === (userId || raw(item.email) || raw(item.phone) || text(item.name, ""))}
+                            onClick={() => void issuePasswordSetupCode(item)}
+                            className="ui-btn h-9 border border-sky-200 bg-sky-50 px-3 text-[12px] text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {issuingCodeId === (userId || raw(item.email) || raw(item.phone) || text(item.name, "")) ? "발급 중" : "비번코드"}
+                          </button>
                           {pending ? (
                             <>
                               <button type="button" disabled={savingId === userId} onClick={() => openApproval(item)} className="ui-btn h-9 bg-emerald-600 px-3 text-[12px] text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
