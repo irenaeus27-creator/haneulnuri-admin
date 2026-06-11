@@ -323,6 +323,45 @@ export async function POST(request: NextRequest) {
     const targetOr = buildTargetOrCondition(target);
     const primaryUserId = target.userIds[0] || text(((context || {}) as JsonRecord).userId);
 
+    if (["list", "fetch", "get", "notifications"].includes(action)) {
+      const limit = parseLimit(body.limit || body.pageSize);
+      const filter = normalizeFilter(body.filter);
+      const unreadOnly = ["1", "true", "yes", "unread", "미확인"].includes(text(body.unread).toLowerCase());
+
+      let query = supabase
+        .from("notifications")
+        .select("*")
+        .or(targetOr)
+        .or(`scheduled_at.is.null,scheduled_at.lte.${now}`)
+        .order("created_at", { ascending: false })
+        .limit(Math.min(limit * 3, 300));
+
+      if (unreadOnly) {
+        query = query.or("read_at.is.null,status.eq.unread,status.eq.미확인,status.eq.대기,status.eq.pending,status.eq.queued,status.is.null");
+      }
+
+      const { data, error } = await query;
+      if (error) throw new Error(`알림 조회 실패: ${error.message}`);
+
+      let notifications = ((data || []) as NotificationRow[])
+        .map(enrichNotification)
+        .filter(isWithinRetention);
+
+      if (filter !== "all") {
+        notifications = notifications.filter((item) => text(item.group) === filter || notificationTypeGroup(item.type, item.title, item.message) === filter);
+      }
+
+      if (unreadOnly) {
+        notifications = notifications.filter((item) => item.isUnread === true);
+      }
+
+      return NextResponse.json({
+        ok: true,
+        notifications: notifications.slice(0, limit),
+        count: notifications.length,
+      });
+    }
+
     if (action === "markAllRead") {
       const { error } = await supabase
         .from("notifications")
