@@ -2683,22 +2683,23 @@ function ScheduleGraph({
                           item.bookingType === "PFI"
                             ? "z-10 overflow-hidden px-0 py-0"
                             : isShortBlock
-                              ? "z-20 overflow-hidden px-1.5 py-1.5"
+                              ? "z-20 overflow-hidden px-1 py-1"
                               : "z-20 overflow-hidden px-2.5 py-1.5"
                         } ${scheduleColorClass(item.bookingType)}`}
                         style={{
                           left: `${displayLeft}%`,
                           width: `${Math.min(width, 100 - displayLeft)}%`,
-                          minWidth: item.bookingType === "PFI" ? "46px" : isShortBlock ? "78px" : "94px",
+                          minWidth: item.bookingType === "PFI" ? "46px" : "0px",
+                          maxWidth: `${Math.min(width, 100 - displayLeft)}%`,
                         }}
                       >
                         {item.bookingType === "PFI" ? (
                           <div className="flex h-full w-full items-center justify-center text-[13px] font-semibold leading-none text-sky-900" aria-label="PFI">PFI</div>
                         ) : isShortBlock ? (
                           <div className="flex h-full min-h-0 flex-col justify-center gap-0.5 text-[#16365f]">
-                            <div className="truncate text-[10.5px] font-medium leading-[12px] text-[#405a78]">{item.bookingType.replace("비행", "")}</div>
-                            <div className="truncate text-[12px] font-semibold leading-[13px] text-[#102a52]">{item.userName}</div>
-                            {item.instructorName ? <div className="truncate text-[10.5px] font-medium leading-[12px] text-[#405a78]">{item.instructorName.replace(/^교관\s*/, "")}</div> : null}
+                            <div className="truncate text-[9.5px] font-medium leading-[11px] text-[#405a78]">{item.bookingType.replace("비행", "")}</div>
+                            <div className="truncate text-[11px] font-semibold leading-[12px] text-[#102a52]">{item.userName}</div>
+                            {item.instructorName ? <div className="truncate text-[9.5px] font-medium leading-[11px] text-[#405a78]">{item.instructorName.replace(/^교관\s*/, "")}</div> : null}
                           </div>
                         ) : (
                           <div className="flex h-full min-h-0 flex-col justify-center gap-0.5 text-[#16365f]">

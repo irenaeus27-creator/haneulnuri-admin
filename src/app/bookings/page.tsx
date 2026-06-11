@@ -1314,7 +1314,10 @@ export default function BookingsPage() {
 
       if (parsed.typeFilter) setTypeFilter(parsed.typeFilter);
       if (parsed.statusFilter) setStatusFilter(parsed.statusFilter);
-      if (parsed.dateFilter) setDateFilter(parsed.dateFilter);
+      // 예약 캘린더는 화면에 들어올 때 항상 오늘을 기준으로 시작합니다.
+      // 이전에 저장된 날짜 필터를 복원하면 일정관리 진입 시 과거 날짜에 머무르는 문제가 생깁니다.
+      setDateFilter("");
+      updateForm("bookingDate", todayIsoText());
       if (typeof parsed.showCancelledBookings === "boolean") setShowCancelledBookings(parsed.showCancelledBookings);
     } catch {
       // 필터 저장값이 깨진 경우 무시합니다.
