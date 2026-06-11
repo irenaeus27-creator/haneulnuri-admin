@@ -423,7 +423,7 @@ export default function DocumentAgreementsPage() {
                 <button
                   type="button"
                   onClick={copyLink}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 text-[14px] font-medium tracking-[-0.01em] text-slate-700 shadow-sm shadow-slate-200/40 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-[18px] border border-blue-200 bg-white px-4 text-[14px] font-medium tracking-[-0.01em] text-slate-700 shadow-sm shadow-slate-200/30 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
                 >
                   <svg className="h-4.5 w-4.5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <rect x="9" y="9" width="13" height="13" rx="2" />
@@ -434,9 +434,9 @@ export default function DocumentAgreementsPage() {
                 <a
                   href={publicUrl || "#"}
                   target="_blank"
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-[18px] border border-blue-600 bg-blue-600 px-4 text-center text-[14px] font-medium tracking-[-0.01em] text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-[18px] border border-blue-200 bg-blue-50 px-4 text-center text-[14px] font-medium tracking-[-0.01em] text-blue-700 shadow-sm shadow-blue-100/50 transition hover:border-blue-300 hover:bg-blue-100"
                 >
-                  <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="h-4.5 w-4.5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M7 17 17 7" />
                     <path d="M8 7h9v9" />
                     <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
@@ -446,9 +446,9 @@ export default function DocumentAgreementsPage() {
                 <button
                   type="button"
                   onClick={handlePrintQrPoster}
-                  className="col-span-2 inline-flex h-12 items-center justify-center gap-2 rounded-[18px] border border-blue-200 bg-blue-50 px-4 text-[14px] font-medium tracking-[-0.01em] text-blue-700 shadow-sm shadow-blue-100/50 transition hover:bg-blue-100"
+                  className="col-span-2 inline-flex h-12 items-center justify-center gap-2 rounded-[18px] border border-blue-200 bg-white px-4 text-[14px] font-medium tracking-[-0.01em] text-slate-700 shadow-sm shadow-slate-200/30 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
                 >
-                  <svg className="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="h-4.5 w-4.5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M6 9V2h12v7" />
                     <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
                     <path d="M6 14h12v8H6z" />
