@@ -49,6 +49,55 @@ function text(value: unknown, fallback = "") {
   return raw || fallback;
 }
 
+function userInitial(name: unknown) {
+  const value = text(name);
+  return Array.from(value)[0] || "회";
+}
+
+function rentalPilotPhotoUrl(row: Row, users: Row[]) {
+  const direct = text(row.photoUrl || row.photo_url || row.profilePhotoUrl || row.profile_photo_url);
+  if (direct) return direct;
+
+  const userId = text(row.userId || row.user_id);
+  const email = text(row.email).toLowerCase();
+  const phone = text(row.phone).replace(/\D/g, "");
+
+  const user = users.find((item) => {
+    const itemUserId = text(item.userId || item.user_id);
+    const itemEmail = text(item.email).toLowerCase();
+    const itemPhone = text(item.phone).replace(/\D/g, "");
+
+    return (
+      (userId && itemUserId && userId === itemUserId) ||
+      (email && itemEmail && email === itemEmail) ||
+      (phone && itemPhone && phone === itemPhone)
+    );
+  });
+
+  return user ? text(user.photoUrl || user.photo_url || user.profilePhotoUrl || user.profile_photo_url) : "";
+}
+
+function RentalPilotAvatar({ row, users }: { row: Row; users: Row[] }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const src = rentalPilotPhotoUrl(row, users);
+  const showImage = src.length > 0 && !imageFailed;
+
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#dbeafe] bg-[#eaf4ff] text-[13px] font-medium text-[#0b47b7]">
+      {showImage ? (
+        <img
+          src={src}
+          alt={`${text(row.name, "렌탈회원")} 사진`}
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        userInitial(row.name)
+      )}
+    </div>
+  );
+}
+
 function numberValue(value: unknown, fallback = 0) {
   const raw = text(value);
   if (!raw) return fallback;
@@ -526,8 +575,13 @@ export default function RentalPilotsPage() {
                 return (
                   <tr key={`${text(row.pilotId || row.pilot_id)}-${index}`} className={stats.instructorRequired ? "bg-amber-50/20" : ""}>
                     <td>
-                      <div className="font-semibold text-[#10213f]">{text(row.name, "-")}</div>
-                      <div className="mt-1 text-xs text-[#7a8ba3]">{text(row.pilotId || row.pilot_id, "-")}</div>
+                      <div className="flex items-center gap-3">
+                        <RentalPilotAvatar row={row} users={users} />
+                        <div className="min-w-0">
+                          <div className="truncate font-semibold text-[#10213f]">{text(row.name, "-")}</div>
+                          <div className="mt-1 truncate text-xs text-[#7a8ba3]">{text(row.pilotId || row.pilot_id, "-")}</div>
+                        </div>
+                      </div>
                     </td>
                     <td>{formatPhone(row.phone) || "-"}</td>
                     <td>{text(row.licenseNo || row.license_no || row.licenseNumber, "-")}</td>
