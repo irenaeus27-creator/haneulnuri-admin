@@ -8,7 +8,7 @@ export const revalidate = 0;
 type JsonRecord = Record<string, unknown>;
 
 function normalizeEmail(value: unknown) {
-  return text(value).toLowerCase();
+  return text(value).trim().toLowerCase();
 }
 
 function phoneDigits(value: unknown) {
@@ -42,31 +42,37 @@ function cleanRow(row: JsonRecord) {
   return result;
 }
 
-function randomPassword() {
-  const random = Math.random().toString(36).slice(2);
-  const time = Date.now().toString(36);
-  return `Skynuri-${random}-${time}!`;
+function safePassword(value: unknown) {
+  return text(value).trim();
+}
+
+function validatePassword(password: string) {
+  if (password.length < 6) return "비밀번호는 6자 이상으로 입력해주세요.";
+  if (password.length > 72) return "비밀번호는 72자 이하로 입력해주세요.";
+  return "";
+}
+
+function isSamePhone(a: unknown, b: unknown) {
+  const aDigits = phoneDigits(a);
+  const bDigits = phoneDigits(b);
+  return !!aDigits && !!bDigits && aDigits === bDigits;
 }
 
 async function findUser(email: string, phone: string) {
   const supabase = getSupabaseServerClient();
 
-  if (email) {
-    const { data, error } = await supabase.from("users").select("*").ilike("email", email).limit(1).maybeSingle();
-    if (error) throw new Error(`회원 이메일 확인 실패: ${error.message}`);
-    if (data) return data as JsonRecord;
+  if (!email) return null;
+
+  const { data, error } = await supabase.from("users").select("*").ilike("email", email).limit(1).maybeSingle();
+  if (error) throw new Error(`회원 이메일 확인 실패: ${error.message}`);
+  if (!data) return null;
+
+  const user = data as JsonRecord;
+  if (!isSamePhone(user.phone, phone)) {
+    throw new Error("이메일과 전화번호가 등록된 회원 정보와 일치하지 않습니다.");
   }
 
-  if (phone) {
-    const candidates = Array.from(new Set([phone, formatPhone(phone), phoneDigits(phone)].filter(Boolean)));
-    for (const value of candidates) {
-      const { data, error } = await supabase.from("users").select("*").eq("phone", value).limit(1).maybeSingle();
-      if (error) throw new Error(`회원 연락처 확인 실패: ${error.message}`);
-      if (data) return data as JsonRecord;
-    }
-  }
-
-  return null;
+  return user;
 }
 
 async function findAuthUserByEmail(email: string) {
@@ -105,23 +111,38 @@ async function updateUserAuthIdIfColumnExists(userId: string, authUserId: string
   throw new Error(`회원 Auth 연결 저장 실패: ${error.message}`);
 }
 
-async function ensureAuthUser(user: JsonRecord, email: string) {
+async function createOrUpdateAuthUser(user: JsonRecord, email: string, password: string) {
   const supabase = getSupabaseServerClient();
   const existing = await findAuthUserByEmail(email);
+  const role = normalizeRole(user.member_type || user.role);
 
   if (existing?.id) {
+    const { error } = await supabase.auth.admin.updateUserById(existing.id, {
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: cleanRow({
+        ...(existing.user_metadata || {}),
+        name: text(user.name),
+        phone: formatPhone(user.phone),
+        role,
+        userId: text(user.user_id),
+      }),
+    });
+
+    if (error) throw new Error(`앱 비밀번호 설정 실패: ${error.message}`);
+
     await updateUserAuthIdIfColumnExists(text(user.user_id), existing.id);
     return existing.id;
   }
 
-  const role = normalizeRole(user.member_type || user.role);
   const { data, error } = await supabase.auth.admin.createUser({
     email,
-    password: randomPassword(),
+    password,
     email_confirm: true,
     user_metadata: cleanRow({
       name: text(user.name),
-      phone: text(user.phone),
+      phone: formatPhone(user.phone),
       role,
       userId: text(user.user_id),
     }),
@@ -135,6 +156,12 @@ async function ensureAuthUser(user: JsonRecord, email: string) {
 
     const fallback = await findAuthUserByEmail(email);
     if (fallback?.id) {
+      const { error: updateError } = await supabase.auth.admin.updateUserById(fallback.id, {
+        password,
+        email_confirm: true,
+      });
+      if (updateError) throw new Error(`앱 비밀번호 설정 실패: ${updateError.message}`);
+
       await updateUserAuthIdIfColumnExists(text(user.user_id), fallback.id);
       return fallback.id;
     }
@@ -147,20 +174,6 @@ async function ensureAuthUser(user: JsonRecord, email: string) {
   return authUserId;
 }
 
-function passwordRedirectUrl(request: NextRequest) {
-  const configured =
-    process.env.NEXT_PUBLIC_PASSWORD_SETUP_REDIRECT_URL ||
-    process.env.NEXT_PUBLIC_APP_PASSWORD_REDIRECT_URL ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    "";
-
-  if (configured) return configured;
-
-  const url = new URL(request.url);
-  return `${url.origin}/auth/set-password`;
-}
-
 export async function POST(request: NextRequest) {
   const startedAt = Date.now();
 
@@ -168,10 +181,34 @@ export async function POST(request: NextRequest) {
     const body = (await request.json().catch(() => ({}))) as JsonRecord;
     const email = normalizeEmail(body.email);
     const phone = formatPhone(body.phone);
+    const password = safePassword(body.password);
+    const passwordConfirm = safePassword(body.passwordConfirm || body.password_confirm || body.confirmPassword);
 
     if (!email) {
       return NextResponse.json(
-        { ok: false, success: false, message: "비밀번호 설정 링크를 받을 이메일을 입력해주세요." },
+        { ok: false, success: false, message: "이메일을 입력해주세요." },
+        { status: 400 },
+      );
+    }
+
+    if (!phone) {
+      return NextResponse.json(
+        { ok: false, success: false, message: "회원 확인을 위해 전화번호를 입력해주세요." },
+        { status: 400 },
+      );
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return NextResponse.json(
+        { ok: false, success: false, message: passwordError },
+        { status: 400 },
+      );
+    }
+
+    if (password !== passwordConfirm) {
+      return NextResponse.json(
+        { ok: false, success: false, message: "비밀번호 확인이 일치하지 않습니다." },
         { status: 400 },
       );
     }
@@ -180,7 +217,7 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { ok: false, success: false, message: "해당 이메일로 등록된 회원을 찾지 못했습니다. 관리자에게 먼저 회원 등록을 요청해주세요." },
+        { ok: false, success: false, message: "등록된 회원을 찾지 못했습니다. 관리자에게 먼저 회원 등록을 요청해주세요." },
         { status: 404 },
       );
     }
@@ -188,31 +225,26 @@ export async function POST(request: NextRequest) {
     const userEmail = normalizeEmail(user.email || email);
     if (!userEmail) {
       return NextResponse.json(
-        { ok: false, success: false, message: "회원 정보에 이메일이 없어 비밀번호 설정 링크를 보낼 수 없습니다." },
+        { ok: false, success: false, message: "회원 정보에 이메일이 없어 앱 비밀번호를 설정할 수 없습니다." },
         { status: 400 },
       );
     }
 
-    const authUserId = await ensureAuthUser(user, userEmail);
-    const supabase = getSupabaseServerClient();
-    const redirectTo = passwordRedirectUrl(request);
-
-    const { error } = await supabase.auth.resetPasswordForEmail(userEmail, { redirectTo });
-    if (error) throw new Error(`비밀번호 설정 메일 발송 실패: ${error.message}`);
+    const authUserId = await createOrUpdateAuthUser(user, userEmail, password);
 
     return NextResponse.json({
       ok: true,
       success: true,
       service: "skynuri-password-setup",
-      message: "비밀번호 설정 링크를 이메일로 보냈습니다.",
+      message: "앱 비밀번호가 설정되었습니다. 이제 앱에서 로그인할 수 있습니다.",
       email: userEmail,
       userId: text(user.user_id),
       authUserId,
-      redirectTo,
+      setupId: buildId("PW"),
       elapsedMs: Date.now() - startedAt,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "비밀번호 설정 링크 발송에 실패했습니다.";
+    const message = error instanceof Error ? error.message : "앱 비밀번호 설정에 실패했습니다.";
     return NextResponse.json(
       {
         ok: false,
