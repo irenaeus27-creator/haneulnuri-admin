@@ -110,6 +110,34 @@ function raw(value: unknown) {
   return String(value ?? "").trim();
 }
 
+
+function getUserInitial(name: unknown) {
+  const value = raw(name);
+  return Array.from(value)[0] || "회";
+}
+
+function UserAvatar({ name, photoUrl, size = "sm" }: { name: unknown; photoUrl?: unknown; size?: "sm" | "lg" }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const src = raw(photoUrl);
+  const showImage = src.length > 0 && !imageFailed;
+  const sizeClass = size === "lg" ? "h-16 w-16 rounded-3xl text-[18px]" : "h-10 w-10 rounded-2xl text-[13px]";
+
+  return (
+    <div className={`flex ${sizeClass} shrink-0 items-center justify-center overflow-hidden border border-[#dbeafe] bg-[#eaf4ff] font-medium text-[#0b47b7]`}>
+      {showImage ? (
+        <img
+          src={src}
+          alt={`${text(name, "회원")} 사진`}
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        getUserInitial(name)
+      )}
+    </div>
+  );
+}
+
 function getUserId(row: UserRow) {
   return raw(row.userId || row.user_id);
 }
@@ -689,9 +717,7 @@ export default function UsersPage() {
                     <tr key={`${userId || "user"}-${index}`} className="align-middle hover:bg-[#fbfdff]">
                       <td>
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#dbeafe] bg-[#eaf4ff] text-[13px] font-medium text-[#0b47b7]">
-                            {photoUrl ? <img src={photoUrl} alt={`${text(item.name) || "회원"} 사진`} className="h-full w-full object-cover" /> : (text(item.name).slice(0, 1) || "회")}
-                          </div>
+                          <UserAvatar name={item.name} photoUrl={photoUrl} />
                           <div className="min-w-0">
                             <div className="truncate text-[14px] font-medium text-[#10213f]">{text(item.name)}</div>
                             <div className="mt-1 truncate text-[12px] font-normal text-[#6f8199]">{userId || "-"}</div>
@@ -770,13 +796,7 @@ export default function UsersPage() {
                 <div className="space-y-5">
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-[#dbe5f1] bg-[#f8fbff] p-5">
                     <div className="flex items-center gap-4">
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-3xl border border-[#dbeafe] bg-[#eaf4ff] text-[18px] font-medium text-[#0b47b7]">
-                        {text(selectedUser.photoUrl || selectedUser.photo_url) ? (
-                          <img src={text(selectedUser.photoUrl || selectedUser.photo_url)} alt={`${text(selectedUser.name) || "회원"} 사진`} className="h-full w-full object-cover" />
-                        ) : (
-                          text(selectedUser.name).slice(0, 1) || "회"
-                        )}
-                      </div>
+                      <UserAvatar name={selectedUser.name} photoUrl={selectedUser.photoUrl || selectedUser.photo_url} size="lg" />
                       <div>
                         <div className="text-[20px] font-medium text-[#10213f]">{text(selectedUser.name)}</div>
                         <div className="mt-1 text-[13px] font-normal text-[#6f8199]">{getUserId(selectedUser) || "-"}</div>
