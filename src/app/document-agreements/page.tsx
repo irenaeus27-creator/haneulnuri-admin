@@ -269,7 +269,7 @@ export default function DocumentAgreementsPage() {
       <div>
         <div class="kicker">SKYNURI FLIGHT</div>
         <h1>하늘누리 비행교육원</h1>
-        <p class="lead">체험비행 탑승 전 모바일 서약서 작성<br/>스마트폰 카메라로 QR을 스캔한 뒤 안내에 따라 작성해주세요.<br/><span style="display:block; margin-top:8px; font-size:13px; line-height:1.7; color:#64748b;">Please scan the QR code and complete the consent form on your phone before boarding.</span><span style="display:block; margin-top:4px; font-size:13px; line-height:1.7; color:#64748b;">请在登机前扫描二维码，并在手机上填写同意书。</span></p>
+        <p class="lead">체험비행 탑승 전 모바일 서약서 작성<br/>스마트폰 카메라로 QR을 스캔한 뒤 안내에 따라 작성해주세요.<br/><span style="display:block; margin-top:8px; font-size:13px; line-height:1.7; color:#64748b;">Please scan the QR code and complete the consent form on your phone before boarding.</span></p>
       </div>
       <div class="badge">체험객 안내용</div>
     </section>
@@ -284,23 +284,23 @@ export default function DocumentAgreementsPage() {
         <div class="notice">
           <h3>작성 전 확인해주세요</h3>
           <ul>
-            <li>탑승자 본인의 정보로 작성해주세요.<br/><span style="color:#7a8aa0;">Please enter the passenger's own information. / 请填写乘机人本人的信息。</span></li>
-            <li>제출 완료 후에는 현장 직원에게 제출 여부를 보여주세요.<br/><span style="color:#7a8aa0;">After submitting, please show the completion screen to the staff. / 提交完成后，请向现场工作人员出示完成画面。</span></li>
-            <li>문제가 있으면 안내 데스크 또는 담당 교관에게 문의해주세요.<br/><span style="color:#7a8aa0;">If you need help, please ask the front desk or your instructor. / 如需帮助，请咨询前台或现场教员。</span></li>
+            <li>탑승자 본인의 정보로 작성해주세요.<br/><span style="color:#7a8aa0;">Please enter the passenger's own information.</span></li>
+            <li>제출 완료 후에는 현장 직원에게 제출 여부를 보여주세요.<br/><span style="color:#7a8aa0;">After submitting, please show the completion screen to the staff.</span></li>
+            <li>문제가 있으면 안내 데스크 또는 담당 교관에게 문의해주세요.<br/><span style="color:#7a8aa0;">If you need help, please ask the front desk or your instructor.</span></li>
           </ul>
         </div>
       </article>
       <aside class="qr-card">
         <p class="qr-title">MOBILE CONSENT</p>
         <h2>탑승자 서약서</h2>
-        <p class="desc">아래 QR을 스캔하면 모바일 작성 페이지로 이동합니다.<br/><span style="display:block; margin-top:6px;">Scan the QR code below to open the mobile consent page.</span><span style="display:block; margin-top:4px;">扫描下方二维码即可进入手机填写页面。</span></p>
+        <p class="desc">아래 QR을 스캔하면 모바일 작성 페이지로 이동합니다.<br/><span style="display:block; margin-top:6px;">Scan the QR code below to open the mobile consent page.</span></p>
         <div class="qr-wrap"><img src="${qrImage}" alt="체험 동의서 QR 코드" /></div>
         <div class="url">${safeUrl}</div>
       </aside>
     </section>
     <footer class="footer">
       <div><strong>하늘누리 비행교육원</strong><br/>체험비행 전 서약서 작성용 안내물</div>
-      <div>QR 스캔 후 모바일에서 작성 · 제출<br/><span style="font-size:11px; color:#8a98ac;">Scan QR and submit on mobile · Scan QR code and submit on your phone · 扫描二维码并在手机上提交</span></div>
+      <div>QR 스캔 후 모바일에서 작성 · 제출<br/><span style="font-size:11px; color:#8a98ac;">Scan QR and submit on mobile · Scan QR code and submit on your phone</span></div>
     </footer>
   </main>
 </body>
@@ -410,29 +410,49 @@ export default function DocumentAgreementsPage() {
                   <div className="h-[260px] w-[260px] animate-pulse rounded-2xl bg-slate-100" />
                 )}
               </div>
-              <p className="mt-4 break-all rounded-2xl bg-white px-4 py-3 text-xs leading-5 text-slate-500">
-                {publicUrl || "링크 생성 중"}
-              </p>
+              <div className="mt-5 w-full rounded-[22px] bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
+                <div className="flex items-center justify-center gap-2 text-center text-[13px] font-medium leading-5 text-slate-500">
+                  <svg className="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L10.5 5.43" />
+                    <path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07l1.62-1.62" />
+                  </svg>
+                  <span className="break-all">{publicUrl || "링크 생성 중"}</span>
+                </div>
+              </div>
               <div className="mt-5 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={copyLink}
-                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium tracking-[-0.01em] text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                  className="inline-flex h-14 items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 text-[15px] font-medium tracking-[-0.01em] text-slate-700 shadow-sm shadow-slate-200/40 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                 >
+                  <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
                   링크 복사
                 </button>
                 <a
                   href={publicUrl || "#"}
                   target="_blank"
-                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-blue-600 bg-blue-600 px-4 text-center text-[15px] font-medium tracking-[-0.01em] text-white shadow-sm transition hover:bg-blue-700"
+                  className="inline-flex h-14 items-center justify-center gap-2 rounded-[18px] border border-blue-600 bg-blue-600 px-4 text-center text-[15px] font-medium tracking-[-0.01em] text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
                 >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M7 17 17 7" />
+                    <path d="M8 7h9v9" />
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7" />
+                  </svg>
                   작성 페이지 열기
                 </a>
                 <button
                   type="button"
                   onClick={handlePrintQrPoster}
-                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-4 text-[15px] font-medium tracking-[-0.01em] text-blue-700 transition hover:bg-blue-100"
+                  className="inline-flex h-14 items-center justify-center gap-2 rounded-[18px] border border-slate-200 bg-white px-4 text-[15px] font-medium tracking-[-0.01em] text-slate-700 shadow-sm shadow-slate-200/40 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                 >
+                  <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 9V2h12v7" />
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <path d="M6 14h12v8H6z" />
+                  </svg>
                   QR 인쇄
                 </button>
               </div>
