@@ -44,6 +44,20 @@ function nullableText(value: unknown) {
   return raw || null;
 }
 
+function cleanRow(row: JsonRecord) {
+  const result: JsonRecord = {};
+  Object.entries(row).forEach(([key, value]) => {
+    if (value === undefined || value === "") return;
+    result[key] = value;
+  });
+  return result;
+}
+
+function isProtectedUserRole(value: unknown) {
+  const raw = text(value).replace(/\s/g, "");
+  return ["admin", "관리자", "instructor", "교관"].includes(raw);
+}
+
 function minutesValue(value: unknown) {
   const parsed = numberOrNull(value);
   if (parsed === null) return 0;
@@ -94,6 +108,97 @@ async function selectOptionalRows(table: string, orderColumn?: string) {
     throw new Error(`${table} 조회 실패: ${error.message}`);
   }
   return mapRows(data as JsonRecord[]);
+}
+
+async function findExistingUserForRentalPilot(row: JsonRecord, input?: JsonRecord) {
+  const supabase = getSupabaseServerClient();
+  const userId = text(row.user_id || input?.userId || input?.user_id);
+  const email = text(row.email || input?.email).toLowerCase();
+  const phone = text(row.phone || input?.phone);
+
+  if (userId) {
+    const { data, error } = await supabase.from("users").select("*").eq("user_id", userId).maybeSingle();
+    if (error) throw new Error(`회원 연결 확인 실패: ${error.message}`);
+    if (data) return data as JsonRecord;
+  }
+
+  if (email) {
+    const { data, error } = await supabase.from("users").select("*").ilike("email", email).limit(1).maybeSingle();
+    if (error) throw new Error(`회원 이메일 확인 실패: ${error.message}`);
+    if (data) return data as JsonRecord;
+  }
+
+  if (phone) {
+    const { data, error } = await supabase.from("users").select("*").eq("phone", phone).limit(1).maybeSingle();
+    if (error) throw new Error(`회원 연락처 확인 실패: ${error.message}`);
+    if (data) return data as JsonRecord;
+  }
+
+  return null;
+}
+
+async function syncRentalPilotUser(row: JsonRecord, input?: JsonRecord) {
+  const supabase = getSupabaseServerClient();
+  const now = nowIso();
+  const existingUser = await findExistingUserForRentalPilot(row, input);
+  const name = text(row.name || input?.name || existingUser?.name);
+  const phone = text(row.phone || input?.phone || existingUser?.phone);
+  const email = text(row.email || input?.email || existingUser?.email).toLowerCase();
+  const memo = text(input?.profileMemo || input?.memo || row.memo || existingUser?.memo);
+
+  if (existingUser) {
+    const userId = text(existingUser.user_id);
+    const keepProtectedRole = isProtectedUserRole(existingUser.role) || isProtectedUserRole(existingUser.member_type);
+    const updatePayload = cleanRow({
+      name,
+      phone,
+      email,
+      role: keepProtectedRole ? text(existingUser.role) : "렌탈회원",
+      member_type: keepProtectedRole ? text(existingUser.member_type) : "렌탈회원",
+      status: keepProtectedRole ? text(existingUser.status) : "승인완료",
+      approved_at: keepProtectedRole ? existingUser.approved_at : existingUser.approved_at || now,
+      memo,
+      notification_enabled: existingUser.notification_enabled ?? true,
+    });
+
+    const { error } = await supabase.from("users").update(updatePayload).eq("user_id", userId);
+    if (error) throw new Error(`회원 자동 동기화 실패: ${error.message}`);
+
+    return {
+      ...row,
+      user_id: userId,
+      name,
+      phone,
+      email,
+    };
+  }
+
+  const userId = text(row.user_id || input?.userId || input?.user_id) || buildId("U");
+  const insertPayload = cleanRow({
+    user_id: userId,
+    name: name || "렌탈회원",
+    phone,
+    email,
+    role: "렌탈회원",
+    status: "승인완료",
+    member_type: "렌탈회원",
+    created_at: now,
+    requested_at: now,
+    approved_at: now,
+    memo,
+    notification_enabled: true,
+  });
+
+  const { error } = await supabase.from("users").upsert(insertPayload, { onConflict: "user_id" });
+  if (error) throw new Error(`렌탈회원 사용자 계정 생성 실패: ${error.message}`);
+
+  return {
+    ...row,
+    user_id: userId,
+    name: text(insertPayload.name),
+    phone: text(insertPayload.phone),
+    email: text(insertPayload.email).toLowerCase(),
+  };
 }
 
 async function findExistingRentalPilot(row: JsonRecord, input?: JsonRecord) {
@@ -187,7 +292,8 @@ async function handlePost(body: JsonRecord) {
     throw new Error(`지원하지 않는 action입니다: ${action}`);
   }
 
-  const row = normalize(data, !isUpdateAction);
+  const normalizedRow = normalize(data, !isUpdateAction);
+  const row = await syncRentalPilotUser(normalizedRow, data);
   const existing = await findExistingRentalPilot(row, data);
 
   if (existing) {
