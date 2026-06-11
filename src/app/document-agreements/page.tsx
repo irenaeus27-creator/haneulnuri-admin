@@ -202,7 +202,25 @@ export default function DocumentAgreementsPage() {
               <Info label="건강상태" value={selected.healthClear === false ? "No" : "Yes"} />
               <Info label="혈액형" value={text(selected.bloodType) || "-"} />
               <Info label="비상연락처" value={`${text(selected.emergencyContactName) || "-"} / ${text(selected.emergencyContactPhone) || "-"}`} />
-              <Info label="서명" value={text(selected.signatureName)} />
+              <Info label="서명자" value={text(selected.signatureName)} />
+              <Info label="서명일시" value={dateTimeText(selected.signedAt)} />
+              <Info label="서약서 버전" value={text(selected.agreementVersion) || "-"} />
+              <Info label="제출 IP" value={text(selected.ipAddress) || "-"} />
+              <div className="sm:col-span-2"><Info label="기기 정보" value={text(selected.userAgent) || "-"} /></div>
+              {text(selected.signatureImageUrl) ? (
+                <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-xs font-medium text-slate-500">자필 서명 이미지</div>
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
+                    <img
+                      src={text(selected.signatureImageUrl)}
+                      alt="자필 서명"
+                      className="max-h-[180px] w-full object-contain"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="sm:col-span-2"><Info label="자필 서명 이미지" value="저장된 서명 이미지 없음" /></div>
+              )}
               <div className="sm:col-span-2"><Info label="주소" value={text(selected.address) || "-"} /></div>
             </div>
           </div>

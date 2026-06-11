@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import type { PointerEvent, ReactNode } from "react";
 
 type SubmitResult = {
   ok?: boolean;
@@ -27,6 +27,7 @@ const initialForm = {
   emergencyContactPhone: "",
   bloodType: "",
   signatureName: "",
+  signatureDataUrl: "",
   understood: false,
   saveConsent: false,
 };
@@ -111,6 +112,7 @@ export default function ExperienceConsentPage() {
       text(form.flightDate) &&
       text(form.healthClear) &&
       text(form.signatureName) &&
+      text(form.signatureDataUrl) &&
       form.understood &&
       form.saveConsent,
     );
@@ -142,6 +144,16 @@ export default function ExperienceConsentPage() {
           reservationSources: form.reservationSources,
           agreementVersion: AGREEMENT_VERSION,
           agreementText: koreanClauses.join("\n"),
+          agreementSnapshot: [
+            "[Korean Agreement]",
+            ...koreanClauses.map((clause, index) => `${index + 1}. ${clause}`),
+            "",
+            "[English Agreement]",
+            ...englishClauses.map((clause, index) => `${index + 1}. ${clause}`),
+          ].join("\n"),
+          signatureDataUrl: form.signatureDataUrl,
+          signedAt: new Date().toISOString(),
+          signatureMethod: "draw",
         }),
       });
       const data = (await response.json()) as SubmitResult;
@@ -463,7 +475,7 @@ export default function ExperienceConsentPage() {
               동의합니다.
             </span>
           </label>
-          <Field label="탑승 서약인 서명" required className="mt-4">
+          <Field label="탑승 서약인 성명" required className="mt-4">
             <input
               value={form.signatureName}
               onChange={(e) => update("signatureName", e.target.value)}
@@ -471,6 +483,31 @@ export default function ExperienceConsentPage() {
               className="input"
             />
           </Field>
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-slate-700">
+                  자필 서명<span className="ml-1 text-rose-500">*</span>
+                </p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  손가락 또는 마우스로 직접 서명해주세요.
+                </p>
+              </div>
+              {form.signatureDataUrl ? (
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                  서명 완료
+                </span>
+              ) : (
+                <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                  필요
+                </span>
+              )}
+            </div>
+            <SignaturePad
+              value={form.signatureDataUrl}
+              onChange={(value) => update("signatureDataUrl", value)}
+            />
+          </div>
           {result?.message ? (
             <p className="mt-3 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {result.message}
@@ -509,6 +546,130 @@ export default function ExperienceConsentPage() {
         }
       `}</style>
     </main>
+  );
+}
+
+function SignaturePad({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const drawingRef = useRef(false);
+  const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+
+  function resizeCanvas() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    const previous = value;
+    canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+    canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.scale(ratio, ratio);
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, rect.width, rect.height);
+    context.lineWidth = 2.4;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.strokeStyle = "#0f172a";
+    if (previous) {
+      const image = new Image();
+      image.onload = () => context.drawImage(image, 0, 0, rect.width, rect.height);
+      image.src = previous;
+    }
+  }
+
+  useEffect(() => {
+    resizeCanvas();
+    window.addEventListener("resize", resizeCanvas);
+    return () => window.removeEventListener("resize", resizeCanvas);
+  }, []);
+
+  function point(event: PointerEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  function save() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    onChange(canvas.toDataURL("image/png"));
+  }
+
+  function start(event: PointerEvent<HTMLCanvasElement>) {
+    event.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.setPointerCapture(event.pointerId);
+    drawingRef.current = true;
+    lastPointRef.current = point(event);
+  }
+
+  function move(event: PointerEvent<HTMLCanvasElement>) {
+    if (!drawingRef.current) return;
+    event.preventDefault();
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    const lastPoint = lastPointRef.current;
+    if (!canvas || !context || !lastPoint) return;
+    const nextPoint = point(event);
+    context.beginPath();
+    context.moveTo(lastPoint.x, lastPoint.y);
+    context.lineTo(nextPoint.x, nextPoint.y);
+    context.stroke();
+    lastPointRef.current = nextPoint;
+    save();
+  }
+
+  function end(event: PointerEvent<HTMLCanvasElement>) {
+    if (!drawingRef.current) return;
+    event.preventDefault();
+    drawingRef.current = false;
+    lastPointRef.current = null;
+    save();
+  }
+
+  function clear() {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+    const rect = canvas.getBoundingClientRect();
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, rect.width, rect.height);
+    onChange("");
+  }
+
+  return (
+    <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-3">
+      <canvas
+        ref={canvasRef}
+        onPointerDown={start}
+        onPointerMove={move}
+        onPointerUp={end}
+        onPointerCancel={end}
+        className="h-[150px] w-full touch-none rounded-2xl border border-slate-200 bg-white shadow-inner"
+        aria-label="자필 서명 입력란"
+      />
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="text-xs leading-5 text-slate-500">
+          서명은 제출 시 이미지로 저장됩니다.
+        </p>
+        <button
+          type="button"
+          onClick={clear}
+          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600"
+        >
+          다시 쓰기
+        </button>
+      </div>
+    </div>
   );
 }
 

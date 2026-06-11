@@ -46,6 +46,33 @@ function booleanOrNull(value: unknown) {
   return null;
 }
 
+function dataUrlToPngBuffer(value: unknown) {
+  const raw = text(value);
+  const match = raw.match(/^data:image\/png;base64,(.+)$/);
+  if (!match) return null;
+  return Buffer.from(match[1], "base64");
+}
+
+async function uploadSignatureImage(consentId: string, signatureDataUrl: unknown) {
+  const buffer = dataUrlToPngBuffer(signatureDataUrl);
+  if (!buffer || buffer.length < 200) return "";
+
+  const supabase = getSupabaseServerClient();
+  const path = `experience/${consentId}/signature.png`;
+  const { error } = await supabase.storage
+    .from("consent-signatures")
+    .upload(path, buffer, {
+      contentType: "image/png",
+      upsert: true,
+    });
+  if (error) throw new Error(`서명 이미지 저장 실패: ${error.message}`);
+
+  const { data } = supabase.storage
+    .from("consent-signatures")
+    .getPublicUrl(path);
+  return data.publicUrl || "";
+}
+
 function normalizeForInsert(input: JsonRecord, request: NextRequest) {
   const consentId =
     text(input.consentId || input.consent_id) || buildId(PREFIX);
@@ -81,11 +108,15 @@ function normalizeForInsert(input: JsonRecord, request: NextRequest) {
     ),
     blood_type: text(input.bloodType || input.blood_type),
     signature_name: text(input.signatureName || input.signature_name),
+    signature_image_url: text(input.signatureImageUrl || input.signature_image_url),
+    signed_at: text(input.signedAt || input.signed_at) || null,
+    signature_method: text(input.signatureMethod || input.signature_method, "draw"),
     agreement_version: text(
       input.agreementVersion || input.agreement_version,
       "experience-passenger-waiver-v2026-06-07",
     ),
     agreement_text: text(input.agreementText || input.agreement_text),
+    agreement_snapshot: text(input.agreementSnapshot || input.agreement_snapshot || input.agreementText || input.agreement_text),
     user_agent: request.headers.get("user-agent") || "",
     ip_address: ipAddress,
     status: text(input.status, "제출완료"),
@@ -150,6 +181,14 @@ export async function POST(request: NextRequest) {
     if (row.health_clear === null)
       throw new Error("건강상태 확인을 선택해주세요.");
     if (!row.signature_name) throw new Error("서명란에 성명을 입력해주세요.");
+
+    row.signature_image_url = await uploadSignatureImage(
+      String(row.consent_id),
+      body.signatureDataUrl || body.signature_data_url,
+    );
+    if (!row.signature_image_url)
+      throw new Error("자필 서명을 입력해주세요.");
+    row.signed_at = row.signed_at || nowIso();
 
     const supabase = getSupabaseServerClient();
     const { data, error } = await supabase
