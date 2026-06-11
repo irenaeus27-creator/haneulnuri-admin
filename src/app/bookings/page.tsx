@@ -1170,8 +1170,12 @@ function bookingDisplayTitle(item: BookingRow) {
   return text(item.courseName || item.userName || item.bookingType, "예약명 미입력");
 }
 
+function isEducationBooking(item: BookingRow) {
+  return `${text(item.bookingType)} ${text(item.courseName)}`.includes("교육");
+}
+
 function isEducationCompletedBooking(item: BookingRow) {
-  return `${text(item.bookingType)} ${text(item.courseName)}`.includes("교육") && text(item.status).replace(/\s/g, "") === "완료";
+  return isEducationBooking(item) && text(item.status).replace(/\s/g, "") === "완료";
 }
 
 function normalizeBookingStatusForDisplay(status: unknown) {
@@ -1244,6 +1248,16 @@ function statusActionButtons(status: string) {
     { label: "확정", nextStatus: "확정", actionLabel: "상태 확정 처리", tone: "primary" },
     { label: "취소", nextStatus: "취소", actionLabel: "관리자 취소", tone: "danger" },
   ] as const;
+}
+
+function statusActionButtonsForBooking(item: BookingRow) {
+  const actions = [...statusActionButtons(normalizedStatusOf(item))];
+
+  if (!isEducationBooking(item)) return actions;
+
+  // 교육비행은 예약관리에서 직접 "완료" 처리하지 않습니다.
+  // 실제 완료 여부는 비행기록/교육기록 등록 흐름에서 반영합니다.
+  return actions.filter((action) => action.nextStatus !== "완료");
 }
 
 function sortRowsByOrder<T extends AnyRow>(rows: T[]) {
@@ -4328,7 +4342,7 @@ export default function BookingsPage() {
             ) : (
               <div className="divide-y divide-[#edf2f8]">
                 {pendingRequestBookings.slice(0, 6).map((item, index) => {
-                  const actions = statusActionButtons(normalizedStatusOf(item));
+                  const actions = statusActionButtonsForBooking(item);
                   return (
                     <div key={`${text(item.bookingId, "request")}-${index}`} title={bookingTooltip(item)} onClick={() => focusBookingInCalendar(item)} className={`pending-request-list-card flex cursor-pointer flex-col gap-2 border-l-4 px-3 py-2 transition hover:bg-blue-50/60 md:flex-row md:items-center md:justify-between ${pendingRequestToneClass(item.status)}`}>
                       <div className="min-w-0">
@@ -4474,7 +4488,7 @@ export default function BookingsPage() {
                     >
                       상세
                     </button>
-                    {statusActionButtons(normalizedStatusOf(selectedBooking)).map((action) => (
+                    {statusActionButtonsForBooking(selectedBooking).map((action) => (
                       <button
                         key={`panel-${action.nextStatus}`}
                         type="button"
