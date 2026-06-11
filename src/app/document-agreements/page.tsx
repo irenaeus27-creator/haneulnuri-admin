@@ -269,7 +269,7 @@ export default function DocumentAgreementsPage() {
       <div>
         <div class="kicker">SKYNURI FLIGHT</div>
         <h1>하늘누리 비행교육원</h1>
-        <p class="lead">체험비행 탑승 전 모바일 서약서 작성<br/>스마트폰 카메라로 QR을 스캔한 뒤 안내에 따라 작성해주세요.</p>
+        <p class="lead">체험비행 탑승 전 모바일 서약서 작성<br/>스마트폰 카메라로 QR을 스캔한 뒤 안내에 따라 작성해주세요.<br/><span style="display:block; margin-top:8px; font-size:13px; line-height:1.7; color:#64748b;">Please scan the QR code and complete the consent form on your phone before boarding.</span><span style="display:block; margin-top:4px; font-size:13px; line-height:1.7; color:#64748b;">请在登机前扫描二维码，并在手机上填写同意书。</span></p>
       </div>
       <div class="badge">체험객 안내용</div>
     </section>
@@ -284,23 +284,23 @@ export default function DocumentAgreementsPage() {
         <div class="notice">
           <h3>작성 전 확인해주세요</h3>
           <ul>
-            <li>탑승자 본인의 정보로 작성해주세요.</li>
-            <li>제출 완료 후에는 현장 직원에게 제출 여부를 보여주세요.</li>
-            <li>문제가 있으면 안내 데스크 또는 담당 교관에게 문의해주세요.</li>
+            <li>탑승자 본인의 정보로 작성해주세요.<br/><span style="color:#7a8aa0;">Please enter the passenger's own information. / 请填写乘机人本人的信息。</span></li>
+            <li>제출 완료 후에는 현장 직원에게 제출 여부를 보여주세요.<br/><span style="color:#7a8aa0;">After submitting, please show the completion screen to the staff. / 提交完成后，请向现场工作人员出示完成画面。</span></li>
+            <li>문제가 있으면 안내 데스크 또는 담당 교관에게 문의해주세요.<br/><span style="color:#7a8aa0;">If you need help, please ask the front desk or your instructor. / 如需帮助，请咨询前台或现场教员。</span></li>
           </ul>
         </div>
       </article>
       <aside class="qr-card">
         <p class="qr-title">MOBILE CONSENT</p>
         <h2>탑승자 서약서</h2>
-        <p class="desc">아래 QR을 스캔하면 모바일 작성 페이지로 이동합니다.</p>
+        <p class="desc">아래 QR을 스캔하면 모바일 작성 페이지로 이동합니다.<br/><span style="display:block; margin-top:6px;">Scan the QR code below to open the mobile consent page.</span><span style="display:block; margin-top:4px;">扫描下方二维码即可进入手机填写页面。</span></p>
         <div class="qr-wrap"><img src="${qrImage}" alt="체험 동의서 QR 코드" /></div>
         <div class="url">${safeUrl}</div>
       </aside>
     </section>
     <footer class="footer">
       <div><strong>하늘누리 비행교육원</strong><br/>체험비행 전 서약서 작성용 안내물</div>
-      <div>QR 스캔 후 모바일에서 작성 · 제출</div>
+      <div>QR 스캔 후 모바일에서 작성 · 제출<br/><span style="font-size:11px; color:#8a98ac;">Scan QR and submit on mobile · Scan QR code and submit on your phone · 扫描二维码并在手机上提交</span></div>
     </footer>
   </main>
 </body>
