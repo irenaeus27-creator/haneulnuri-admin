@@ -4045,8 +4045,8 @@ if (form.instructorId) {
                 <h2 className="shrink-0 text-[15px] font-semibold tracking-[-0.02em] text-[#10213f]">예약 캘린더</h2>
 </div>
 
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-[14px] font-semibold text-blue-800 ring-1 ring-blue-200">
+              <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
+                <span className="inline-flex text-[16px] font-semibold tracking-[-0.02em] text-blue-800">
                   {calendarViewMode === "week" ? `${koreanDateLabel(calendarDate)}부터 7일` : koreanDateLabel(calendarDate)}
                 </span>
                 {selectedBooking ? (
