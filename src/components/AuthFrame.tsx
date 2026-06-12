@@ -146,7 +146,17 @@ export default function AuthFrame({ children }: { children: React.ReactNode }) {
 
     supabase?.auth.getSession().then(async ({ data }) => {
       if (!alive) return;
-      await resolveUser(data.session?.user ?? null);
+
+      let session = data.session;
+      if (!session) {
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        if (!alive) return;
+        const retry = await supabase.auth.getSession();
+        session = retry.data.session;
+      }
+
+      if (!alive) return;
+      await resolveUser(session?.user ?? null);
     });
 
     const { data: listener } = supabase?.auth.onAuthStateChange((_event, session) => {

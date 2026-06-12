@@ -4,6 +4,16 @@ import { FormEvent, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
+async function waitForAuthSession(supabase: ReturnType<typeof getSupabaseBrowserClient>) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) return data.session;
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+
+  return null;
+}
+
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -27,14 +37,21 @@ function LoginContent() {
 
     setSubmitting(true);
     const supabase = getSupabaseBrowserClient();
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password,
     });
-    setSubmitting(false);
 
     if (error) {
+      setSubmitting(false);
       setMessage("로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.");
+      return;
+    }
+
+    const session = data.session || await waitForAuthSession(supabase);
+    if (!session) {
+      setSubmitting(false);
+      setMessage("로그인 세션을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.");
       return;
     }
 
