@@ -3613,11 +3613,6 @@ export default function BookingsPage() {
         return;
       }
 
-      if (isRentalForm && !form.instructorId) {
-        alert("렌탈비행은 감독을 선택해야 저장할 수 있습니다.");
-        return;
-      }
-
       if (form.instructorId) {
         const unavailable = instructorAvailabilityStatus(
           form.instructorId,
@@ -3651,7 +3646,7 @@ export default function BookingsPage() {
         status: editing ? normalizeBookingStatusForDisplay(form.status) : "확정",
         paymentStatus: normalizePaymentStatusForSave(form.paymentStatus, normalizedBookingType),
         instructorId: form.instructorId,
-        instructorName: form.instructorName,
+        instructorName: form.instructorId ? form.instructorName : "",
         ...(conflictWarningMessages.length > 0 ? { allowConflict: true } : {}),
       };
 
