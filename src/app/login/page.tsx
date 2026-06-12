@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
 async function waitForAuthSession(supabase: ReturnType<typeof getSupabaseBrowserClient>) {
-  for (let attempt = 0; attempt < 12; attempt += 1) {
+  for (let attempt = 0; attempt < 15; attempt += 1) {
     const { data } = await supabase.auth.getSession();
     if (data.session) return data.session;
     await new Promise((resolve) => setTimeout(resolve, 120));
@@ -55,8 +55,7 @@ function LoginContent() {
       return;
     }
 
-    router.replace(nextPath);
-    router.refresh();
+    window.location.assign(nextPath);
   }
 
   function moveDevMode() {

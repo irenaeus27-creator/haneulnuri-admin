@@ -126,20 +126,37 @@ async function findAuthUserByEmail(email: string) {
   return null;
 }
 
-async function updateUserAuthIdIfColumnExists(userId: string, authUserId: string) {
+async function updateUserAuthIdIfColumnExists(userId: string, authUserId: string, user?: JsonRecord) {
   if (!userId || !authUserId) return;
 
   const supabase = getSupabaseServerClient();
+  const role = normalizeRole(user?.member_type || user?.role);
+  const status = text(user?.status);
+  const approvedStatus = ["활성", "정상", "승인완료", "승인", "근무중", "사용", "활동", "활동중"].includes(status)
+    ? status
+    : "승인완료";
+
   const { error } = await supabase
     .from("users")
-    .update({ auth_user_id: authUserId, updated_at: nowIso() })
+    .update(cleanRow({
+      auth_user_id: authUserId,
+      role,
+      member_type: role,
+      status: approvedStatus,
+      updated_at: nowIso(),
+    }))
     .eq("user_id", userId);
 
   if (!error) return;
 
   const message = error.message || "";
   if (message.includes("auth_user_id") || message.includes("schema cache") || message.includes("column")) {
-    await supabase.from("users").update({ updated_at: nowIso() }).eq("user_id", userId);
+    await supabase.from("users").update(cleanRow({
+      role,
+      member_type: role,
+      status: approvedStatus,
+      updated_at: nowIso(),
+    })).eq("user_id", userId);
     return;
   }
 
@@ -167,7 +184,7 @@ async function createOrUpdateAuthUser(user: JsonRecord, email: string, password:
 
     if (error) throw new Error(`앱 비밀번호 설정 실패: ${error.message}`);
 
-    await updateUserAuthIdIfColumnExists(text(user.user_id), existing.id);
+    await updateUserAuthIdIfColumnExists(text(user.user_id), existing.id, user);
     return existing.id;
   }
 
@@ -197,7 +214,7 @@ async function createOrUpdateAuthUser(user: JsonRecord, email: string, password:
       });
       if (updateError) throw new Error(`앱 비밀번호 설정 실패: ${updateError.message}`);
 
-      await updateUserAuthIdIfColumnExists(text(user.user_id), fallback.id);
+      await updateUserAuthIdIfColumnExists(text(user.user_id), fallback.id, user);
       return fallback.id;
     }
 
@@ -205,7 +222,7 @@ async function createOrUpdateAuthUser(user: JsonRecord, email: string, password:
   }
 
   const authUserId = data.user?.id || "";
-  await updateUserAuthIdIfColumnExists(text(user.user_id), authUserId);
+  await updateUserAuthIdIfColumnExists(text(user.user_id), authUserId, user);
   return authUserId;
 }
 

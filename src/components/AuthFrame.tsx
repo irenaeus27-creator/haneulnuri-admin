@@ -17,6 +17,8 @@ type UserRow = {
   userName?: string;
   email?: string;
   role?: string;
+  member_type?: string;
+  memberType?: string;
   status?: string;
 };
 
@@ -36,11 +38,11 @@ function isDevBypassEnabled() {
 }
 
 function normalizeRole(value: unknown) {
-  const raw = text(value).toLowerCase();
+  const raw = text(value).replace(/\s/g, "").toLowerCase();
   if (raw === "관리자" || raw === "admin" || raw === "administrator" || raw === "master") return "admin";
-  if (raw === "교관" || raw === "instructor") return "instructor";
-  if (raw === "교육생" || raw === "student") return "student";
-  if (raw === "렌탈기장" || raw === "렌탈회원" || raw === "rental_pilot" || raw === "rental-pilot") return "rental_pilot";
+  if (raw === "교관" || raw === "교관회원" || raw === "instructor" || raw.includes("instructor")) return "instructor";
+  if (raw === "교육생" || raw === "학생" || raw === "학생회원" || raw === "student" || raw.includes("교육")) return "student";
+  if (raw === "렌탈기장" || raw === "렌탈회원" || raw === "rental" || raw === "rental_pilot" || raw === "rental-pilot" || raw.includes("렌탈")) return "rental_pilot";
   return raw;
 }
 
@@ -53,9 +55,14 @@ function isApprovedStatus(value: unknown) {
     raw === "정상" ||
     raw === "승인완료" ||
     raw === "승인" ||
+    raw === "근무중" ||
+    raw === "사용" ||
+    raw === "활동" ||
+    raw === "활동중" ||
     lower === "active" ||
     lower === "approved" ||
-    lower === "enabled"
+    lower === "enabled" ||
+    lower === "working"
   );
 }
 
@@ -84,7 +91,7 @@ function profileFromUserRow(row: UserRow, fallback: AuthProfile): AuthProfile {
   return {
     name: text(row.name || row.userName, fallback.name),
     email: text(row.email, fallback.email),
-    role: text(row.role, fallback.role),
+    role: text(row.role || row.member_type || row.memberType, fallback.role),
     status: text(row.status, fallback.status),
     userId: text(row.user_id || row.userId, fallback.userId),
   };
@@ -148,8 +155,8 @@ export default function AuthFrame({ children }: { children: React.ReactNode }) {
       if (!alive) return;
 
       let session = data.session;
-      if (!session) {
-        await new Promise((resolve) => setTimeout(resolve, 180));
+      for (let attempt = 0; !session && attempt < 8; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 150));
         if (!alive) return;
         const retry = await supabase.auth.getSession();
         session = retry.data.session;
