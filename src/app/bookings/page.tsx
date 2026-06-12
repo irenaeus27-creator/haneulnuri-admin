@@ -58,6 +58,11 @@ type InstructorRow = {
   active?: string;
   weeklyOffDays?: string;
   weeklyAvailableTimes?: string;
+  displayColor?: string;
+  display_color?: string;
+  instructorColor?: string;
+  instructor_color?: string;
+  color?: string;
   memo?: string;
   [key: string]: unknown;
 };
@@ -947,6 +952,59 @@ function calendarTypeClass(type: unknown) {
   return "border-slate-400 bg-slate-100 text-slate-900";
 }
 
+function stableInstructorColorKey(value: unknown) {
+  const raw = text(value);
+  let hash = 0;
+
+  for (let index = 0; index < raw.length; index += 1) {
+    hash = (hash * 31 + raw.charCodeAt(index)) % 100000;
+  }
+
+  return hash;
+}
+
+const instructorColorPalette = [
+  "#2563eb",
+  "#059669",
+  "#7c3aed",
+  "#0891b2",
+  "#dc2626",
+  "#ea580c",
+  "#4f46e5",
+  "#0f766e",
+  "#be123c",
+  "#9333ea",
+];
+
+function normalizeInstructorColor(value: unknown) {
+  const raw = text(value);
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw;
+  return "";
+}
+
+function instructorColorFromMemo(value: unknown) {
+  const memo = text(value);
+  const match = memo.match(/\[COLOR:(#[0-9a-fA-F]{6})\]/);
+  return normalizeInstructorColor(match?.[1]);
+}
+
+function instructorDisplayColor(row?: InstructorRow | null) {
+  const explicit =
+    normalizeInstructorColor(row?.displayColor) ||
+    normalizeInstructorColor(row?.display_color) ||
+    normalizeInstructorColor(row?.instructorColor) ||
+    normalizeInstructorColor(row?.instructor_color) ||
+    normalizeInstructorColor(row?.color) ||
+    instructorColorFromMemo(row?.memo);
+
+  if (explicit) return explicit;
+
+  const colorKey = text(row?.instructorId || row?.name || row?.email || row?.phone);
+  if (!colorKey) return "#94a3b8";
+
+  return instructorColorPalette[stableInstructorColorKey(colorKey) % instructorColorPalette.length];
+}
+
 function statusBadgeClass(status: unknown) {
   const value = text(status, "");
 
@@ -1767,7 +1825,7 @@ export default function BookingsPage() {
     if (form.startTime && form.endTime && form.startTime >= form.endTime) warnings.push("종료시간은 시작시간보다 늦어야 합니다.");
 
     if (!form.userName.trim()) {
-      warnings.push(isEducationForm ? "교육생을 선택하세요." : isRentalForm ? "렌탈 기장을 선택하세요." : isExperienceForm ? "체험 고객명을 입력하세요." : "예약자 이름을 입력하세요.");
+      warnings.push(isEducationForm ? "교육생을 선택하세요." : isRentalForm ? "렌탈 기장을 선택하세요." : "예약자 이름을 입력하세요.");
     }
 
     if (isEducationForm && (!form.instructorId || !form.aircraftId)) {
@@ -2558,6 +2616,41 @@ export default function BookingsPage() {
     return showAogAircraft ? [...operationalAircraft, ...aogAircraft] : operationalAircraft;
   }
 
+  function instructorForBooking(booking: BookingRow) {
+    const instructorId = formValue(booking.instructorId);
+    const instructorName = formValue(booking.instructorName);
+
+    return instructors.find((item) => {
+      if (instructorId && formValue(item.instructorId) === instructorId) return true;
+      if (instructorName && formValue(item.name) === instructorName) return true;
+      return false;
+    });
+  }
+
+  function instructorStripeColor(booking: BookingRow) {
+    const row = instructorForBooking(booking);
+    const fallbackKey = formValue(booking.instructorId || booking.instructorName);
+
+    if (row) return instructorDisplayColor(row);
+    if (fallbackKey) {
+      return instructorColorPalette[stableInstructorColorKey(fallbackKey) % instructorColorPalette.length];
+    }
+
+    return "#94a3b8";
+  }
+
+  function calendarBlockStyleWithInstructor(booking: BookingRow, startTime?: string, endTime?: string) {
+    const baseStyle = startTime && endTime
+      ? calendarBlockStyleByTime(startTime, endTime)
+      : calendarBlockStyle(booking);
+
+    return {
+      ...baseStyle,
+      borderLeftColor: instructorStripeColor(booking),
+      borderLeftWidth: "4px",
+    };
+  }
+
   function resourceName(resource: AircraftRow | InstructorRow) {
     if (calendarResourceMode === "instructor") {
       return text((resource as InstructorRow).name || (resource as InstructorRow).instructorId, "-");
@@ -2716,7 +2809,7 @@ export default function BookingsPage() {
                             {showPfi ? (
                               <div
                                 className="absolute top-2 z-10 flex h-[44px] items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-2 text-[12px] font-medium text-sky-800 shadow-sm"
-                                style={calendarBlockStyleByTime(pfiStart, pfiEnd)}
+                                style={calendarBlockStyleWithInstructor(booking, pfiStart, pfiEnd)}
                                 title={`PFI ${pfiStart}~${pfiEnd}\n${bookingTooltip(booking)}`}
                               >
                                 PFI
@@ -2725,7 +2818,7 @@ export default function BookingsPage() {
                             <button
                               type="button"
                               className={`absolute top-2 z-20 flex h-[44px] min-w-[54px] flex-col justify-center overflow-hidden rounded-lg border px-2 text-left text-[11px] leading-tight shadow-sm ${calendarTypeClass(booking.bookingType)}`}
-                              style={calendarBlockStyle(booking)}
+                              style={calendarBlockStyleWithInstructor(booking)}
                               title={bookingTooltip(booking)}
                               onClick={() => {
                                 setWeeklyScheduleOpen(false);
@@ -3702,7 +3795,7 @@ export default function BookingsPage() {
       }
 
       if (!form.userName.trim()) {
-        alert(isEducationForm ? "교육생을 선택하세요." : isRentalForm ? "렌탈 기장을 선택하세요." : isExperienceForm ? "체험 고객명을 입력하세요." : isOtherUseForm ? "예약명 또는 사용 불가 사유를 입력하세요." : "예약자 이름을 입력하세요.");
+        alert(isEducationForm ? "교육생을 선택하세요." : isRentalForm ? "렌탈 기장을 선택하세요." : isOtherUseForm ? "예약명 또는 사용 불가 사유를 입력하세요." : "예약자 이름을 입력하세요.");
         return;
       }
 
@@ -4280,7 +4373,7 @@ if (form.instructorId) {
                                 {showPfi ? (
                                   <div
                                     className="absolute top-3 z-10 flex h-[56px] items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-2 text-[13px] font-medium text-sky-800 shadow-sm"
-                                    style={calendarBlockStyleByTime(pfiStart, pfiEnd)}
+                                    style={calendarBlockStyleWithInstructor(booking, pfiStart, pfiEnd)}
                                     title={`PFI ${pfiStart}~${pfiEnd}\n${bookingTooltip(booking)}`}
                                   >
                                     PFI
@@ -4291,7 +4384,7 @@ if (form.instructorId) {
                                   className={`group absolute top-3 z-20 h-[56px] min-w-0 overflow-hidden rounded-xl border px-1.5 py-1 text-left shadow-[0_8px_18px_rgba(20,46,80,0.08)] ring-1 ring-white/70 transition hover:z-30 hover:shadow-[0_12px_24px_rgba(20,46,80,0.14)] ${
                                     calendarMoveDrag?.bookingId === bookingId || calendarResizeDrag?.bookingId === bookingId ? "scale-[1.02] opacity-90" : "hover:scale-[1.02]"
                                   } ${calendarBookingCardClass(booking)} ${isUnpaidExperience(booking) ? "ring-2 ring-amber-200" : ""} ${isSelectedBooking(booking) ? "ring-2 ring-blue-500 shadow-[0_0_0_4px_rgba(37,99,235,0.16),0_12px_24px_rgba(37,99,235,0.22)]" : ""}`}
-                                  style={calendarBlockStyleByTime(previewTimes.startTime, previewTimes.endTime)}
+                                  style={calendarBlockStyleWithInstructor(booking, previewTimes.startTime, previewTimes.endTime)}
                                   title={bookingTooltip(booking)}
                                   onMouseDown={(event) => beginCalendarMoveDrag(event, booking)}
                                   onMouseUp={(event) => {
@@ -4405,7 +4498,9 @@ if (form.instructorId) {
                                     key={`${text(booking.bookingId, "booking")}-${index}`}
                                     type="button"
                                     onClick={() => startEdit(booking)}
-                                    title={bookingTooltip(booking)} className={`w-full rounded-xl border px-2 py-1.5 text-left shadow-sm ${calendarTypeClass(booking.bookingType)}`}
+                                    title={bookingTooltip(booking)}
+                                    style={{ borderLeftColor: instructorStripeColor(booking), borderLeftWidth: "4px" }}
+                                    className={`w-full rounded-xl border px-2 py-1.5 text-left shadow-sm ${calendarTypeClass(booking.bookingType)}`}
                                   >
                                     <div className="truncate text-[12px] font-semibold leading-tight opacity-80">{compactBookingTypeLabel(booking.bookingType)}</div>
                                     <div className="mt-0.5 truncate text-[13px] font-semibold leading-tight">{calendarPersonLabel(booking)}</div>
@@ -4432,6 +4527,7 @@ if (form.instructorId) {
           <div className="mt-3 flex flex-wrap gap-2 text-[13px] font-bold text-[#61758f]">
             <span className="rounded-full bg-[#f3f7fb] px-2 py-0.5">빈 칸 드래그: 시간 선택</span>
             <span className="rounded-full bg-[#f3f7fb] px-2 py-0.5">블록 클릭: 선택</span>
+            <span className="rounded-full bg-[#f3f7fb] px-2 py-0.5">왼쪽 세로줄: 교관 구분</span>
             <span className="rounded-full bg-[#f3f7fb] px-2 py-0.5">블록 더블클릭: 상세수정</span>
             <span className="rounded-full bg-[#f3f7fb] px-2 py-0.5">블록 드래그: 이동</span>
             <span className="rounded-full bg-[#f3f7fb] px-2 py-0.5">오른쪽 끝 드래그: 종료시간 조절</span>
@@ -4817,11 +4913,8 @@ if (form.instructorId) {
 
             <div className="min-w-0 rounded-[14px] border border-[#e1eaf6] bg-[#fbfdff] p-2">
               <div className="grid gap-1.5 text-[13px] font-medium text-[#36506d] md:grid-cols-4 xl:grid-cols-8">
-                <div className={`rounded-lg px-2.5 py-1.5 ${isExperienceForm || isOtherUseForm ? "border border-[#d4deeb] bg-white shadow-sm" : "bg-white"}`}>
-                  <p className="flex items-center gap-1 text-[13px] font-semibold text-[#60738d]">
-                    <span>{isRentalForm ? "기장명" : isEducationForm ? "교육생명" : isOtherUseForm ? "예약명/사유" : isExperienceForm ? "체험 고객명" : "예약자명"}</span>
-                    {isExperienceForm || isOtherUseForm ? <span className="h-1.5 w-1.5 rounded-full bg-blue-500" title="필수 입력" /> : null}
-                  </p>
+                <div className="rounded-lg bg-white px-2.5 py-1.5">
+                  <p className="text-[13px] font-semibold text-[#8292a8]">{isRentalForm ? "기장명" : isEducationForm ? "교육생명" : isOtherUseForm ? "예약명/사유" : "예약자명"}</p>
                   {isExperienceForm || isOtherUseForm ? (
                     <input
                       value={form.userName}
@@ -4831,22 +4924,19 @@ if (form.instructorId) {
                         if (isOtherUseForm) updateForm("courseName", value);
                       }}
                       placeholder={isOtherUseForm ? "예: 방송국 촬영, 정비, 행사, 임시 사용 제한" : "체험 고객명"}
-                      className="mt-1 h-9 w-full rounded-lg border border-[#cbd9ea] bg-white px-2 text-[13px] font-medium text-[#102544] outline-none transition focus:border-[#1f6fff] focus:ring-4 focus:ring-blue-100"
+                      className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]"
                     />
                   ) : (
                     <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{form.userName || "자동 입력"}</p>
                   )}
                 </div>
 
-                <div className={`rounded-lg px-2.5 py-1.5 ${isExperienceForm || isOtherUseForm ? "border border-[#d4deeb] bg-white shadow-sm" : "bg-white"}`}>
-                  <p className="flex items-center gap-1 text-[13px] font-semibold text-[#60738d]">
-                    <span>연락처</span>
-                    {isExperienceForm ? <span className="h-1.5 w-1.5 rounded-full bg-blue-500" title="필수 입력" /> : null}
-                  </p>
+                <div className="rounded-lg bg-white px-2.5 py-1.5">
+                  <p className="text-[13px] font-semibold text-[#8292a8]">연락처</p>
                   {isExperienceForm ? (
-                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="01000000000" className="mt-1 h-9 w-full rounded-lg border border-[#cbd9ea] bg-white px-2 text-[13px] font-medium text-[#102544] outline-none transition focus:border-[#1f6fff] focus:ring-4 focus:ring-blue-100" />
+                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="01000000000" className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]" />
                   ) : isOtherUseForm ? (
-                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="담당자 연락처 선택" className="mt-1 h-9 w-full rounded-lg border border-[#cbd9ea] bg-white px-2 text-[13px] font-medium text-[#102544] outline-none transition focus:border-[#1f6fff] focus:ring-4 focus:ring-blue-100" />
+                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="담당자 연락처 선택" className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]" />
                   ) : (
                     <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{form.phone || "자동 입력"}</p>
                   )}
@@ -5177,16 +5267,15 @@ if (form.instructorId) {
           box-shadow: 0 0 0 4px rgba(191, 219, 254, 0.65);
         }
         .input-disabled {
-          margin-top: 0;
-          height: 2.35rem;
+          margin-top: 0.4rem;
+          height: 2.25rem;
           width: 100%;
-          border-radius: 0.75rem;
-          border: 1px solid rgb(212 222 235);
+          border-radius: 0.9rem;
+          border: 1px solid rgb(229 236 244);
           background: rgb(248 251 255);
           padding: 0 0.75rem;
-          font-size: 12px;
-          font-weight: 600;
-          color: rgb(91 110 133);
+          font-size: 0.78rem;
+          color: rgb(113 128 150);
           outline: none;
         }
         .filter-base {
@@ -5295,7 +5384,7 @@ function Field({ label, children, required = false, auto = false }: { label: str
       <label className="mb-1.5 flex items-center gap-1 text-[12px] font-medium text-[#60738d]">
         <span>{label}</span>
         {required ? <span className="h-1.5 w-1.5 rounded-full bg-blue-500" title="필수 입력" /> : null}
-        {auto ? <span className="rounded-full bg-slate-100 px-1.5 py-0 text-[11px] font-medium leading-4 text-slate-500">자동</span> : null}
+        {auto ? <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[13px] font-medium text-slate-500">자동</span> : null}
       </label>
       {children}
     </div>

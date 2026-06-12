@@ -18,6 +18,7 @@ type InstructorForm = {
   password: string;
   licenseNo: string;
   photoUrl: string;
+  displayColor: string;
   status: string;
   memo: string;
   active: string;
@@ -79,6 +80,7 @@ const emptyInstructorForm: InstructorForm = {
   password: "",
   licenseNo: "",
   photoUrl: "",
+  displayColor: "#2563eb",
   status: "근무중",
   memo: "",
   active: "Y",
@@ -102,6 +104,72 @@ const SCHEDULE_HOURS = Array.from({ length: 18 }, (_, index) => `${String(index 
 function text(value: unknown, fallback = "") {
   const raw = String(value ?? "").trim();
   return raw || fallback;
+}
+
+const instructorColorPalette = [
+  "#2563eb",
+  "#059669",
+  "#7c3aed",
+  "#0891b2",
+  "#dc2626",
+  "#ea580c",
+  "#4f46e5",
+  "#0f766e",
+  "#be123c",
+  "#9333ea",
+];
+
+function stableInstructorColorKey(value: unknown) {
+  const raw = text(value);
+  let hash = 0;
+
+  for (let index = 0; index < raw.length; index += 1) {
+    hash = (hash * 31 + raw.charCodeAt(index)) % 100000;
+  }
+
+  return hash;
+}
+
+function normalizeInstructorColor(value: unknown) {
+  const raw = text(value);
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw;
+  return "";
+}
+
+function colorFromMemo(value: unknown) {
+  const memo = text(value);
+  const match = memo.match(/\[COLOR:(#[0-9a-fA-F]{6})\]/);
+  return normalizeInstructorColor(match?.[1]);
+}
+
+function memoWithoutColor(value: unknown) {
+  return text(value)
+    .replace(/\s*\[COLOR:#[0-9a-fA-F]{6}\]\s*/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function memoWithColor(memo: unknown, color: string) {
+  const cleanMemo = memoWithoutColor(memo);
+  const normalizedColor = normalizeInstructorColor(color) || "#2563eb";
+  return [cleanMemo, `[COLOR:${normalizedColor}]`].filter(Boolean).join(" ").trim();
+}
+
+function instructorDisplayColor(row?: Row | null) {
+  const explicit =
+    normalizeInstructorColor(row?.displayColor) ||
+    normalizeInstructorColor(row?.display_color) ||
+    normalizeInstructorColor(row?.instructorColor) ||
+    normalizeInstructorColor(row?.instructor_color) ||
+    normalizeInstructorColor(row?.color) ||
+    colorFromMemo(row?.memo);
+
+  if (explicit) return explicit;
+
+  const key = text(row?.instructorId || row?.instructor_id || row?.name || row?.email || row?.phone);
+  if (!key) return "#2563eb";
+
+  return instructorColorPalette[stableInstructorColorKey(key) % instructorColorPalette.length];
 }
 
 function isActive(value: unknown) {
@@ -397,8 +465,9 @@ export default function InstructorsPage() {
       password: "",
       licenseNo: text(row.licenseNo || row.license_no),
       photoUrl: text(row.photoUrl || row.photo_url),
+      displayColor: instructorDisplayColor(row),
       status: text(row.status, "근무중"),
-      memo: text(row.memo),
+      memo: memoWithoutColor(row.memo),
       active: isActive(row.active) ? "Y" : "N",
     });
     setScheduleForm(
@@ -423,10 +492,14 @@ export default function InstructorsPage() {
     setSaving(true);
     try {
       const action = drawerMode === "instructorEdit" ? "updateInstructor" : "addInstructor";
+      const payload = {
+        ...form,
+        memo: memoWithColor(form.memo, form.displayColor),
+      };
       const response = await fetch("/api/instructors", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, data: form }),
+        body: JSON.stringify({ action, data: payload }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || result.ok === false)
@@ -908,7 +981,13 @@ export default function InstructorsPage() {
                       size="lg"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-semibold text-[#10213f]">프로필 사진</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[14px] font-semibold text-[#10213f]">프로필 사진</p>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[12px] font-semibold text-[#536b87] ring-1 ring-slate-200">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: form.displayColor }} />
+                          일정표 표시색
+                        </span>
+                      </div>
                       <p className="mt-1 text-[12px] font-medium text-[#6f8199]">
                         신규 등록 시 로그인 계정과 교관 정보가 함께 생성됩니다. 사진은 저장 후 업로드하세요.
                       </p>
@@ -1004,6 +1083,35 @@ export default function InstructorsPage() {
                     }
                     placeholder="면장번호"
                   />
+                </Field>
+                <Field label="일정표 표시색">
+                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={form.displayColor}
+                        onChange={(event) =>
+                          setForm({ ...form, displayColor: event.target.value })
+                        }
+                        className="h-9 w-12 cursor-pointer rounded-xl border border-slate-200 bg-white p-1"
+                        title="일정표 블록 왼쪽 세로줄 색상"
+                      />
+                      <span className="text-[13px] font-semibold text-[#334e68]">{form.displayColor}</span>
+                      <span className="ml-auto h-8 w-1.5 rounded-full" style={{ backgroundColor: form.displayColor }} />
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {instructorColorPalette.map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setForm({ ...form, displayColor: color })}
+                          className={`h-6 w-6 rounded-full ring-2 transition ${form.displayColor === color ? "ring-[#10213f] ring-offset-2" : "ring-slate-200"}`}
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </Field>
                 <Field label="상태">
                   <select
