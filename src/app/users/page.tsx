@@ -524,7 +524,10 @@ export default function UsersPage() {
       setSavingId(userId);
       setOperationMessage("회원 연결/생성 후 승인 처리 중입니다...");
 
-      const instructor = activeInstructors.find((item) => getInstructorId(item) === approvalForm.assignedInstructorId);
+      const isStudentApproval = approvalForm.memberType === "교육생";
+      const instructor = isStudentApproval
+        ? activeInstructors.find((item) => getInstructorId(item) === approvalForm.assignedInstructorId)
+        : undefined;
 
       const payload = {
         ...selectedUser,
@@ -540,8 +543,8 @@ export default function UsersPage() {
         course: approvalForm.course.trim(),
         licenseType: approvalForm.licenseType.trim(),
         licenseNo: approvalForm.licenseNo.trim(),
-        assignedInstructorId: approvalForm.assignedInstructorId,
-        assignedInstructorName: raw(instructor?.name),
+        assignedInstructorId: isStudentApproval ? approvalForm.assignedInstructorId : "",
+        assignedInstructorName: isStudentApproval ? raw(instructor?.name) : "",
         assignedAircraftIds: approvalForm.assignedAircraftIds.join(","),
         profileMemo: approvalForm.profileMemo.trim(),
       };

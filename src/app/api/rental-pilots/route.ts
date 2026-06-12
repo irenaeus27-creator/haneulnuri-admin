@@ -173,7 +173,23 @@ async function syncRentalPilotUser(row: JsonRecord, input?: JsonRecord) {
     };
   }
 
-  const userId = text(row.user_id || input?.userId || input?.user_id) || buildId("U");
+  const requestedUserId = text(row.user_id || input?.userId || input?.user_id);
+
+  // 렌탈기장관리에서 새 렌탈회원을 등록할 때는 앱 로그인용 users 계정을
+  // 반드시 만들 필요가 없습니다. users 자동 생성/승인 과정에서 DB 알림 트리거가
+  // notifications.user_id 외래키와 충돌할 수 있으므로, 명시적으로 기존 회원을
+  // 선택한 경우에만 새 users row를 생성합니다.
+  if (!requestedUserId) {
+    return {
+      ...row,
+      user_id: null,
+      name: name || text(row.name) || "렌탈회원",
+      phone,
+      email,
+    };
+  }
+
+  const userId = requestedUserId;
   const insertPayload = cleanRow({
     user_id: userId,
     name: name || "렌탈회원",
@@ -267,6 +283,7 @@ function isDuplicateKeyError(error: unknown) {
 async function saveNewRentalPilot(row: JsonRecord) {
   const supabase = getSupabaseServerClient();
   const insertPayload = { ...row };
+  if (!text(insertPayload.user_id)) delete insertPayload.user_id;
   if (!text(insertPayload[ID_COLUMN])) insertPayload[ID_COLUMN] = buildId(PREFIX);
   if (!insertPayload.created_at) insertPayload.created_at = nowIso();
   insertPayload.updated_at = nowIso();
