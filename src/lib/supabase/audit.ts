@@ -73,13 +73,32 @@ export async function writeNotification(input: NotificationInput) {
 
     const now = new Date().toISOString();
 
+    const targetUserId = text(input.targetUserId || input.userId);
+    const userId = text(input.userId || input.targetUserId);
+
+    if (!targetUserId || !userId) {
+      return;
+    }
+
+    const { data: existingUser, error: userError } = await supabase
+      .from("users")
+      .select("user_id")
+      .eq("user_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (userError || !existingUser) {
+      console.warn("[skynuri audit] notification skipped: target user not found", userId);
+      return;
+    }
+
     const { error } = await supabase.from("notifications").insert({
       notification_id: buildId("NTF"),
       title: text(input.title),
       body: text(input.body),
       target_type: text(input.targetType, "user"),
-      target_user_id: text(input.targetUserId || input.userId),
-      user_id: text(input.userId || input.targetUserId),
+      target_user_id: targetUserId,
+      user_id: userId,
       target_user_name: text(input.targetUserName),
       related_id: text(input.relatedId || input.memo),
       status: text(input.status, "대기"),

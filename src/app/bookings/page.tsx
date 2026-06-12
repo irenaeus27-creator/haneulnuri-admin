@@ -3612,8 +3612,7 @@ export default function BookingsPage() {
         alert("선택한 렌탈기장에게 배정되지 않은 항공기입니다.");
         return;
       }
-
-      if (form.instructorId) {
+if (form.instructorId) {
         const unavailable = instructorAvailabilityStatus(
           form.instructorId,
           form.instructorName,

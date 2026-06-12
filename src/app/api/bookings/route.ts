@@ -74,7 +74,20 @@ async function resolveBookingNotificationUserId(booking: JsonRecord) {
     if (value) candidates.add(value);
   }
 
-  return Array.from(candidates).find(Boolean) || directUserId;
+  for (const candidate of Array.from(candidates).filter(Boolean)) {
+    const { data, error } = await supabase
+      .from("users")
+      .select("user_id")
+      .eq("user_id", candidate)
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data && text((data as JsonRecord).user_id)) {
+      return candidate;
+    }
+  }
+
+  return "";
 }
 
 function addDays(date: Date, days: number) {
@@ -119,6 +132,37 @@ function numberOrNull(value: unknown) {
   if (!raw) return null;
   const numberValue = Number(raw);
   return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function looksLikeRentalPilotId(value: unknown) {
+  const raw = text(value).toUpperCase();
+  return raw.startsWith("RP-") || raw.startsWith("RTP-") || raw.startsWith("PILOT-");
+}
+
+function isRentalBookingType(value: unknown) {
+  return text(value).includes("렌탈");
+}
+
+function normalizeBookingUserIdForDb(input: JsonRecord, bookingType: string, existing?: JsonRecord) {
+  const userId = text(input.userId || input.user_id || existing?.user_id);
+  if (!userId) return null;
+
+  // 렌탈회원 명단용 RP-* 값은 public.users.user_id가 아닐 수 있습니다.
+  // 이 값을 bookings.user_id에 넣으면 DB 트리거가 notifications.user_id FK에서 막힐 수 있으므로
+  // 렌탈 예약에서는 pilot_id/student_id 쪽에만 보존하고 user_id는 비웁니다.
+  if (isRentalBookingType(bookingType) && looksLikeRentalPilotId(userId)) return null;
+
+  return userId;
+}
+
+function normalizeBookingRentalPilotIdForDb(input: JsonRecord, bookingType: string, existing?: JsonRecord) {
+  const explicit = text(input.rentalPilotId || input.rental_pilot_id || input.pilotId || input.pilot_id || existing?.pilot_id || existing?.student_id);
+  if (explicit) return explicit;
+
+  const userId = text(input.userId || input.user_id);
+  if (isRentalBookingType(bookingType) && userId) return userId;
+
+  return "";
 }
 
 function toCamelKey(key: string) {
@@ -210,9 +254,9 @@ function normalizeBookingPayload(input: JsonRecord, existing?: JsonRecord) {
     booking_type: bookingType,
     reservation_type: reservationType || bookingType,
     course_name: nullIfEmpty(input.courseName || input.course_name || existing?.course_name),
-    user_id: nullIfEmpty(input.userId || input.user_id || existing?.user_id),
-    student_id: nullIfEmpty(input.studentId || input.student_id || input.rentalPilotId || existing?.student_id),
-    pilot_id: nullIfEmpty(input.pilotId || input.pilot_id || existing?.pilot_id),
+    user_id: nullIfEmpty(normalizeBookingUserIdForDb(input, bookingType, existing)),
+    student_id: nullIfEmpty(input.studentId || input.student_id || normalizeBookingRentalPilotIdForDb(input, bookingType, existing) || existing?.student_id),
+    pilot_id: nullIfEmpty(normalizeBookingRentalPilotIdForDb(input, bookingType, existing) || existing?.pilot_id),
     user_name: nullIfEmpty(input.userName || input.user_name || input.name || existing?.user_name),
     phone: nullIfEmpty(input.phone || existing?.phone),
     instructor_id: nullIfEmpty(input.instructorId || input.instructor_id || existing?.instructor_id),
@@ -435,7 +479,7 @@ async function recordBookingAudit(action: string, booking: JsonRecord) {
     status === "확정" ||
     status === "취소";
 
-  if (shouldCreateNotification) {
+  if (shouldCreateNotification && userId) {
     await writeNotification({
       title: label,
       body: message,
