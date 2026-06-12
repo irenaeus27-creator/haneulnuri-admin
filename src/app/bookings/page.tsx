@@ -1351,6 +1351,7 @@ export default function BookingsPage() {
   const [calendarViewMode, setCalendarViewMode] = useState<"day" | "week">("day");
   const [calendarResourceMode, setCalendarResourceMode] = useState<"aircraft" | "instructor">("aircraft");
   const [showAogAircraft, setShowAogAircraft] = useState(false);
+  const [weeklyScheduleOpen, setWeeklyScheduleOpen] = useState(false);
 
   const [form, setForm] = useState<BookingForm>(emptyForm);
   const [durationMinutes, setDurationMinutes] = useState(60);
@@ -2351,6 +2352,19 @@ export default function BookingsPage() {
       ),
     [bookings, calendarDates, showCancelledBookings]
   );
+  const weeklyPopupDates = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => addDaysToDate(todayText, index)),
+    [todayText]
+  );
+  const weeklyPopupBookings = useMemo(
+    () =>
+      bookings.filter(
+        (item) =>
+          weeklyPopupDates.includes(normalizeDate(item.bookingDate)) &&
+          isVisibleOperationalBooking(item, showCancelledBookings)
+      ),
+    [bookings, weeklyPopupDates, showCancelledBookings]
+  );
   const pendingRequestBookings = useMemo(
     () =>
       bookings
@@ -2552,7 +2566,7 @@ export default function BookingsPage() {
     return aircraftDisplay(resource as AircraftRow);
   }
 
-  function calendarRowBookings(resource: AircraftRow | InstructorRow, dateText?: string) {
+  function calendarRowBookings(resource: AircraftRow | InstructorRow, dateText?: string, sourceBookings = calendarBookings) {
     const resourceKeys =
       calendarResourceMode === "instructor"
         ? [formValue((resource as InstructorRow).instructorId), formValue((resource as InstructorRow).name)].filter(Boolean)
@@ -2562,7 +2576,7 @@ export default function BookingsPage() {
             formValue((resource as AircraftRow).registrationNo),
           ].filter(Boolean);
 
-    return calendarBookings.filter((booking) => {
+    return sourceBookings.filter((booking) => {
       if (dateText && normalizeDate(booking.bookingDate) !== dateText) return false;
 
       if (calendarResourceMode === "instructor") {
@@ -2618,6 +2632,125 @@ export default function BookingsPage() {
 
   function calendarBlockStyle(booking: BookingRow) {
     return calendarBlockStyleByTime(bookingStartForCalendar(booking), normalizeTime(booking.endTime));
+  }
+
+  function weeklyScheduleDateTitle(dateText: string, index: number) {
+    if (index === 0) return `오늘 · ${koreanDateLabel(dateText)}`;
+    if (index === 1) return `내일 · ${koreanDateLabel(dateText)}`;
+    if (index === 2) return `모레 · ${koreanDateLabel(dateText)}`;
+    return koreanDateLabel(dateText);
+  }
+
+  function renderWeeklyScheduleDay(dateText: string, dayIndex: number) {
+    const rows = calendarResourceRows();
+
+    return (
+      <section key={dateText} className="overflow-hidden rounded-[20px] border border-[#d9e6f5] bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-[#d9e6f5] bg-[#f7fbff] px-4 py-3">
+          <div>
+            <p className="text-[12px] font-medium uppercase tracking-[0.18em] text-[#7c93b2]">Weekly Schedule</p>
+            <h3 className="mt-0.5 text-[15px] font-semibold tracking-[-0.02em] text-[#102544]">
+              {weeklyScheduleDateTitle(dateText, dayIndex)}
+            </h3>
+          </div>
+          <span className="rounded-full bg-white px-3 py-1 text-[12px] font-semibold text-[#48617f] ring-1 ring-[#d9e6f5]">
+            {dateText}
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <div className="min-w-[1180px]">
+            <div className="grid grid-cols-[130px_1fr] border-b border-[#d4e1ef] py-2 text-[12px] font-semibold text-[#213a5a]">
+              <div className="pl-3">{calendarResourceMode === "instructor" ? "교관" : "항공기"}</div>
+              <div className="relative h-6 min-w-[980px]">
+                {calendarHourHeaders.map((hour, index) => (
+                  <div
+                    key={`${dateText}-${hour}`}
+                    className={`absolute top-0 text-center text-[12px] font-bold text-[#102544] ${index === 0 ? "translate-x-0" : index === calendarHourHeaders.length - 1 ? "-translate-x-full" : "-translate-x-1/2"}`}
+                    style={{ left: `${(index / 13) * 100}%` }}
+                  >
+                    {String(hour).padStart(2, "0")}:00
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="divide-y divide-[#e4edf7]">
+              {rows.map((resource, resourceIndex) => {
+                const rowBookings = calendarRowBookings(resource, dateText, weeklyPopupBookings);
+
+                return (
+                  <div key={`${dateText}-${resourceName(resource)}-${resourceIndex}`} className="grid grid-cols-[130px_1fr]">
+                    <div className={`flex min-h-[64px] items-center gap-2 bg-[#fbfdff] px-3 text-[13px] font-semibold ${calendarResourceMode === "aircraft" && !isAircraftOperational(resource as AircraftRow) ? "text-slate-500" : "text-[#102544]"}`}>
+                      <span className={calendarResourceMode === "aircraft" && !isAircraftOperational(resource as AircraftRow) ? "text-slate-400" : "text-[#1f6fff]"}>
+                        {calendarResourceMode === "instructor" ? "👤" : "✈"}
+                      </span>
+                      <span className="truncate">{resourceName(resource)}</span>
+                    </div>
+
+                    <div className="relative min-h-[64px] min-w-[980px] border-l border-[#d4e1ef]">
+                      <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${CALENDAR_SLOT_COUNT}, minmax(0, 1fr))` }}>
+                        {calendarTimeSlots.map((slotStart, slotIndex) => (
+                          <div
+                            key={`${dateText}-${resourceName(resource)}-${slotStart}`}
+                            className={`${
+                              slotIndex % 4 === 3
+                                ? "border-r-2 border-solid border-[#a9bdd3]"
+                                : slotIndex % 2 === 1
+                                  ? "border-r border-solid border-[#c0d0e2]"
+                                  : "border-r border-dashed border-[#e4edf7]"
+                            }`}
+                          />
+                        ))}
+                      </div>
+
+                      {rowBookings.map((booking, index) => {
+                        const bookingId = text(booking.bookingId, "booking");
+                        const previewTimes = calendarPreviewTimes(booking);
+                        const pfiStart = addMinutes(previewTimes.startTime, -PFI_DURATION_MINUTES);
+                        const pfiEnd = previewTimes.startTime;
+                        const showPfi = needsPfiBlock(booking) && calendarResourceMode === "aircraft";
+
+                        return (
+                          <div key={`${dateText}-${bookingId}-${index}`}>
+                            {showPfi ? (
+                              <div
+                                className="absolute top-2 z-10 flex h-[44px] items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-2 text-[12px] font-medium text-sky-800 shadow-sm"
+                                style={calendarBlockStyleByTime(pfiStart, pfiEnd)}
+                                title={`PFI ${pfiStart}~${pfiEnd}\n${bookingTooltip(booking)}`}
+                              >
+                                PFI
+                              </div>
+                            ) : null}
+                            <button
+                              type="button"
+                              className={`absolute top-2 z-20 flex h-[44px] min-w-[54px] flex-col justify-center overflow-hidden rounded-lg border px-2 text-left text-[11px] leading-tight shadow-sm ${calendarTypeClass(booking.bookingType)}`}
+                              style={calendarBlockStyle(booking)}
+                              title={bookingTooltip(booking)}
+                              onClick={() => {
+                                setWeeklyScheduleOpen(false);
+                                selectBookingForPanel(booking);
+                                setDateFilter(normalizeDate(booking.bookingDate));
+                                updateForm("bookingDate", normalizeDate(booking.bookingDate));
+                                window.setTimeout(() => calendarSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+                              }}
+                            >
+                              <span className="truncate font-semibold">{calendarPersonLabel(booking)}</span>
+                              <span className="truncate">{normalizeBookingTypeForSave(booking.bookingType)}</span>
+                              <span className="truncate text-[10px] opacity-80">{formatBookingSummaryTimeRange(booking.startTime, booking.endTime)}</span>
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   function applyCalendarSlot(resource: AircraftRow | InstructorRow, startTime: string, dateText = calendarDate) {
@@ -4018,13 +4151,22 @@ if (form.instructorId) {
                 <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 ring-1 ring-emerald-100">운항 가능 {operationalAircraft.length}대</span>
                 <span className="rounded-full bg-rose-50 px-2 py-0.5 text-rose-700 ring-1 ring-rose-100">AOG {aogAircraft.length}대</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowAogAircraft((prev) => !prev)}
-                className="inline-flex h-9 items-center rounded-xl border border-[#cfd9e6] bg-white px-3 text-[13px] font-medium text-[#334e68] shadow-sm hover:bg-[#f3f7fb]"
-              >
-                {showAogAircraft ? "AOG 접기" : "AOG 펼치기"}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setWeeklyScheduleOpen(true)}
+                  className="inline-flex h-9 items-center rounded-xl border border-[#bcd5f4] bg-[#f7fbff] px-3 text-[13px] font-medium text-[#1f5fae] shadow-sm transition hover:bg-[#eef6ff]"
+                >
+                  주간일정
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAogAircraft((prev) => !prev)}
+                  className="inline-flex h-9 items-center rounded-xl border border-[#cfd9e6] bg-white px-3 text-[13px] font-medium text-[#334e68] shadow-sm hover:bg-[#f3f7fb]"
+                >
+                  {showAogAircraft ? "AOG 접기" : "AOG 펼치기"}
+                </button>
+              </div>
             </div>
           ) : null}
 
@@ -5012,6 +5154,34 @@ if (form.instructorId) {
           )}
         </section>
       </div>
+
+
+      {weeklyScheduleOpen ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/45 px-4 py-6">
+          <div className="w-full max-w-[1480px] rounded-[28px] border border-[#d9e6f5] bg-[#f3f7fc] p-4 shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
+            <div className="sticky top-0 z-40 mb-4 flex flex-col gap-3 rounded-[22px] border border-[#d9e6f5] bg-white/95 px-5 py-4 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[12px] font-medium uppercase tracking-[0.22em] text-[#7c93b2]">7 Days View</p>
+                <h2 className="mt-1 text-[21px] font-semibold tracking-[-0.04em] text-[#071a35]">주간일정</h2>
+                <p className="mt-1 text-[13px] text-[#61758f]">
+                  오늘부터 7일간의 {calendarResourceMode === "instructor" ? "교관별" : "항공기별"} 일정을 한 번에 확인합니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWeeklyScheduleOpen(false)}
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-[#071a35] px-4 text-[13px] font-medium text-white transition hover:bg-[#102544]"
+              >
+                닫기
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {weeklyPopupDates.map((dateText, index) => renderWeeklyScheduleDay(dateText, index))}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <style jsx>{`
         .input-base {
