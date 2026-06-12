@@ -4031,7 +4031,7 @@ if (form.instructorId) {
           {calendarViewMode === "day" ? (
             <div className="max-h-[720px] overflow-auto">
               <div className="min-w-[1280px]">
-                <div className="grid grid-cols-[140px_1fr] border-b border-[#dce7f3] pb-2 text-[13px] font-semibold text-[#314965]">
+                <div className="grid grid-cols-[140px_1fr] border-b border-[#c8d8ea] pb-2 text-[13px] font-semibold text-[#213a5a]">
                   <div className="pl-1">{calendarResourceMode === "instructor" ? "교관" : "항공기"}</div>
                   <div className="relative min-w-[980px] h-8">
                     {calendarHourHeaders.map((hour, index) => (
@@ -4040,13 +4040,15 @@ if (form.instructorId) {
                         className={`absolute top-0 text-center ${index === 0 ? "translate-x-0" : index === calendarHourHeaders.length - 1 ? "-translate-x-full" : "-translate-x-1/2"}`}
                         style={{ left: `${(index / 13) * 100}%`}}
                       >
-                        {String(hour).padStart(2, "0")}:00
+                        <span className="inline-flex rounded-md bg-white/95 px-1.5 py-0.5 text-[13px] font-bold text-[#102544] ring-1 ring-[#c8d8ea]">
+                          {String(hour).padStart(2, "0")}:00
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="divide-y divide-[#edf2f8]">
+                <div className="divide-y divide-[#dce7f3]">
                   {calendarResourceRows().map((resource, resourceIndex) => {
                     const rowBookings = calendarRowBookings(resource, calendarDate);
 
@@ -4121,8 +4123,12 @@ if (form.instructorId) {
                                     if (isCalendarDragging || calendarDragClickBlockRef.current) return;
                                     applyCalendarSlot(resource, slotStart, calendarDate);
                                   }}
-                                  className={`border-r border-dashed transition ${
-                                    slotIndex % 2 === 1 ? "border-[#b9cce4]" : "border-[#edf3fa]"
+                                  className={`transition ${
+                                    slotIndex % 4 === 3
+                                      ? "border-r-2 border-solid border-[#5f7896]"
+                                      : slotIndex % 2 === 1
+                                        ? "border-r border-solid border-[#9fb5cf]"
+                                        : "border-r border-dashed border-[#d7e3f1]"
                                   } ${
                                     disabled
                                       ? "cursor-not-allowed bg-white"
