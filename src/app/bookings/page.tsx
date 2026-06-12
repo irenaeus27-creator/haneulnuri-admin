@@ -4044,9 +4044,7 @@ if (form.instructorId) {
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <h2 className="shrink-0 text-[15px] font-semibold tracking-[-0.02em] text-[#10213f]">예약 캘린더</h2>
 </div>
-              <p className="mt-0.5 text-[13px] font-normal text-[#6d7f96]">
-                대시보드와 같은 형태로 PFI와 예약을 함께 보면서 15분 단위로 예약을 지정합니다.
-              </p>
+
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                 <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-[13px] font-medium text-blue-700">
                   {calendarViewMode === "week" ? `${koreanDateLabel(calendarDate)}부터 7일` : koreanDateLabel(calendarDate)}
@@ -4468,13 +4466,13 @@ if (form.instructorId) {
             <div className="flex items-center justify-between border-b border-[#edf2f7] px-3 py-2">
               <div>
                 <h2 className="text-[15px] font-semibold text-[#10213f]">처리 대기 요청</h2>
-                <p className="mt-0.5 text-[13px] font-normal text-[#61758f]">승인 대기와 취소 요청을 확인하고, 선택한 예약 패널에서도 상태 처리할 수 있습니다.</p>
+
               </div>
               <span className="rounded-full bg-blue-50 px-3 py-1 text-[13px] font-medium text-blue-700">{pendingRequestBookings.length}건</span>
             </div>
 
             {pendingRequestBookings.length === 0 ? (
-              <div className="mx-5 my-3 rounded-xl border border-dashed border-[#dbe5f1] bg-[#f8fbff] px-3 py-3 text-center"><p className="text-[13px] font-medium text-[#60738d]">처리 대기 요청이 없습니다.</p><p className="mt-1 text-[13px] font-normal text-[#8ba0b8]">앱 예약 요청과 취소 요청이 들어오면 이 영역에 표시됩니다.</p></div>
+              <div className="mx-5 my-3 rounded-xl border border-dashed border-[#dbe5f1] bg-[#f8fbff] px-3 py-3 text-center"><p className="text-[13px] font-medium text-[#60738d]">처리 대기 요청이 없습니다.</p></div>
             ) : (
               <div className="divide-y divide-[#edf2f8]">
                 {pendingRequestBookings.slice(0, 6).map((item, index) => {
@@ -4534,7 +4532,7 @@ if (form.instructorId) {
             <div className="mb-3 flex items-start justify-between gap-2">
               <div>
                 <h2 className="text-[15px] font-semibold text-[#10213f]">선택한 예약</h2>
-                <p className="mt-0.5 text-[13px] font-normal text-[#61758f]">캘린더나 목록에서 선택한 예약을 확인하고 상태를 처리합니다. 선택된 예약은 캘린더와 목록에서 함께 강조됩니다.</p>
+
               </div>
               {selectedBooking ? (
                 <div className="flex shrink-0 items-center gap-1.5">
@@ -4554,7 +4552,7 @@ if (form.instructorId) {
 
             {!selectedBooking ? (
               <div className="rounded-xl border border-dashed border-[#d7e1ed] bg-[#f8fbff] px-3 py-2.5 text-center text-[13px] font-medium text-[#7c8da4]">
-                예약을 선택하면 상세 정보가 표시됩니다.
+
               </div>
             ) : (
               <div className="space-y-3">
@@ -4653,20 +4651,11 @@ if (form.instructorId) {
                   {editing ? "수정 모드" : "신규 등록"}
                 </span>
               </div>
-              <p className="mt-0.5 text-[13px] font-normal text-[#61758f]">필수 항목을 선택하면 대상자 정보와 코스 기준 점유 시간이 자동으로 정리됩니다.</p>
-              <div className="mt-1.5 rounded-xl border border-[#e1eaf6] bg-[#f8fbff] px-3 py-1.5 text-[13px] font-medium text-[#536b87]">
-                입력 요약: {compactFormSummary(form)}
-              </div>
+
+
             </div>
             <div className="flex flex-nowrap items-center justify-end gap-2 lg:max-w-[520px]">
-              {bookingTypeGuideMessage() ? (
-                <span
-                  title={bookingTypeGuideMessage()}
-                  className="inline-flex h-8 max-w-[360px] items-center truncate rounded-xl border border-blue-100 bg-blue-50/70 px-3 text-[13px] font-medium text-blue-800"
-                >
-                  {bookingTypeGuideMessage()}
-                </span>
-              ) : null}
+
               <button
                 type="button"
                 onClick={startCreate}
@@ -4679,7 +4668,7 @@ if (form.instructorId) {
           </div>
 
           <div className="space-y-2.5">
-            <FormGroup title="예약 정보" description="유형·대상자·자원·시간 순서로 입력합니다." columns="xl:grid-cols-8">
+            <FormGroup title="예약 정보" columns="xl:grid-cols-8">
               <Field label="예약 유형" required>
                 <select value={form.bookingType} onChange={(event) => resetTypeSpecificFields(event.target.value)} className="input-base compact-input">
                   {bookingTypes
