@@ -175,10 +175,8 @@ async function syncRentalPilotUser(row: JsonRecord, input?: JsonRecord) {
 
   const requestedUserId = text(row.user_id || input?.userId || input?.user_id);
 
-  // 렌탈기장관리에서 새 렌탈회원을 등록할 때는 앱 로그인용 users 계정을
-  // 반드시 만들 필요가 없습니다. users 자동 생성/승인 과정에서 DB 알림 트리거가
-  // notifications.user_id 외래키와 충돌할 수 있으므로, 명시적으로 기존 회원을
-  // 선택한 경우에만 새 users row를 생성합니다.
+  // 렌탈기장관리에서 기존 회원을 선택하지 않은 경우에는 users 계정을 강제로 만들지 않습니다.
+  // 이미 users에 연결된 회원을 선택했거나 userId가 넘어온 경우에만 회원관리와 동기화합니다.
   if (!requestedUserId) {
     return {
       ...row,

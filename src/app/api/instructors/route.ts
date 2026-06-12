@@ -401,21 +401,30 @@ async function ensureInstructorUser(data: JsonRecord, isCreate: boolean) {
 
 async function syncInstructorUser(data: JsonRecord) {
   const email = normalizeEmail(data.email);
-  const userId = text(data.userId || data.user_id);
+  const userId = text(data.userId || data.user_id || data.instructorId || data.instructor_id);
   if (!email && !userId) return;
 
   const now = nowIso();
   const payload: JsonRecord = {
+    user_id: userId || undefined,
     name: text(data.name || data.userName || data.user_name),
     phone: normalizePhone(data.phone),
     email,
     role: "교관",
     status: text(data.active).toUpperCase() === "N" || text(data.status) === "비활성" ? "비활성" : "활성",
     member_type: "교관",
+    approved_at: now,
     updated_at: now,
   };
 
-  await updateUserRowSafely(userId, email, payload);
+  const updated = await updateUserRowSafely(userId, email, payload);
+  if (!updated && userId) {
+    await insertUserRowSafely({
+      ...payload,
+      created_at: now,
+      requested_at: now,
+    });
+  }
 }
 
 function monthRange(monthInput: string) {
@@ -841,7 +850,14 @@ async function handlePost(body: JsonRecord) {
     const row = normalize(data, false);
     const id = text(data.instructorId || data.instructor_id || row[ID_COLUMN]);
     const saved = await updateInstructorRow(id, row);
-    await syncInstructorUser({ ...data, userId: saved.userId || saved.user_id || data.userId || data.user_id });
+    await syncInstructorUser({
+      ...data,
+      ...saved,
+      userId: saved.userId || saved.user_id || data.userId || data.user_id || id,
+      user_id: saved.userId || saved.user_id || data.userId || data.user_id || id,
+      instructorId: id,
+      instructor_id: id,
+    });
     return { message: "교관 정보와 회원 계정을 수정했습니다.", [RESPONSE_KEY]: saved, data: saved };
   }
 

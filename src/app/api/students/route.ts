@@ -557,6 +557,28 @@ async function ensureLinkedUser(row: JsonRecord, input: JsonRecord) {
   return userId;
 }
 
+async function syncStudentToUser(row: JsonRecord) {
+  const userId = text(row.user_id || row.userId);
+  if (!userId) return;
+
+  const supabase = getSupabaseServerClient();
+  const { error } = await supabase
+    .from("users")
+    .update(cleanUserRow({
+      name: text(row.name),
+      phone: text(row.phone),
+      email: text(row.email),
+      role: "교육생",
+      member_type: "교육생",
+      updated_at: nowIso(),
+    }))
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(`회원관리 교육생 정보 동기화 실패: ${error.message}`);
+  }
+}
+
 async function findExistingStudent(studentId: string) {
   const supabase = getSupabaseServerClient();
 
@@ -586,6 +608,8 @@ async function insertStudent(data: JsonRecord) {
     .single();
 
   if (error) throw new Error(error.message);
+
+  await syncStudentToUser(saved as JsonRecord);
 
   return toCamelObject(saved as JsonRecord);
 }
@@ -630,6 +654,8 @@ async function updateStudent(data: JsonRecord) {
     .single();
 
   if (error) throw new Error(error.message);
+
+  await syncStudentToUser(saved as JsonRecord);
 
   return toCamelObject(saved as JsonRecord);
 }

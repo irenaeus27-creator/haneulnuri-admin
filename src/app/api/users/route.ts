@@ -332,6 +332,77 @@ async function linkOrCreateRentalPilot(user: JsonRecord, input: JsonRecord) {
   return toCamelObject(data as JsonRecord);
 }
 
+
+async function updateProfileByCandidates(
+  table: string,
+  candidates: Array<{ column: string; value: string; ilike?: boolean }>,
+  payload: JsonRecord,
+) {
+  const supabase = getSupabaseServerClient();
+  const cleaned = cleanRow({ ...payload, updated_at: nowIso() });
+  const seen = new Set<string>();
+
+  for (const candidate of candidates) {
+    const value = text(candidate.value);
+    if (!value) continue;
+
+    const key = `${table}:${candidate.column}:${value.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    let query = supabase.from(table).update(cleaned);
+    query = candidate.ilike ? query.ilike(candidate.column, value) : query.eq(candidate.column, value);
+
+    const { error } = await query;
+    if (error) {
+      const message = error.message || "";
+      if (message.includes("does not exist") || message.includes("schema cache") || message.includes("Could not find")) continue;
+      throw new Error(`${table} 프로필 동기화 실패: ${error.message}`);
+    }
+  }
+}
+
+async function syncProfileFromUser(user: JsonRecord, previousUser?: JsonRecord | null) {
+  const userId = text(user.userId || user.user_id || previousUser?.user_id || previousUser?.userId);
+  const memberType = normalizeMemberType(user.memberType || user.member_type || user.role || previousUser?.member_type || previousUser?.role);
+  const email = text(user.email || previousUser?.email);
+  const previousEmail = text(previousUser?.email);
+  const phone = text(user.phone || previousUser?.phone);
+  const previousPhone = text(previousUser?.phone);
+
+  const payload = cleanRow({
+    name: text(user.name || previousUser?.name),
+    phone,
+    email,
+  });
+
+  if (memberType === "교육생") {
+    await updateProfileByCandidates("students", [
+      { column: "user_id", value: userId },
+      { column: "email", value: previousEmail, ilike: true },
+      { column: "email", value: email, ilike: true },
+      { column: "phone", value: previousPhone },
+      { column: "phone", value: phone },
+    ], payload);
+  } else if (memberType === "렌탈회원") {
+    await updateProfileByCandidates("rental_pilots", [
+      { column: "user_id", value: userId },
+      { column: "email", value: previousEmail, ilike: true },
+      { column: "email", value: email, ilike: true },
+      { column: "phone", value: previousPhone },
+      { column: "phone", value: phone },
+    ], payload);
+  } else if (memberType === "교관") {
+    await updateProfileByCandidates("instructors", [
+      { column: "email", value: previousEmail, ilike: true },
+      { column: "email", value: email, ilike: true },
+      { column: "phone", value: previousPhone },
+      { column: "phone", value: phone },
+    ], payload);
+  }
+}
+
+
 async function approveUserWithProfile(data: JsonRecord) {
   const userId = text(data.userId || data.user_id);
   if (!userId) throw new Error("userId가 필요합니다.");
@@ -380,8 +451,10 @@ async function handlePost(body: JsonRecord) {
   if (action === "updateUser" || action === "updateRow") {
     const row = normalizeUser(data, false);
     const userId = text(data.userId || data.user_id || row.user_id);
+    const previousUser = userId ? await getUserById(userId) : null;
     delete row.user_id;
     const saved = await updateRow("users", "user_id", userId, row);
+    await syncProfileFromUser(saved as JsonRecord, previousUser);
     return { message: "회원 정보를 수정했습니다.", user: saved, data: saved };
   }
 
