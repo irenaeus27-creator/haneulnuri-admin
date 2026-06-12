@@ -1447,10 +1447,21 @@ export default function BookingsPage() {
   const [editing, setEditing] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<BookingRow | null>(null);
   const [requestActionMemo, setRequestActionMemo] = useState("");
+  const [panelSubstituteEnabled, setPanelSubstituteEnabled] = useState(false);
+  const [panelSubstituteInstructorId, setPanelSubstituteInstructorId] = useState("");
+  const [panelSubstituteReason, setPanelSubstituteReason] = useState("");
+
+  function resetPanelSubstituteState(item: BookingRow | null) {
+    const parsed = parseSubstituteInstructorMemo(item?.memo);
+    setPanelSubstituteEnabled(parsed.enabled);
+    setPanelSubstituteInstructorId(parsed.enabled ? parsed.actualInstructorId || text(item?.instructorId, "") : "");
+    setPanelSubstituteReason(parsed.reason || "");
+  }
 
   function selectBookingForPanel(item: BookingRow | null) {
     setSelectedBooking(item);
     setRequestActionMemo("");
+    resetPanelSubstituteState(item);
   }
 
   function focusBookingInCalendar(item: BookingRow) {
@@ -1516,6 +1527,7 @@ export default function BookingsPage() {
   function clearSelectedBooking() {
     setSelectedBooking(null);
     setRequestActionMemo("");
+    resetPanelSubstituteState(null);
   }
 
   const getSettingValues = useCallback(
@@ -4048,6 +4060,126 @@ if (form.instructorId) {
     }
   }
 
+  async function saveSelectedBookingSubstitute() {
+    if (!selectedBooking) {
+      alert("예약을 먼저 선택하세요.");
+      return;
+    }
+
+    if (!isEducationBooking(selectedBooking)) {
+      alert("대체 교관은 교육비행 예약에서만 설정할 수 있습니다.");
+      return;
+    }
+
+    const bookingId = text(selectedBooking.bookingId, "");
+    if (!bookingId) {
+      alert("bookingId가 없습니다.");
+      return;
+    }
+
+    const selectedForm = toForm(selectedBooking);
+    const previousSubstitute = parseSubstituteInstructorMemo(selectedBooking.memo);
+    const assignedInstructorId = previousSubstitute.assignedInstructorId || selectedForm.assignedInstructorId || selectedForm.instructorId;
+    const assignedInstructorName = previousSubstitute.assignedInstructorName || selectedForm.assignedInstructorName || selectedForm.instructorName;
+
+    const actualInstructor = panelSubstituteInstructorId
+      ? instructors.find((item) => text(item.instructorId, "") === panelSubstituteInstructorId)
+      : null;
+
+    if (panelSubstituteEnabled && !actualInstructor) {
+      alert("대체 교관을 선택하세요.");
+      return;
+    }
+
+    const nextForm: BookingForm = {
+      ...selectedForm,
+      assignedInstructorId,
+      assignedInstructorName,
+      substituteInstructorEnabled: panelSubstituteEnabled,
+      substituteReason: panelSubstituteEnabled ? panelSubstituteReason || "담당 교관 부재로 대체 비행" : "",
+      instructorId: panelSubstituteEnabled ? text(actualInstructor?.instructorId, "") : assignedInstructorId,
+      instructorName: panelSubstituteEnabled ? text(actualInstructor?.name, "") : assignedInstructorName,
+      memo: stripSubstituteInstructorMemo(selectedBooking.memo),
+    };
+
+    if (!nextForm.instructorId) {
+      alert("담당 교관 정보가 없습니다.");
+      return;
+    }
+
+    const unavailable = instructorAvailabilityStatus(
+      nextForm.instructorId,
+      nextForm.instructorName,
+      nextForm.bookingDate,
+      nextForm.startTime,
+      nextForm.endTime
+    );
+
+    if (unavailable.blocked) {
+      const ok = window.confirm(`선택한 교관은 예약 불가 시간입니다. (${unavailable.label})\n그래도 저장할까요?`);
+      if (!ok) return;
+    }
+
+    try {
+      setSaving(true);
+      setOperationMessage("대체 교관 설정을 저장하는 중입니다...");
+
+      const payload: BookingForm = {
+        ...nextForm,
+        ...canonicalAircraftPayload(nextForm, aircraft),
+        bookingId,
+        bookingType: normalizeBookingTypeForSave(nextForm.bookingType),
+        status: normalizeBookingStatusForDisplay(nextForm.status),
+        memo: buildActionMemo(
+          mergeSubstituteInstructorMemo(nextForm.memo, nextForm),
+          panelSubstituteEnabled ? "대체 교관 설정" : "대체 교관 해제",
+          panelSubstituteEnabled
+            ? `${assignedInstructorName || "기본 교관"} → ${nextForm.instructorName}${nextForm.substituteReason ? ` / ${nextForm.substituteReason}` : ""}`
+            : "기본 담당 교관으로 복구"
+        ),
+      };
+
+      const response = await fetch(`/api/bookings?noCache=1&_ts=${Date.now()}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updateBooking", data: payload }),
+      });
+
+      const rawText = await response.text();
+      if (!rawText.trim()) throw new Error("서버 응답이 비어 있습니다.");
+
+      let result: { ok?: boolean; success?: boolean; message?: string };
+      try {
+        result = JSON.parse(rawText);
+      } catch {
+        throw new Error("서버 응답을 JSON으로 변환하지 못했습니다.");
+      }
+
+      if (!response.ok || (!result.ok && !result.success)) {
+        throw new Error(result.message || "대체 교관 설정 저장에 실패했습니다.");
+      }
+
+      await loadData(true, true);
+      setSelectedBooking((prev) =>
+        prev
+          ? {
+              ...prev,
+              instructorId: payload.instructorId,
+              instructorName: payload.instructorName,
+              memo: payload.memo,
+            }
+          : prev
+      );
+      setRequestActionMemo("");
+      alert(panelSubstituteEnabled ? "대체 교관이 설정되었습니다." : "대체 교관 설정이 해제되었습니다.");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "대체 교관 설정 저장에 실패했습니다.");
+    } finally {
+      setSaving(false);
+      setOperationMessage("");
+    }
+  }
+
   async function cancelSelectedBooking() {
     if (!selectedBooking) {
       alert("취소할 예약을 먼저 선택하세요.");
@@ -4716,6 +4848,78 @@ if (form.instructorId) {
                     </div>
                   </div>
                 </div>
+
+                {isEducationBooking(selectedBooking) ? (
+                  <div className="mt-3 rounded-[16px] border border-[#e1eaf6] bg-[#fbfdff] p-2.5">
+                    <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold text-[#10213f]">대체 교관</p>
+                        <p className="mt-0.5 text-[12px] font-medium text-[#60738d]">
+                          선택한 예약의 실제 비행 교관만 변경합니다. 교육생의 기본 담당 교관은 유지됩니다.
+                        </p>
+                      </div>
+                      <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-xl border border-[#d4deeb] bg-white px-3 py-2 text-[13px] font-semibold text-[#28486d]">
+                        <input
+                          type="checkbox"
+                          checked={panelSubstituteEnabled}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            setPanelSubstituteEnabled(checked);
+                            if (!checked) {
+                              setPanelSubstituteInstructorId("");
+                              setPanelSubstituteReason("");
+                            } else if (!panelSubstituteReason) {
+                              setPanelSubstituteReason("담당 교관 부재로 대체 비행");
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-[#b8c8dc]"
+                        />
+                        대체 교관 사용
+                      </label>
+                    </div>
+
+                    {panelSubstituteEnabled ? (
+                      <div className="mt-2 grid gap-2 lg:grid-cols-[240px_1fr_auto]">
+                        <select
+                          value={panelSubstituteInstructorId}
+                          onChange={(event) => setPanelSubstituteInstructorId(event.target.value)}
+                          className="input-base compact-input"
+                        >
+                          <option value="">대체 교관 선택</option>
+                          {instructors.filter((item) => isActiveValue(item.active)).map((item, index) => {
+                            const instructorId = text(item.instructorId, "");
+                            return <option key={`panel-substitute-${instructorId}-${index}`} value={instructorId}>{text(item.name)} / {instructorId}</option>;
+                          })}
+                        </select>
+                        <input
+                          value={panelSubstituteReason}
+                          onChange={(event) => setPanelSubstituteReason(event.target.value)}
+                          placeholder="대체 사유 예: 담당 교관 부재로 대체 비행"
+                          className="input-base compact-input"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void saveSelectedBookingSubstitute()}
+                          disabled={saving}
+                          className="inline-flex h-[2.35rem] shrink-0 items-center justify-center rounded-xl bg-blue-600 px-3 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                        >
+                          저장
+                        </button>
+                      </div>
+                    ) : parseSubstituteInstructorMemo(selectedBooking.memo).enabled ? (
+                      <div className="mt-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => void saveSelectedBookingSubstitute()}
+                          disabled={saving}
+                          className="inline-flex h-[2.35rem] items-center justify-center rounded-xl border border-[#d4deeb] bg-white px-3 text-[13px] font-semibold text-[#28486d] shadow-sm transition hover:bg-[#f7faff] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          대체 해제 저장
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="flex items-end gap-1.5 rounded-[16px] border border-[#e1eaf6] bg-[#f8fbff] p-2.5">
                   <div className="min-w-0 flex-1">
