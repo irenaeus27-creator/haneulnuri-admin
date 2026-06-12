@@ -4046,7 +4046,7 @@ if (form.instructorId) {
 </div>
 
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-[13px] font-medium text-blue-700">
+                <span className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-[14px] font-semibold text-blue-800 ring-1 ring-blue-200">
                   {calendarViewMode === "week" ? `${koreanDateLabel(calendarDate)}부터 7일` : koreanDateLabel(calendarDate)}
                 </span>
                 {selectedBooking ? (
@@ -4551,8 +4551,8 @@ if (form.instructorId) {
             </div>
 
             {!selectedBooking ? (
-              <div className="rounded-xl border border-dashed border-[#d7e1ed] bg-[#f8fbff] px-3 py-2.5 text-center text-[13px] font-medium text-[#7c8da4]">
-
+              <div className="rounded-xl border border-dashed border-[#d7e1ed] bg-[#f8fbff] px-3 py-3 text-center text-[13px] font-medium text-[#60738d]">
+                캘린더나 요청 목록에서 예약을 선택하면 상세 정보와 처리 버튼이 표시됩니다.
               </div>
             ) : (
               <div className="space-y-3">
