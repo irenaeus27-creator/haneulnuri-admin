@@ -939,7 +939,7 @@ function isUnpaidExperience(booking: BookingRow) {
 function calendarTypeClass(type: unknown) {
   const value = text(type, "");
 
-  if (value.includes("교육")) return "border-blue-400 bg-blue-100 text-blue-950";
+  if (value.includes("교육")) return "border-blue-300 bg-blue-50 text-blue-900";
   if (value.includes("체험")) return "border-emerald-400 bg-emerald-100 text-emerald-950";
   if (value.includes("렌탈")) return "border-orange-400 bg-orange-100 text-orange-950";
   if (value.includes("정비")) return "border-violet-400 bg-violet-100 text-violet-950";
