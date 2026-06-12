@@ -4039,14 +4039,14 @@ if (form.instructorId) {
         </section>
 
         <section ref={calendarSectionRef} className="min-w-0 rounded-[24px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_12px_34px_rgba(20,46,80,0.065)]">
-          <div className="mb-2 flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
-            <div className="min-w-0 flex-1">
+          <div className="mb-3 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+            <div className="min-w-0 flex-1 pt-1">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <h2 className="shrink-0 text-[15px] font-semibold tracking-[-0.02em] text-[#10213f]">예약 캘린더</h2>
-</div>
+              </div>
 
-              <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
-                <span className="inline-flex text-[16px] font-semibold tracking-[-0.02em] text-blue-800">
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <span className="inline-flex text-[17px] font-semibold tracking-[-0.02em] text-blue-800">
                   {calendarViewMode === "week" ? `${koreanDateLabel(calendarDate)}부터 7일` : koreanDateLabel(calendarDate)}
                 </span>
                 {selectedBooking ? (
@@ -4055,7 +4055,7 @@ if (form.instructorId) {
                   </span>
                 ) : null}
                 {calendarMoveDrag ? (
-                  <span className="inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-[13px] font-medium text-amber-700 ring-1 ring-amber-100">
+                  <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-[13px] font-medium text-blue-700 ring-1 ring-blue-100">
                     이동 중: {calendarMoveDrag.deltaSteps > 0 ? "+" : ""}{calendarMoveDrag.deltaSteps * RESERVATION_SLOT_MINUTES}분
                   </span>
                 ) : null}
@@ -4067,7 +4067,7 @@ if (form.instructorId) {
               </div>
             </div>
 
-            <div className="w-full rounded-[20px] border border-[#dfe8f4] bg-white/90 p-3 shadow-[0_8px_22px_rgba(15,40,80,0.035)] xl:w-[620px]">
+            <div className="w-full rounded-[20px] border border-[#dfe8f4] bg-white/90 p-3 shadow-[0_8px_22px_rgba(15,40,80,0.035)] xl:w-[620px] xl:flex-none">
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[96px_120px_minmax(170px,1fr)_auto] sm:items-end">
                 <Field label="보기">
                   <select
