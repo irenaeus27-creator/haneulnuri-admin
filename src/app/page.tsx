@@ -2691,7 +2691,7 @@ function ScheduleGraph({
                         data-end-time={item.endTime}
                         title={scheduleTooltipText(item)}
                         aria-label={scheduleTooltipText(item)}
-                        className={`absolute ${DASHBOARD_SCHEDULE_STICKER_TOP} ${DASHBOARD_SCHEDULE_STICKER_HEIGHT} cursor-help rounded-xl border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                        className={`absolute ${DASHBOARD_SCHEDULE_STICKER_TOP} ${DASHBOARD_SCHEDULE_STICKER_HEIGHT} cursor-help rounded-[6px] border shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
                           item.bookingType === "PFI"
                             ? "z-10 overflow-hidden px-0 py-0"
                             : isShortBlock

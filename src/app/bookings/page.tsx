@@ -2715,7 +2715,7 @@ export default function BookingsPage() {
                           <div key={`${dateText}-${bookingId}-${index}`}>
                             {showPfi ? (
                               <div
-                                className="absolute top-2 z-10 flex h-[44px] items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-2 text-[12px] font-medium text-sky-800 shadow-sm"
+                                className="absolute top-2 z-10 flex h-[44px] items-center justify-center rounded-[6px] border border-sky-200 bg-sky-50 px-2 text-[12px] font-medium text-sky-800 shadow-sm"
                                 style={calendarBlockStyleByTime(pfiStart, pfiEnd)}
                                 title={`PFI ${pfiStart}~${pfiEnd}\n${bookingTooltip(booking)}`}
                               >
@@ -2724,7 +2724,7 @@ export default function BookingsPage() {
                             ) : null}
                             <button
                               type="button"
-                              className={`absolute top-2 z-20 flex h-[44px] min-w-[54px] flex-col justify-center overflow-hidden rounded-lg border px-2 text-left text-[11px] leading-tight shadow-sm ${calendarTypeClass(booking.bookingType)}`}
+                              className={`absolute top-2 z-20 flex h-[44px] min-w-[54px] flex-col justify-center overflow-hidden rounded-[6px] border px-2 text-left text-[11px] leading-tight shadow-sm ${calendarTypeClass(booking.bookingType)}`}
                               style={calendarBlockStyle(booking)}
                               title={bookingTooltip(booking)}
                               onClick={() => {
@@ -4279,7 +4279,7 @@ if (form.instructorId) {
                               <div key={`${bookingId}-${index}`}>
                                 {showPfi ? (
                                   <div
-                                    className="absolute top-3 z-10 flex h-[56px] items-center justify-center rounded-lg border border-sky-200 bg-sky-50 px-2 text-[13px] font-medium text-sky-800 shadow-sm"
+                                    className="absolute top-3 z-10 flex h-[56px] items-center justify-center rounded-[6px] border border-sky-200 bg-sky-50 px-2 text-[13px] font-medium text-sky-800 shadow-sm"
                                     style={calendarBlockStyleByTime(pfiStart, pfiEnd)}
                                     title={`PFI ${pfiStart}~${pfiEnd}\n${bookingTooltip(booking)}`}
                                   >
@@ -4288,7 +4288,7 @@ if (form.instructorId) {
                                 ) : null}
 
                                 <div
-                                  className={`group absolute top-3 z-20 h-[56px] min-w-0 overflow-hidden rounded-xl border px-1.5 py-1 text-left shadow-[0_8px_18px_rgba(20,46,80,0.08)] ring-1 ring-white/70 transition hover:z-30 hover:shadow-[0_12px_24px_rgba(20,46,80,0.14)] ${
+                                  className={`group absolute top-3 z-20 h-[56px] min-w-0 overflow-hidden rounded-[6px] border px-1.5 py-1 text-left shadow-[0_8px_18px_rgba(20,46,80,0.08)] ring-1 ring-white/70 transition hover:z-30 hover:shadow-[0_12px_24px_rgba(20,46,80,0.14)] ${
                                     calendarMoveDrag?.bookingId === bookingId || calendarResizeDrag?.bookingId === bookingId ? "scale-[1.02] opacity-90" : "hover:scale-[1.02]"
                                   } ${calendarBookingCardClass(booking)} ${isUnpaidExperience(booking) ? "ring-2 ring-amber-200" : ""} ${isSelectedBooking(booking) ? "ring-2 ring-blue-500 shadow-[0_0_0_4px_rgba(37,99,235,0.16),0_12px_24px_rgba(37,99,235,0.22)]" : ""}`}
                                   style={calendarBlockStyleByTime(previewTimes.startTime, previewTimes.endTime)}
@@ -4405,7 +4405,7 @@ if (form.instructorId) {
                                     key={`${text(booking.bookingId, "booking")}-${index}`}
                                     type="button"
                                     onClick={() => startEdit(booking)}
-                                    title={bookingTooltip(booking)} className={`w-full rounded-xl border px-2 py-1.5 text-left shadow-sm ${calendarTypeClass(booking.bookingType)}`}
+                                    title={bookingTooltip(booking)} className={`w-full rounded-[6px] border px-2 py-1.5 text-left shadow-sm ${calendarTypeClass(booking.bookingType)}`}
                                   >
                                     <div className="truncate text-[12px] font-semibold leading-tight opacity-80">{compactBookingTypeLabel(booking.bookingType)}</div>
                                     <div className="mt-0.5 truncate text-[13px] font-semibold leading-tight">{calendarPersonLabel(booking)}</div>
@@ -5266,7 +5266,7 @@ if (form.instructorId) {
           pointer-events: none;
           position: absolute;
           inset: -4px;
-          border-radius: 1rem;
+          border-radius: 0.375rem;
           border: 1px dashed rgba(100, 116, 139, 0.7);
           animation: pending-request-soft-ring 2.8s ease-in-out infinite;
         }
