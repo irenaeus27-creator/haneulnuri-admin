@@ -1777,10 +1777,6 @@ export default function BookingsPage() {
       warnings.push("항공기를 선택하세요.");
     }
 
-    if (isRentalForm && !form.instructorId) {
-      warnings.push("렌탈비행 감독을 선택하세요.");
-    }
-
     if (isExperienceForm && !form.phone.trim()) {
       warnings.push("체험 고객 연락처를 입력하세요.");
     }
@@ -4614,9 +4610,9 @@ export default function BookingsPage() {
                   </select>
                 </Field>
               ) : isRentalForm ? (
-                <Field label="감독" required>
+                <Field label="감독">
                   <select value={form.instructorId} onChange={(event) => selectInstructor(event.target.value)} className="input-base compact-input">
-                    <option value="">감독 선택</option>
+                    <option value="">감독 없음</option>
                     {instructors.filter((item) => isActiveValue(item.active)).map((item, index) => {
                       const instructorId = text(item.instructorId, "");
                       return <option key={`${instructorId}-${index}`} value={instructorId}>{text(item.name)} / {instructorId}</option>;
