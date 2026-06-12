@@ -116,18 +116,64 @@ export async function writeNotification(input: NotificationInput) {
   }
 }
 
+function latestBookingActionReason(memo: unknown, actionLabel: string) {
+  const lines = text(memo, "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const latestActionLine = [...lines].reverse().find((line) => line.startsWith("["));
+  if (!latestActionLine) return "";
+
+  let reason = latestActionLine
+    .replace(/^\[[^\]]+\]\s*/, "")
+    .trim();
+
+  const colonIndex = reason.indexOf(":");
+  if (colonIndex >= 0) {
+    reason = reason.slice(colonIndex + 1).trim();
+  }
+
+  const dashIndex = reason.indexOf(" - ");
+  if (dashIndex >= 0) {
+    reason = reason.slice(dashIndex + 3).trim();
+  }
+
+  reason = reason
+    .replace(/^예약\s*취소\s*/g, "")
+    .replace(/^취소\s*/g, "")
+    .replace(/^기상취소\s*/g, "")
+    .replace(/^노쇼\s*/g, "")
+    .replace(/^반려\s*/g, "")
+    .trim();
+
+  if (!reason || reason === actionLabel) return "";
+  return reason;
+}
+
 export function bookingAuditMessage(booking: JsonRecord, actionLabel: string) {
   const userName = text(booking.userName || booking.user_name || booking.name, "예약자 미입력");
   const bookingDate = text(booking.bookingDate || booking.booking_date);
   const startTime = text(booking.startTime || booking.start_time);
+  const endTime = text(booking.endTime || booking.end_time);
   const bookingType = text(booking.bookingType || booking.booking_type || booking.type, "예약");
   const aircraftName = text(booking.aircraftName || booking.aircraft_name || booking.aircraft);
+  const status = text(booking.status || booking.booking_status);
+  const actionReason = latestBookingActionReason(booking.memo, actionLabel);
+  const shouldShowReason =
+    actionLabel.includes("취소") ||
+    actionLabel.includes("반려") ||
+    actionLabel.includes("노쇼") ||
+    status.includes("취소") ||
+    status.includes("반려") ||
+    status.includes("노쇼");
 
   return [
     `${actionLabel} · ${userName}`,
-    [bookingDate, startTime].filter(Boolean).join(" "),
+    [bookingDate, startTime && endTime ? `${startTime}~${endTime}` : startTime].filter(Boolean).join(" "),
     bookingType,
     aircraftName,
+    shouldShowReason && actionReason ? `사유: ${actionReason}` : "",
   ]
     .filter(Boolean)
     .join(" / ");
