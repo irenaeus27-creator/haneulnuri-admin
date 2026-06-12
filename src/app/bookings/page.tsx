@@ -4041,14 +4041,14 @@ if (form.instructorId) {
         <section ref={calendarSectionRef} className="min-w-0 rounded-[24px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_12px_34px_rgba(20,46,80,0.065)]">
           <div className="mb-3 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 flex-1 pt-1">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <div className="flex min-w-0 flex-col gap-1.5">
                 <h2 className="shrink-0 text-[15px] font-semibold tracking-[-0.02em] text-[#10213f]">예약 캘린더</h2>
-              </div>
-
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <span className="inline-flex text-[17px] font-semibold tracking-[-0.02em] text-blue-800">
+                <span className="inline-flex text-[18px] font-semibold tracking-[-0.03em] text-[#173052]">
                   {calendarViewMode === "week" ? `${koreanDateLabel(calendarDate)}부터 7일` : koreanDateLabel(calendarDate)}
                 </span>
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 {selectedBooking ? (
                   <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[13px] font-medium text-[#516982]">
                     선택 중: {text(selectedBooking.userName, "-")} · {formatBookingSummaryTimeRange(selectedBooking.startTime, selectedBooking.endTime)}
@@ -4067,106 +4067,94 @@ if (form.instructorId) {
               </div>
             </div>
 
-            <div className="w-full rounded-[20px] border border-[#dfe8f4] bg-white/90 p-3 shadow-[0_8px_22px_rgba(15,40,80,0.035)] xl:w-[620px] xl:flex-none">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[96px_120px_minmax(170px,1fr)_auto] sm:items-end">
-                <Field label="보기">
-                  <select
-                    value={calendarViewMode}
-                    onChange={(event) => setCalendarViewMode(event.target.value as "day" | "week")}
-                    className="input-base mt-1 h-10 rounded-xl bg-white px-3 text-[13px] font-semibold text-[#173052]"
-                  >
-                    <option value="day">일간</option>
-                    <option value="week">주간</option>
-                  </select>
-                </Field>
+            <div className="w-full rounded-[20px] border border-[#dfe8f4] bg-white/90 p-3 shadow-[0_8px_22px_rgba(15,40,80,0.035)] xl:w-auto xl:min-w-[760px] xl:flex-none">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <select
+                  value={calendarViewMode}
+                  onChange={(event) => setCalendarViewMode(event.target.value as "day" | "week")}
+                  className="input-base h-10 min-w-[96px] rounded-xl bg-white px-3 text-[13px] font-semibold text-[#173052]"
+                  aria-label="보기"
+                >
+                  <option value="day">일간</option>
+                  <option value="week">주간</option>
+                </select>
 
-                <Field label="기준">
-                  <select
-                    value={calendarResourceMode}
-                    onChange={(event) => setCalendarResourceMode(event.target.value as "aircraft" | "instructor")}
-                    className="input-base mt-1 h-10 rounded-xl bg-white px-3 text-[13px] font-semibold text-[#173052]"
-                  >
-                    <option value="aircraft">항공기별</option>
-                    <option value="instructor">교관별</option>
-                  </select>
-                </Field>
+                <select
+                  value={calendarResourceMode}
+                  onChange={(event) => setCalendarResourceMode(event.target.value as "aircraft" | "instructor")}
+                  className="input-base h-10 min-w-[110px] rounded-xl bg-white px-3 text-[13px] font-semibold text-[#173052]"
+                  aria-label="기준"
+                >
+                  <option value="aircraft">항공기별</option>
+                  <option value="instructor">교관별</option>
+                </select>
 
-                <Field label="캘린더 날짜">
-                  <input
-                    type="date"
-                    value={calendarDate}
-                    onChange={(event) => {
-                      updateForm("bookingDate", event.target.value);
-                      setDateFilter(event.target.value);
-                    }}
-                    className="input-base mt-1 h-10 rounded-xl bg-white px-3 text-[13px] font-semibold text-[#173052]"
-                  />
-                </Field>
+                <input
+                  type="date"
+                  value={calendarDate}
+                  onChange={(event) => {
+                    updateForm("bookingDate", event.target.value);
+                    setDateFilter(event.target.value);
+                  }}
+                  className="input-base h-10 min-w-[170px] rounded-xl bg-white px-3 text-[13px] font-semibold text-[#173052]"
+                  aria-label="캘린더 날짜"
+                />
 
-                <div className="grid grid-cols-3 gap-1.5 sm:pt-[22px]">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextDate = addDaysToDate(calendarDate, calendarViewMode === "week" ? -7 : -1);
-                      updateForm("bookingDate", nextDate);
-                      setDateFilter(nextDate);
-                    }}
-                    className="inline-flex h-10 min-w-[56px] items-center justify-center rounded-xl border border-[#d5e0ee] bg-white px-3 text-[13px] font-semibold text-[#28486d] shadow-sm transition hover:border-[#bcd3f2] hover:bg-[#f7faff]"
-                  >
-                    이전
-                  </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextDate = addDaysToDate(calendarDate, calendarViewMode === "week" ? -7 : -1);
+                    updateForm("bookingDate", nextDate);
+                    setDateFilter(nextDate);
+                  }}
+                  className="inline-flex h-10 min-w-[56px] items-center justify-center rounded-xl border border-[#d5e0ee] bg-white px-3 text-[13px] font-semibold text-[#28486d] shadow-sm transition hover:border-[#bcd3f2] hover:bg-[#f7faff]"
+                >
+                  이전
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      updateForm("bookingDate", todayText);
-                      setDateFilter(todayText);
-                    }}
-                    className="inline-flex h-10 min-w-[56px] items-center justify-center rounded-xl border border-[#b9d1ff] bg-[#eef5ff] px-3 text-[13px] font-semibold text-[#1264f4] shadow-sm transition hover:bg-[#e2efff]"
-                  >
-                    오늘
-                  </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateForm("bookingDate", todayText);
+                    setDateFilter(todayText);
+                  }}
+                  className="inline-flex h-10 min-w-[56px] items-center justify-center rounded-xl border border-[#b9d1ff] bg-[#eef5ff] px-3 text-[13px] font-semibold text-[#1264f4] shadow-sm transition hover:bg-[#e2efff]"
+                >
+                  오늘
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextDate = addDaysToDate(calendarDate, calendarViewMode === "week" ? 7 : 1);
-                      updateForm("bookingDate", nextDate);
-                      setDateFilter(nextDate);
-                    }}
-                    className="inline-flex h-10 min-w-[56px] items-center justify-center rounded-xl border border-[#d5e0ee] bg-white px-3 text-[13px] font-semibold text-[#28486d] shadow-sm transition hover:border-[#bcd3f2] hover:bg-[#f7faff]"
-                  >
-                    다음
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextDate = addDaysToDate(calendarDate, calendarViewMode === "week" ? 7 : 1);
+                    updateForm("bookingDate", nextDate);
+                    setDateFilter(nextDate);
+                  }}
+                  className="inline-flex h-10 min-w-[56px] items-center justify-center rounded-xl border border-[#d5e0ee] bg-white px-3 text-[13px] font-semibold text-[#28486d] shadow-sm transition hover:border-[#bcd3f2] hover:bg-[#f7faff]"
+                >
+                  다음
+                </button>
 
-          {calendarResourceMode === "aircraft" && aogAircraft.length > 0 ? (
-            <div className="mb-3 flex items-center justify-between rounded-2xl border border-[#e1eaf6] bg-[#f8fbff] px-4 py-2.5">
-              <div className="flex flex-wrap items-center gap-2 text-[13px] font-bold text-[#566b85]">
-                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700 ring-1 ring-emerald-100">운항 가능 {operationalAircraft.length}대</span>
-                <span className="rounded-full bg-rose-50 px-2 py-0.5 text-rose-700 ring-1 ring-rose-100">AOG {aogAircraft.length}대</span>
-              </div>
-              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setWeeklyScheduleOpen(true)}
-                  className="inline-flex h-9 items-center rounded-xl border border-[#bcd5f4] bg-[#f7fbff] px-3 text-[13px] font-medium text-[#1f5fae] shadow-sm transition hover:bg-[#eef6ff]"
+                  className="inline-flex h-10 items-center rounded-xl border border-[#bcd5f4] bg-[#f7fbff] px-3 text-[13px] font-medium text-[#1f5fae] shadow-sm transition hover:bg-[#eef6ff]"
                 >
                   주간일정
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAogAircraft((prev) => !prev)}
-                  className="inline-flex h-9 items-center rounded-xl border border-[#cfd9e6] bg-white px-3 text-[13px] font-medium text-[#334e68] shadow-sm hover:bg-[#f3f7fb]"
-                >
-                  {showAogAircraft ? "AOG 접기" : "AOG 펼치기"}
-                </button>
+
+                {calendarResourceMode === "aircraft" && aogAircraft.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAogAircraft((prev) => !prev)}
+                    className="inline-flex h-10 items-center rounded-xl border border-[#cfd9e6] bg-white px-3 text-[13px] font-medium text-[#334e68] shadow-sm hover:bg-[#f3f7fb]"
+                  >
+                    {showAogAircraft ? "AOG 접기" : "AOG 펼치기"}
+                  </button>
+                ) : null}
               </div>
             </div>
-          ) : null}
+          </div>
 
           {calendarViewMode === "day" ? (
             <div className="max-h-[720px] overflow-auto">
