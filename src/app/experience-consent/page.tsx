@@ -71,6 +71,54 @@ const englishClauses = [
   "I confirm that this agreement is made voluntarily, without any coercion or misunderstanding, and that I fully understand its contents and agree of my own free will.",
 ];
 
+const chineseClauses = [
+  "本人自愿按照本人意愿搭乘 SKYNURI 飞行教育中心运营的轻型航空器并参加飞行。",
+  "本人确认，因本人疏忽或过失在登机过程或飞行过程中发生的人身或财产损害，其损害赔偿责任由本人自行承担，并且不向 SKYNURI 飞行教育中心追究任何民事或刑事责任。",
+  "如发生事故，本人同意仅通过保险公司代表 SKYNURI 飞行教育中心支付的保险金获得赔偿，并放弃向 SKYNURI 飞行教育中心提出任何额外损害赔偿请求的权利。但航空器运营者存在故意或重大过失的情况除外。",
+  "本人同意，针对 SKYNURI 飞行教育中心的损害赔偿请求权，如自事故发生日起一年内未行使，将因时效届满而消灭。",
+  "本人确认不存在会妨碍参加熟悉体验飞行的身体或精神方面的问题。",
+  "本人确认，本承诺书并非因任何强迫或误解而作出，而是在充分理解其内容后，基于本人自由意愿作出的同意。",
+];
+
+type AgreementLanguage = "ko" | "en" | "zh";
+
+const agreementLanguageOptions: { value: AgreementLanguage; label: string; title: string; help: string; clauses: string[] }[] = [
+  {
+    value: "ko",
+    label: "한국어",
+    title: "서약 내용",
+    help: "아래 내용을 읽고 확인해주세요.",
+    clauses: koreanClauses,
+  },
+  {
+    value: "en",
+    label: "English",
+    title: "Agreement",
+    help: "Please read and confirm the agreement below.",
+    clauses: englishClauses,
+  },
+  {
+    value: "zh",
+    label: "中文",
+    title: "承诺书内容",
+    help: "请阅读并确认以下内容。",
+    clauses: chineseClauses,
+  },
+];
+
+function agreementSnapshotText() {
+  return [
+    "[Korean Agreement]",
+    ...koreanClauses.map((clause, index) => `${index + 1}. ${clause}`),
+    "",
+    "[English Agreement]",
+    ...englishClauses.map((clause, index) => `${index + 1}. ${clause}`),
+    "",
+    "[Chinese Agreement]",
+    ...chineseClauses.map((clause, index) => `${index + 1}. ${clause}`),
+  ].join("\n");
+}
+
 function todayText() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -103,6 +151,14 @@ export default function ExperienceConsentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<SubmitResult | null>(null);
+  const [agreementLanguage, setAgreementLanguage] = useState<AgreementLanguage>("ko");
+
+  const selectedAgreement = useMemo(
+    () =>
+      agreementLanguageOptions.find((item) => item.value === agreementLanguage) ||
+      agreementLanguageOptions[0],
+    [agreementLanguage],
+  );
 
   const canSubmit = useMemo(() => {
     return Boolean(
@@ -143,14 +199,9 @@ export default function ExperienceConsentPage() {
           reservationSource: form.reservationSources.join(", "),
           reservationSources: form.reservationSources,
           agreementVersion: AGREEMENT_VERSION,
-          agreementText: koreanClauses.join("\n"),
-          agreementSnapshot: [
-            "[Korean Agreement]",
-            ...koreanClauses.map((clause, index) => `${index + 1}. ${clause}`),
-            "",
-            "[English Agreement]",
-            ...englishClauses.map((clause, index) => `${index + 1}. ${clause}`),
-          ].join("\n"),
+          agreementLanguage,
+          agreementText: selectedAgreement.clauses.join("\n"),
+          agreementSnapshot: agreementSnapshotText(),
           signatureDataUrl: form.signatureDataUrl,
           signedAt: new Date().toISOString(),
           signatureMethod: "draw",
@@ -347,15 +398,39 @@ export default function ExperienceConsentPage() {
         </section>
 
         <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-semibold tracking-[-0.03em]">
-            서약 내용
-          </h2>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            아래 내용을 읽고 확인해주세요.
-          </p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold tracking-[-0.03em]">
+                {selectedAgreement.title}
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                {selectedAgreement.help}
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-slate-200 bg-slate-50 p-1">
+              {agreementLanguageOptions.map((item) => {
+                const selected = agreementLanguage === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setAgreementLanguage(item.value)}
+                    className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                      selected
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-transparent text-slate-500"
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-4">
-            {koreanClauses.map((clause, index) => (
-              <p key={clause} className="text-sm leading-6 text-slate-700">
+            {selectedAgreement.clauses.map((clause, index) => (
+              <p key={`${agreementLanguage}-${index}`} className="text-sm leading-6 text-slate-700">
                 <span className="mr-1 font-semibold text-slate-950">
                   {index + 1}.
                 </span>
@@ -363,19 +438,10 @@ export default function ExperienceConsentPage() {
               </p>
             ))}
           </div>
-          <details className="mt-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-700">
-              English Agreement 보기
-            </summary>
-            <div className="mt-3 space-y-3">
-              {englishClauses.map((clause, index) => (
-                <p key={clause} className="text-sm leading-6 text-slate-600">
-                  <span className="mr-1 font-semibold">{index + 1}.</span>
-                  {clause}
-                </p>
-              ))}
-            </div>
-          </details>
+
+          <p className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-xs leading-5 text-blue-700">
+            선택한 언어의 서약 내용으로 확인하며, 제출 시 한국어·영어·중국어 전체 문안도 함께 보관됩니다.
+          </p>
         </section>
 
         <section className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -459,7 +525,7 @@ export default function ExperienceConsentPage() {
               className="mt-1 h-5 w-5 shrink-0 rounded border-slate-300"
             />
             <span>
-              본인은 위 서약서 내용을 충분히 읽고 이해했으며 자유로운 의사로
+              본인은 선택한 언어의 서약서 내용을 충분히 읽고 이해했으며 자유로운 의사로
               동의합니다.
             </span>
           </label>
