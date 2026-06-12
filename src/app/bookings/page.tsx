@@ -4039,40 +4039,38 @@ if (form.instructorId) {
         </section>
 
         <section ref={calendarSectionRef} className="min-w-0 rounded-[24px] border border-[#d9e6f5] bg-white/95 p-3 shadow-[0_12px_34px_rgba(20,46,80,0.065)]">
-          <div className="mb-3 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0 flex-1 pt-1">
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <h2 className="shrink-0 text-[15px] font-semibold tracking-[-0.02em] text-[#10213f]">예약 캘린더</h2>
-                <span className="inline-flex text-[18px] font-semibold tracking-[-0.03em] text-[#173052]">
-                  {calendarViewMode === "week" ? `${koreanDateLabel(calendarDate)}부터 7일` : koreanDateLabel(calendarDate)}
+          <div className="mb-3 flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
+            <div className="min-w-0 flex flex-wrap items-center gap-3">
+              <h2 className="shrink-0 text-[22px] font-semibold tracking-[-0.04em] text-[#071a35]">예약 캘린더</h2>
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-[#dbe8fb] bg-[#f4f8ff] text-[16px] text-[#1f6fff]">
+                📅
+              </span>
+              <span className="inline-flex text-[16px] font-medium tracking-[-0.02em] text-[#243b5a]">
+                {calendarViewMode === "week" ? `${koreanDateLabel(calendarDate)}부터 7일` : koreanDateLabel(calendarDate)}
+              </span>
+              {selectedBooking ? (
+                <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[13px] font-medium text-[#516982]">
+                  선택 중: {text(selectedBooking.userName, "-")} · {formatBookingSummaryTimeRange(selectedBooking.startTime, selectedBooking.endTime)}
                 </span>
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {selectedBooking ? (
-                  <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[13px] font-medium text-[#516982]">
-                    선택 중: {text(selectedBooking.userName, "-")} · {formatBookingSummaryTimeRange(selectedBooking.startTime, selectedBooking.endTime)}
-                  </span>
-                ) : null}
-                {calendarMoveDrag ? (
-                  <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-[13px] font-medium text-blue-700 ring-1 ring-blue-100">
-                    이동 중: {calendarMoveDrag.deltaSteps > 0 ? "+" : ""}{calendarMoveDrag.deltaSteps * RESERVATION_SLOT_MINUTES}분
-                  </span>
-                ) : null}
-                {calendarResizeDrag ? (
-                  <span className="inline-flex rounded-full bg-violet-50 px-2.5 py-0.5 text-[13px] font-medium text-violet-700 ring-1 ring-violet-100">
-                    종료 조절: {calendarResizeDrag.deltaSteps > 0 ? "+" : ""}{calendarResizeDrag.deltaSteps * RESERVATION_SLOT_MINUTES}분
-                  </span>
-                ) : null}
-              </div>
+              ) : null}
+              {calendarMoveDrag ? (
+                <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-0.5 text-[13px] font-medium text-blue-700 ring-1 ring-blue-100">
+                  이동 중: {calendarMoveDrag.deltaSteps > 0 ? "+" : ""}{calendarMoveDrag.deltaSteps * RESERVATION_SLOT_MINUTES}분
+                </span>
+              ) : null}
+              {calendarResizeDrag ? (
+                <span className="inline-flex rounded-full bg-violet-50 px-2.5 py-0.5 text-[13px] font-medium text-violet-700 ring-1 ring-violet-100">
+                  종료 조절: {calendarResizeDrag.deltaSteps > 0 ? "+" : ""}{calendarResizeDrag.deltaSteps * RESERVATION_SLOT_MINUTES}분
+                </span>
+              ) : null}
             </div>
 
-            <div className="w-full rounded-[20px] border border-[#dfe8f4] bg-white/90 p-3 shadow-[0_8px_22px_rgba(15,40,80,0.035)] xl:w-auto xl:min-w-[760px] xl:flex-none">
-              <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="w-full overflow-x-auto rounded-[18px] border border-[#dfe8f4] bg-white/90 px-3 py-2 shadow-[0_8px_22px_rgba(15,40,80,0.035)] 2xl:w-auto 2xl:flex-none">
+              <div className="flex min-w-max flex-nowrap items-center justify-end gap-2">
                 <select
                   value={calendarViewMode}
                   onChange={(event) => setCalendarViewMode(event.target.value as "day" | "week")}
-                  className="input-base h-10 min-w-[96px] rounded-xl bg-white px-3 text-[13px] font-semibold text-[#173052]"
+                  className="h-10 w-[112px] shrink-0 rounded-xl border border-[#d5e0ee] bg-white px-3 text-[13px] font-semibold text-[#173052] outline-none transition hover:border-[#bcd3f2] focus:border-[#1f6fff] focus:ring-4 focus:ring-[#dbeafe]"
                   aria-label="보기"
                 >
                   <option value="day">일간</option>
@@ -4082,7 +4080,7 @@ if (form.instructorId) {
                 <select
                   value={calendarResourceMode}
                   onChange={(event) => setCalendarResourceMode(event.target.value as "aircraft" | "instructor")}
-                  className="input-base h-10 min-w-[110px] rounded-xl bg-white px-3 text-[13px] font-semibold text-[#173052]"
+                  className="h-10 w-[132px] shrink-0 rounded-xl border border-[#d5e0ee] bg-white px-3 text-[13px] font-semibold text-[#173052] outline-none transition hover:border-[#bcd3f2] focus:border-[#1f6fff] focus:ring-4 focus:ring-[#dbeafe]"
                   aria-label="기준"
                 >
                   <option value="aircraft">항공기별</option>
@@ -4096,7 +4094,7 @@ if (form.instructorId) {
                     updateForm("bookingDate", event.target.value);
                     setDateFilter(event.target.value);
                   }}
-                  className="input-base h-10 min-w-[170px] rounded-xl bg-white px-3 text-[13px] font-semibold text-[#173052]"
+                  className="h-10 w-[176px] shrink-0 rounded-xl border border-[#d5e0ee] bg-white px-3 text-[13px] font-semibold text-[#173052] outline-none transition hover:border-[#bcd3f2] focus:border-[#1f6fff] focus:ring-4 focus:ring-[#dbeafe]"
                   aria-label="캘린더 날짜"
                 />
 
@@ -4107,7 +4105,7 @@ if (form.instructorId) {
                     updateForm("bookingDate", nextDate);
                     setDateFilter(nextDate);
                   }}
-                  className="inline-flex h-10 min-w-[56px] items-center justify-center rounded-xl border border-[#d5e0ee] bg-white px-3 text-[13px] font-semibold text-[#28486d] shadow-sm transition hover:border-[#bcd3f2] hover:bg-[#f7faff]"
+                  className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-[#d5e0ee] bg-white px-3.5 text-[13px] font-semibold text-[#28486d] shadow-sm transition hover:border-[#bcd3f2] hover:bg-[#f7faff]"
                 >
                   이전
                 </button>
@@ -4118,7 +4116,7 @@ if (form.instructorId) {
                     updateForm("bookingDate", todayText);
                     setDateFilter(todayText);
                   }}
-                  className="inline-flex h-10 min-w-[56px] items-center justify-center rounded-xl border border-[#b9d1ff] bg-[#eef5ff] px-3 text-[13px] font-semibold text-[#1264f4] shadow-sm transition hover:bg-[#e2efff]"
+                  className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-[#8fb8ff] bg-[#f0f6ff] px-3.5 text-[13px] font-semibold text-[#1264f4] shadow-sm transition hover:bg-[#e5f0ff]"
                 >
                   오늘
                 </button>
@@ -4130,7 +4128,7 @@ if (form.instructorId) {
                     updateForm("bookingDate", nextDate);
                     setDateFilter(nextDate);
                   }}
-                  className="inline-flex h-10 min-w-[56px] items-center justify-center rounded-xl border border-[#d5e0ee] bg-white px-3 text-[13px] font-semibold text-[#28486d] shadow-sm transition hover:border-[#bcd3f2] hover:bg-[#f7faff]"
+                  className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl border border-[#d5e0ee] bg-white px-3.5 text-[13px] font-semibold text-[#28486d] shadow-sm transition hover:border-[#bcd3f2] hover:bg-[#f7faff]"
                 >
                   다음
                 </button>
@@ -4138,7 +4136,7 @@ if (form.instructorId) {
                 <button
                   type="button"
                   onClick={() => setWeeklyScheduleOpen(true)}
-                  className="inline-flex h-10 items-center rounded-xl border border-[#bcd5f4] bg-[#f7fbff] px-3 text-[13px] font-medium text-[#1f5fae] shadow-sm transition hover:bg-[#eef6ff]"
+                  className="inline-flex h-10 shrink-0 items-center rounded-xl border border-[#d5e0ee] bg-white px-3.5 text-[13px] font-semibold text-[#405875] shadow-sm transition hover:border-[#bcd3f2] hover:bg-[#f7faff]"
                 >
                   주간일정
                 </button>
@@ -4147,7 +4145,7 @@ if (form.instructorId) {
                   <button
                     type="button"
                     onClick={() => setShowAogAircraft((prev) => !prev)}
-                    className="inline-flex h-10 items-center rounded-xl border border-[#cfd9e6] bg-white px-3 text-[13px] font-medium text-[#334e68] shadow-sm hover:bg-[#f3f7fb]"
+                    className="inline-flex h-10 shrink-0 items-center rounded-xl border border-[#d5e0ee] bg-white px-3.5 text-[13px] font-semibold text-[#405875] shadow-sm transition hover:border-[#bcd3f2] hover:bg-[#f7faff]"
                   >
                     {showAogAircraft ? "AOG 접기" : "AOG 펼치기"}
                   </button>
