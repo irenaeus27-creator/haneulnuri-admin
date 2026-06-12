@@ -2604,7 +2604,7 @@ function ScheduleGraph({
 
       <div className="overflow-x-auto px-6 pb-4">
         <div className="min-w-[1220px]">
-          <div className="grid grid-cols-[110px_1fr] border-b border-[#dbe5f1] pb-2">
+          <div className="grid grid-cols-[110px_1fr] border-b border-[#d4e1ef] pb-2">
             <div className="text-[15px] font-bold text-[#314965]">항공기</div>
             <div className="relative h-8">
               {showCurrentTimeLine ? (
@@ -2636,7 +2636,7 @@ function ScheduleGraph({
             return (
               <div
                 key={aircraftName}
-                className="grid min-h-[74px] grid-cols-[116px_1fr] border-b border-[#edf2f7]"
+                className="grid min-h-[74px] grid-cols-[116px_1fr] border-b border-[#e4edf7]"
               >
                 <div className="flex items-center gap-2 text-[15px] font-extrabold text-[#10213f]">
                   <span className="text-[#1264f4]">✈</span>
@@ -2651,13 +2651,25 @@ function ScheduleGraph({
                       aria-hidden="true"
                     />
                   ) : null}
-                  {quarterSlots.map((minutes) => (
-                    <div
-                      key={`${aircraftName}-slot-${minutes}`}
-                      className={`absolute bottom-0 top-0 border-l border-dashed ${minutes % 60 === 0 ? "border-[#dbe5f1]" : "border-[#eef3f9]"}`}
-                      style={{ left: `${((minutes - SCHEDULE_START_MIN) / SCHEDULE_TOTAL_MIN) * 100}%` }}
-                    />
-                  ))}
+                  {quarterSlots.map((minutes) => {
+                    const offset = minutes - SCHEDULE_START_MIN;
+                    const isHour = offset % 60 === 0;
+                    const isHalfHour = offset % 30 === 0;
+
+                    return (
+                      <div
+                        key={`${aircraftName}-slot-${minutes}`}
+                        className={`absolute bottom-0 top-0 ${
+                          isHour
+                            ? "border-l-2 border-solid border-[#a9bdd3]"
+                            : isHalfHour
+                              ? "border-l border-solid border-[#c0d0e2]"
+                              : "border-l border-dashed border-[#e4edf7]"
+                        }`}
+                        style={{ left: `${((minutes - SCHEDULE_START_MIN) / SCHEDULE_TOTAL_MIN) * 100}%` }}
+                      />
+                    );
+                  })}
 
                   {items.map((item) => {
                     const start = Math.max(timeToMinutes(item.startTime), SCHEDULE_START_MIN);
