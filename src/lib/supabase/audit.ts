@@ -168,11 +168,14 @@ export function bookingAuditMessage(booking: JsonRecord, actionLabel: string) {
     status.includes("반려") ||
     status.includes("노쇼");
 
+  const noShowDeducted = text(booking.noShowDeducted).toLowerCase() === "true" || booking.noShowDeducted === true;
+
   return [
     `${actionLabel} · ${userName}`,
     [bookingDate, startTime && endTime ? `${startTime}~${endTime}` : startTime].filter(Boolean).join(" "),
     bookingType,
     aircraftName,
+    noShowDeducted ? "교육생 노쇼로 실제 교육을 진행한 것으로 처리되어 예약 시간만큼 교육시간이 차감되었습니다." : "",
     shouldShowReason && actionReason ? `사유: ${actionReason}` : "",
   ]
     .filter(Boolean)
@@ -190,6 +193,7 @@ export function bookingActionLabel(statusOrAction: string) {
   if (value === "취소요청") return "예약 취소 요청";
   if (value === "확정") return "예약 확정";
   if (value === "취소") return "예약 취소";
+  if (value === "노쇼") return "노쇼 처리";
 
   return value || "예약 변경";
 }

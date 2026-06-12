@@ -134,6 +134,228 @@ function numberOrNull(value: unknown) {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
+function numberValue(value: unknown) {
+  const raw = text(value).replace(/,/g, "").trim();
+  if (!raw) return 0;
+  const numberValue = Number(raw);
+  return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function minutesBetweenTimes(startTime: unknown, endTime: unknown) {
+  const start = timeText(startTime);
+  const end = timeText(endTime);
+  const [startHour, startMinute] = start.split(":").map(Number);
+  const [endHour, endMinute] = end.split(":").map(Number);
+
+  if (
+    !Number.isFinite(startHour) ||
+    !Number.isFinite(startMinute) ||
+    !Number.isFinite(endHour) ||
+    !Number.isFinite(endMinute)
+  ) {
+    return 0;
+  }
+
+  const startTotal = startHour * 60 + startMinute;
+  const endTotal = endHour * 60 + endMinute;
+
+  return endTotal > startTotal ? endTotal - startTotal : 0;
+}
+
+function trainingLogMinutesForStudent(row: JsonRecord) {
+  const status = text(row.status).replaceAll(" ", "");
+  if (["작성대기", "대기", "취소", "기상취소", "노쇼", "반려", "삭제"].some((item) => status.includes(item))) return 0;
+
+  const type = text(row.training_type || row.trainingType);
+  if (!type.includes("교육")) return 0;
+
+  const deducted = numberValue(row.deducted_minutes || row.deductedMinutes);
+  if (deducted > 0) return Math.round(deducted);
+
+  const actual = numberValue(row.actual_flight_minutes || row.actualFlightMinutes);
+  if (actual > 0) return Math.round(actual);
+
+  return minutesBetweenTimes(row.actual_start_time || row.actualStartTime, row.actual_end_time || row.actualEndTime);
+}
+
+function chargedTrainingMinutes(row: JsonRecord) {
+  const candidates = [
+    row.total_charged_minutes,
+    row.charged_training_minutes,
+    row.initial_charge_minutes,
+  ];
+
+  for (const value of candidates) {
+    const minutes = numberValue(value);
+    if (minutes > 0) return Math.round(minutes);
+  }
+
+  const hours = numberValue(row.initial_charge_hours);
+  return hours > 0 ? Math.round(hours * 60) : 0;
+}
+
+async function selectStudentForBooking(booking: JsonRecord) {
+  const supabase = getSupabaseServerClient();
+  const studentId = text(booking.studentId || booking.student_id);
+  const userId = text(booking.userId || booking.user_id);
+  const userName = text(booking.userName || booking.user_name || booking.name);
+
+  if (studentId) {
+    const { data, error } = await supabase.from("students").select("*").eq("student_id", studentId).maybeSingle();
+    if (error) throw new Error(`교육생 조회 실패: ${error.message}`);
+    if (data) return data as JsonRecord;
+  }
+
+  if (userId) {
+    const { data, error } = await supabase.from("students").select("*").eq("user_id", userId).maybeSingle();
+    if (error) throw new Error(`교육생 조회 실패: ${error.message}`);
+    if (data) return data as JsonRecord;
+  }
+
+  if (userName) {
+    const { data, error } = await supabase.from("students").select("*").eq("name", userName).limit(1).maybeSingle();
+    if (!error && data) return data as JsonRecord;
+  }
+
+  return null;
+}
+
+async function refreshStudentTrainingSummary(student: JsonRecord) {
+  const supabase = getSupabaseServerClient();
+  const studentId = text(student.student_id || student.studentId);
+  const userId = text(student.user_id || student.userId);
+  const name = text(student.name || student.student_name || student.studentName);
+  const rows: JsonRecord[] = [];
+  const seen = new Set<string>();
+
+  async function append(query: unknown) {
+    const result = (await query) as { data?: unknown[] | null; error?: { message?: string } | null };
+    if (result.error) throw new Error(`교육생 교육시간 집계 실패: ${result.error.message || "unknown"}`);
+    for (const row of (result.data || []) as JsonRecord[]) {
+      const record = row as JsonRecord;
+      const id = text(record.training_log_id || record.trainingLogId || `${record.training_date}-${record.actual_start_time}-${record.student_name}`);
+      if (id && seen.has(id)) continue;
+      if (id) seen.add(id);
+      rows.push(record);
+    }
+  }
+
+  if (studentId) await append(supabase.from("training_logs").select("*").eq("student_id", studentId));
+  if (userId) await append(supabase.from("training_logs").select("*").eq("user_id", userId));
+  if (name) await append(supabase.from("training_logs").select("*").eq("student_name", name));
+
+  const completed = rows
+    .map((row) => ({ row, minutes: trainingLogMinutesForStudent(row) }))
+    .filter((item) => item.minutes > 0);
+
+  const usedMinutes = completed.reduce((sum, item) => sum + item.minutes, 0);
+  const chargedMinutes = chargedTrainingMinutes(student);
+  const manualMinutes = numberValue(student.manual_training_minutes || student.manualTrainingMinutes);
+  const remainingMinutes = chargedMinutes > 0 ? Math.max(chargedMinutes - usedMinutes - manualMinutes, 0) : 0;
+  const latestDate = completed
+    .map((item) => text(item.row.training_date || item.row.trainingDate).slice(0, 10))
+    .filter(Boolean)
+    .sort((a, b) => b.localeCompare(a))[0] || null;
+
+  const { error } = await supabase
+    .from("students")
+    .update({
+      used_training_minutes: usedMinutes,
+      used_minutes: usedMinutes,
+      used_training_hours: Number((usedMinutes / 60).toFixed(2)),
+      used_hours: Number((usedMinutes / 60).toFixed(2)),
+      completed_training_count: completed.length,
+      remaining_training_minutes: remainingMinutes,
+      remaining_minutes: remainingMinutes,
+      remaining_training_hours: Number((remainingMinutes / 60).toFixed(2)),
+      remaining_hours: Number((remainingMinutes / 60).toFixed(2)),
+      last_flight_date: latestDate,
+      recent_flight_date: latestDate,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("student_id", studentId);
+
+  if (error) throw new Error(`교육생 교육시간 반영 실패: ${error.message}`);
+}
+
+async function applyEducationNoShowDeduction(booking: JsonRecord) {
+  if (!isEducationBooking(booking)) return;
+
+  const supabase = getSupabaseServerClient();
+  const bookingId = text(booking.bookingId || booking.booking_id);
+  const student = await selectStudentForBooking(booking);
+
+  if (!bookingId || !student) return;
+
+  const studentId = text(student.student_id || student.studentId);
+  const userId = text(student.user_id || student.userId || booking.userId || booking.user_id);
+  const studentName = text(student.name || booking.userName || booking.user_name);
+  const startTime = timeText(booking.startTime || booking.start_time);
+  const endTime = timeText(booking.endTime || booking.end_time);
+  const scheduledMinutes = numberValue(booking.durationMinutes || booking.duration_minutes) || minutesBetweenTimes(startTime, endTime);
+
+  if (scheduledMinutes <= 0) return;
+
+  const noShowRow: JsonRecord = {
+    booking_id: bookingId,
+    student_id: studentId,
+    student_name: studentName,
+    user_id: userId || null,
+    instructor_id: nullIfEmpty(booking.instructorId || booking.instructor_id),
+    instructor_name: text(booking.instructorName || booking.instructor_name),
+    aircraft_id: nullIfEmpty(booking.aircraftId || booking.aircraft_id),
+    aircraft_name: text(booking.aircraftName || booking.aircraft_name || booking.aircraft),
+    training_date: dateOrNull(booking.bookingDate || booking.booking_date),
+    scheduled_start_time: startTime,
+    scheduled_end_time: endTime,
+    actual_start_time: startTime,
+    actual_end_time: endTime,
+    scheduled_minutes: scheduledMinutes,
+    actual_flight_minutes: 0,
+    ground_briefing_minutes: 0,
+    training_type: "교육비행",
+    lesson_title: "노쇼 교육시간 차감",
+    training_items: "노쇼 처리에 따른 교육시간 차감",
+    instructor_notes: "예약관리에서 노쇼 처리되어 실제 교육을 진행한 것으로 교육시간을 차감했습니다.",
+    student_notes: "노쇼 처리로 예약 시간만큼 교육시간이 차감되었습니다.",
+    homework: "",
+    caution_notes: "",
+    next_training_plan: "",
+    student_visible: true,
+    time_deducted: true,
+    deducted_minutes: scheduledMinutes,
+    status: "작성완료",
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data: existing, error: existingError } = await supabase
+    .from("training_logs")
+    .select("training_log_id")
+    .eq("booking_id", bookingId)
+    .maybeSingle();
+
+  if (existingError) throw new Error(`노쇼 교육기록 확인 실패: ${existingError.message}`);
+
+  if (existing) {
+    const { error } = await supabase
+      .from("training_logs")
+      .update(noShowRow)
+      .eq("training_log_id", text((existing as JsonRecord).training_log_id));
+
+    if (error) throw new Error(`노쇼 교육시간 차감 기록 수정 실패: ${error.message}`);
+  } else {
+    const { error } = await supabase.from("training_logs").insert({
+      training_log_id: buildId("TL"),
+      ...noShowRow,
+      created_at: new Date().toISOString(),
+    });
+
+    if (error) throw new Error(`노쇼 교육시간 차감 기록 생성 실패: ${error.message}`);
+  }
+
+  await refreshStudentTrainingSummary(student);
+}
+
 function looksLikeRentalPilotId(value: unknown) {
   const raw = text(value).toUpperCase();
   return raw.startsWith("RP-") || raw.startsWith("RTP-") || raw.startsWith("PILOT-");
@@ -477,6 +699,7 @@ async function recordBookingAudit(action: string, booking: JsonRecord) {
     status === "요청" ||
     status === "취소요청" ||
     status === "확정" ||
+    status === "노쇼" ||
     status === "취소";
 
   if (shouldCreateNotification && userId) {
@@ -550,6 +773,12 @@ async function updateBooking(data: JsonRecord, auditAction = "updateBooking") {
   }
 
   const booking = withBookingAliases(toCamelObject(updated as JsonRecord));
+
+  if (text(booking.status) === "노쇼" && isEducationBooking(booking)) {
+    await applyEducationNoShowDeduction(booking);
+    booking.noShowDeducted = true;
+  }
+
   await recordBookingAudit(auditAction, booking);
 
   return booking;

@@ -178,6 +178,15 @@ type CalendarResizeDrag = {
   originalEndTime: string;
 } | null;
 
+type StatusActionTone = "primary" | "secondary" | "danger";
+
+type StatusAction = {
+  label: string;
+  nextStatus: string;
+  actionLabel: string;
+  tone: StatusActionTone;
+};
+
 const defaultBookingStatuses = [
   "요청",
   "확정",
@@ -1293,7 +1302,7 @@ function aircraftDisplay(item: AircraftRow | BookingRow) {
   return text(item.aircraftName || item.registrationNo || item.aircraftId, "-");
 }
 
-function statusActionButtons(status: string) {
+function statusActionButtons(status: string): StatusAction[] {
   status = normalizeBookingStatusForDisplay(status);
 
   if (status === "요청") {
@@ -1301,14 +1310,14 @@ function statusActionButtons(status: string) {
       { label: "승인", nextStatus: "확정", actionLabel: "예약 요청 승인", tone: "primary" },
       { label: "반려", nextStatus: "반려", actionLabel: "예약 요청 반려", tone: "danger" },
       { label: "취소", nextStatus: "취소", actionLabel: "관리자 취소", tone: "danger" },
-    ] as const;
+    ];
   }
 
   if (status === "취소요청") {
     return [
       { label: "취소", nextStatus: "취소", actionLabel: "취소 요청 승인", tone: "danger" },
       { label: "반려", nextStatus: "확정", actionLabel: "취소 요청 반려", tone: "secondary" },
-    ] as const;
+    ];
   }
 
   if (status === "확정" || status === "예정") {
@@ -1317,20 +1326,20 @@ function statusActionButtons(status: string) {
       { label: "기상", nextStatus: "기상취소", actionLabel: "기상취소", tone: "secondary" },
       { label: "노쇼", nextStatus: "노쇼", actionLabel: "노쇼 처리", tone: "danger" },
       { label: "취소", nextStatus: "취소", actionLabel: "관리자 취소", tone: "danger" },
-    ] as const;
+    ];
   }
 
   if (status === "완료") {
     return [
       { label: "확정복구", nextStatus: "확정", actionLabel: "완료 처리 취소", tone: "secondary" },
       { label: "취소", nextStatus: "취소", actionLabel: "완료 예약 관리자 취소", tone: "danger" },
-    ] as const;
+    ];
   }
 
   if (["취소", "기상취소", "노쇼", "반려"].includes(status)) {
     return [
       { label: "확정복구", nextStatus: "확정", actionLabel: `${status} 처리 취소`, tone: "secondary" },
-    ] as const;
+    ];
   }
 
   return [
@@ -1339,14 +1348,29 @@ function statusActionButtons(status: string) {
   ] as const;
 }
 
-function statusActionButtonsForBooking(item: BookingRow) {
-  const actions = [...statusActionButtons(normalizedStatusOf(item))];
+function statusActionButtonsForBooking(item: BookingRow): StatusAction[] {
+  const status = normalizedStatusOf(item);
 
-  if (!isEducationBooking(item)) return actions;
+  if (status === "확정" || status === "예정" || status === "완료") {
+    return [
+      { label: "노쇼", nextStatus: "노쇼", actionLabel: "노쇼 처리", tone: "danger" },
+      { label: "취소", nextStatus: "취소", actionLabel: "관리자 취소", tone: "danger" },
+    ];
+  }
 
-  // 교육비행은 예약관리에서 직접 "완료" 처리하지 않습니다.
-  // 실제 완료 여부는 비행기록/교육기록 등록 흐름에서 반영합니다.
-  return actions.filter((action) => action.nextStatus !== "완료");
+  if (status === "취소요청") {
+    return [
+      { label: "취소", nextStatus: "취소", actionLabel: "취소 요청 승인", tone: "danger" },
+    ];
+  }
+
+  if (status === "요청") {
+    return [
+      { label: "취소", nextStatus: "취소", actionLabel: "관리자 취소", tone: "danger" },
+    ];
+  }
+
+  return [];
 }
 
 function sortRowsByOrder<T extends AnyRow>(rows: T[]) {
@@ -4013,7 +4037,7 @@ if (form.instructorId) {
               [
                 note,
                 nextStatus === "노쇼" && text(booking.bookingType, "").includes("교육")
-                  ? "교육생 노쇼: 비행기록에서 차감 여부 확인 필요"
+                  ? "교육생 노쇼: 교육을 진행한 것으로 처리되어 예약 시간만큼 교육시간이 차감됩니다."
                   : "",
               ].filter(Boolean).join(" / ")
             ),
