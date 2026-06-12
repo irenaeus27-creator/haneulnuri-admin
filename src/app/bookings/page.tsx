@@ -1767,7 +1767,7 @@ export default function BookingsPage() {
     if (form.startTime && form.endTime && form.startTime >= form.endTime) warnings.push("종료시간은 시작시간보다 늦어야 합니다.");
 
     if (!form.userName.trim()) {
-      warnings.push(isEducationForm ? "교육생을 선택하세요." : isRentalForm ? "렌탈 기장을 선택하세요." : "예약자 이름을 입력하세요.");
+      warnings.push(isEducationForm ? "교육생을 선택하세요." : isRentalForm ? "렌탈 기장을 선택하세요." : isExperienceForm ? "체험 고객명을 입력하세요." : "예약자 이름을 입력하세요.");
     }
 
     if (isEducationForm && (!form.instructorId || !form.aircraftId)) {
@@ -3702,7 +3702,7 @@ export default function BookingsPage() {
       }
 
       if (!form.userName.trim()) {
-        alert(isEducationForm ? "교육생을 선택하세요." : isRentalForm ? "렌탈 기장을 선택하세요." : isOtherUseForm ? "예약명 또는 사용 불가 사유를 입력하세요." : "예약자 이름을 입력하세요.");
+        alert(isEducationForm ? "교육생을 선택하세요." : isRentalForm ? "렌탈 기장을 선택하세요." : isExperienceForm ? "체험 고객명을 입력하세요." : isOtherUseForm ? "예약명 또는 사용 불가 사유를 입력하세요." : "예약자 이름을 입력하세요.");
         return;
       }
 
@@ -4817,8 +4817,11 @@ if (form.instructorId) {
 
             <div className="min-w-0 rounded-[14px] border border-[#e1eaf6] bg-[#fbfdff] p-2">
               <div className="grid gap-1.5 text-[13px] font-medium text-[#36506d] md:grid-cols-4 xl:grid-cols-8">
-                <div className="rounded-lg bg-white px-2.5 py-1.5">
-                  <p className="text-[13px] font-semibold text-[#8292a8]">{isRentalForm ? "기장명" : isEducationForm ? "교육생명" : isOtherUseForm ? "예약명/사유" : "예약자명"}</p>
+                <div className={`rounded-lg px-2.5 py-1.5 ${isExperienceForm || isOtherUseForm ? "border border-[#d4deeb] bg-white shadow-sm" : "bg-white"}`}>
+                  <p className="flex items-center gap-1 text-[13px] font-semibold text-[#60738d]">
+                    <span>{isRentalForm ? "기장명" : isEducationForm ? "교육생명" : isOtherUseForm ? "예약명/사유" : isExperienceForm ? "체험 고객명" : "예약자명"}</span>
+                    {isExperienceForm || isOtherUseForm ? <span className="h-1.5 w-1.5 rounded-full bg-blue-500" title="필수 입력" /> : null}
+                  </p>
                   {isExperienceForm || isOtherUseForm ? (
                     <input
                       value={form.userName}
@@ -4828,19 +4831,22 @@ if (form.instructorId) {
                         if (isOtherUseForm) updateForm("courseName", value);
                       }}
                       placeholder={isOtherUseForm ? "예: 방송국 촬영, 정비, 행사, 임시 사용 제한" : "체험 고객명"}
-                      className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]"
+                      className="mt-1 h-9 w-full rounded-lg border border-[#cbd9ea] bg-white px-2 text-[13px] font-medium text-[#102544] outline-none transition focus:border-[#1f6fff] focus:ring-4 focus:ring-blue-100"
                     />
                   ) : (
                     <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{form.userName || "자동 입력"}</p>
                   )}
                 </div>
 
-                <div className="rounded-lg bg-white px-2.5 py-1.5">
-                  <p className="text-[13px] font-semibold text-[#8292a8]">연락처</p>
+                <div className={`rounded-lg px-2.5 py-1.5 ${isExperienceForm || isOtherUseForm ? "border border-[#d4deeb] bg-white shadow-sm" : "bg-white"}`}>
+                  <p className="flex items-center gap-1 text-[13px] font-semibold text-[#60738d]">
+                    <span>연락처</span>
+                    {isExperienceForm ? <span className="h-1.5 w-1.5 rounded-full bg-blue-500" title="필수 입력" /> : null}
+                  </p>
                   {isExperienceForm ? (
-                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="01000000000" className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]" />
+                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="01000000000" className="mt-1 h-9 w-full rounded-lg border border-[#cbd9ea] bg-white px-2 text-[13px] font-medium text-[#102544] outline-none transition focus:border-[#1f6fff] focus:ring-4 focus:ring-blue-100" />
                   ) : isOtherUseForm ? (
-                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="담당자 연락처 선택" className="mt-1 h-9 w-full rounded-lg border border-[#d4deeb] bg-white px-2 text-[13px] outline-none focus:border-[#1f6fff]" />
+                    <input value={form.phone} onChange={(event) => updateForm("phone", event.target.value)} placeholder="담당자 연락처 선택" className="mt-1 h-9 w-full rounded-lg border border-[#cbd9ea] bg-white px-2 text-[13px] font-medium text-[#102544] outline-none transition focus:border-[#1f6fff] focus:ring-4 focus:ring-blue-100" />
                   ) : (
                     <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">{form.phone || "자동 입력"}</p>
                   )}
@@ -5171,15 +5177,16 @@ if (form.instructorId) {
           box-shadow: 0 0 0 4px rgba(191, 219, 254, 0.65);
         }
         .input-disabled {
-          margin-top: 0.4rem;
-          height: 2.25rem;
+          margin-top: 0;
+          height: 2.35rem;
           width: 100%;
-          border-radius: 0.9rem;
-          border: 1px solid rgb(229 236 244);
+          border-radius: 0.75rem;
+          border: 1px solid rgb(212 222 235);
           background: rgb(248 251 255);
           padding: 0 0.75rem;
-          font-size: 0.78rem;
-          color: rgb(113 128 150);
+          font-size: 12px;
+          font-weight: 600;
+          color: rgb(91 110 133);
           outline: none;
         }
         .filter-base {
@@ -5288,7 +5295,7 @@ function Field({ label, children, required = false, auto = false }: { label: str
       <label className="mb-1.5 flex items-center gap-1 text-[12px] font-medium text-[#60738d]">
         <span>{label}</span>
         {required ? <span className="h-1.5 w-1.5 rounded-full bg-blue-500" title="필수 입력" /> : null}
-        {auto ? <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[13px] font-medium text-slate-500">자동</span> : null}
+        {auto ? <span className="rounded-full bg-slate-100 px-1.5 py-0 text-[11px] font-medium leading-4 text-slate-500">자동</span> : null}
       </label>
       {children}
     </div>
