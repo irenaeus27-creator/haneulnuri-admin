@@ -135,6 +135,10 @@ type BookingForm = {
   phone: string;
   instructorId: string;
   instructorName: string;
+  assignedInstructorId?: string;
+  assignedInstructorName?: string;
+  substituteInstructorEnabled?: boolean;
+  substituteReason?: string;
   aircraftId: string;
   aircraftName: string;
   status: string;
@@ -215,6 +219,10 @@ const emptyForm: BookingForm = {
   phone: "",
   instructorId: "",
   instructorName: "",
+  assignedInstructorId: "",
+  assignedInstructorName: "",
+  substituteInstructorEnabled: false,
+  substituteReason: "",
   aircraftId: "",
   aircraftName: "",
   status: "확정",
@@ -446,6 +454,10 @@ function formatBookingSummaryTimeRange(start: unknown, end: unknown) {
 }
 
 function toForm(row: BookingRow): BookingForm {
+  const substitute = parseSubstituteInstructorMemo(row.memo);
+  const currentInstructorId = formValue(row.instructorId);
+  const currentInstructorName = formValue(row.instructorName);
+
   return {
     bookingId: formValue(row.bookingId),
     bookingDate: normalizeDate(row.bookingDate),
@@ -457,13 +469,17 @@ function toForm(row: BookingRow): BookingForm {
     userId: formValue(row.userId),
     userName: formValue(row.userName),
     phone: formValue(row.phone),
-    instructorId: formValue(row.instructorId),
-    instructorName: formValue(row.instructorName),
+    instructorId: substitute.actualInstructorId || currentInstructorId,
+    instructorName: substitute.actualInstructorName || currentInstructorName,
+    assignedInstructorId: substitute.assignedInstructorId || currentInstructorId,
+    assignedInstructorName: substitute.assignedInstructorName || currentInstructorName,
+    substituteInstructorEnabled: substitute.enabled,
+    substituteReason: substitute.reason,
     aircraftId: formValue(row.aircraftId),
     aircraftName: formValue(row.aircraftName),
     status: formValue(row.status || emptyForm.status),
     paymentStatus: formValue(row.paymentStatus || emptyForm.paymentStatus),
-    memo: formValue(row.memo),
+    memo: stripSubstituteInstructorMemo(row.memo),
   };
 }
 
@@ -1136,6 +1152,79 @@ function buildActionMemo(existingMemo: string, actionLabel?: string, note?: stri
   return lines.join("\n").trim();
 }
 
+const SUBSTITUTE_MEMO_PREFIX = "대체교관기록:";
+
+function parseSubstituteInstructorMemo(memo: unknown) {
+  const raw = text(memo, "");
+  const line = raw
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(SUBSTITUTE_MEMO_PREFIX));
+
+  if (!line) {
+    return {
+      enabled: false,
+      assignedInstructorId: "",
+      assignedInstructorName: "",
+      actualInstructorId: "",
+      actualInstructorName: "",
+      reason: "",
+    };
+  }
+
+  const content = line.slice(SUBSTITUTE_MEMO_PREFIX.length).trim();
+  const [assigned = "", actual = "", reason = ""] = content.split("=>").map((item) => item.trim());
+  const [assignedInstructorId = "", assignedInstructorName = ""] = assigned.split("|").map((item) => item.trim());
+  const [actualInstructorId = "", actualInstructorName = ""] = actual.split("|").map((item) => item.trim());
+
+  return {
+    enabled: true,
+    assignedInstructorId,
+    assignedInstructorName,
+    actualInstructorId,
+    actualInstructorName,
+    reason,
+  };
+}
+
+function stripSubstituteInstructorMemo(memo: unknown) {
+  return text(memo, "")
+    .split(/\r?\n/)
+    .filter((line) => !line.trim().startsWith(SUBSTITUTE_MEMO_PREFIX))
+    .join("\n")
+    .trim();
+}
+
+function buildSubstituteInstructorMemoLine(form: BookingForm) {
+  if (!form.substituteInstructorEnabled) return "";
+
+  const assignedId = text(form.assignedInstructorId, "");
+  const assignedName = text(form.assignedInstructorName, "");
+  const actualId = text(form.instructorId, "");
+  const actualName = text(form.instructorName, "");
+  const reason = text(form.substituteReason, "담당 교관 부재로 대체 비행");
+
+  return `${SUBSTITUTE_MEMO_PREFIX} ${assignedId}|${assignedName}=>${actualId}|${actualName}=>${reason}`;
+}
+
+function mergeSubstituteInstructorMemo(memo: unknown, form: BookingForm) {
+  const baseMemo = stripSubstituteInstructorMemo(memo);
+  const substituteLine = buildSubstituteInstructorMemoLine(form);
+
+  return [baseMemo, substituteLine].filter(Boolean).join("\n").trim();
+}
+
+function substituteInstructorBadgeText(booking: BookingRow) {
+  const parsed = parseSubstituteInstructorMemo(booking.memo);
+  if (!parsed.enabled) return "";
+
+  const actualName = parsed.actualInstructorName || text(booking.instructorName, "");
+  const assignedName = parsed.assignedInstructorName;
+
+  if (!actualName || !assignedName || actualName === assignedName) return "대체";
+  return `${actualName} · 대체`;
+}
+
 function latestActionMemo(memo: unknown) {
   const lines = text(memo, "")
     .split(/\r?\n/)
@@ -1770,8 +1859,12 @@ export default function BookingsPage() {
       warnings.push(isEducationForm ? "교육생을 선택하세요." : isRentalForm ? "렌탈 기장을 선택하세요." : isExperienceForm ? "체험 고객명을 입력하세요." : "예약자 이름을 입력하세요.");
     }
 
-    if (isEducationForm && (!form.instructorId || !form.aircraftId)) {
-      warnings.push("교육생의 배정 교관/항공기 정보가 필요합니다.");
+    if (isEducationForm && (!form.assignedInstructorId || !form.aircraftId)) {
+      warnings.push("교육생의 기본 배정 교관/항공기 정보가 필요합니다.");
+    }
+
+    if (isEducationForm && form.substituteInstructorEnabled && !form.instructorId) {
+      warnings.push("대체 교관을 선택하세요.");
     }
 
     if ((isRentalForm || isExperienceForm) && !form.aircraftId) {
@@ -2483,6 +2576,10 @@ export default function BookingsPage() {
       courseName: prev.courseName || text(selected.course, "교육비행"),
       instructorId: text(selected.assignedInstructorId, prev.instructorId),
       instructorName: text(selected.assignedInstructorName, prev.instructorName),
+      assignedInstructorId: text(selected.assignedInstructorId, prev.assignedInstructorId || prev.instructorId),
+      assignedInstructorName: text(selected.assignedInstructorName, prev.assignedInstructorName || prev.instructorName),
+      substituteInstructorEnabled: false,
+      substituteReason: "",
       aircraftId: assignedAircraft ? text(assignedAircraft.aircraftId, "") : text(selected.assignedAircraftId || selected.aircraftId, prev.aircraftId),
       aircraftName: assignedAircraft
         ? text(assignedAircraft.aircraftName || assignedAircraft.registrationNo || assignedAircraft.aircraftId, "")
@@ -2507,6 +2604,10 @@ export default function BookingsPage() {
       phone: text(selected.phone, ""),
       instructorId: "",
       instructorName: "",
+      assignedInstructorId: "",
+      assignedInstructorName: "",
+      substituteInstructorEnabled: false,
+      substituteReason: "",
       aircraftId: assignedAircraft ? text(assignedAircraft.aircraftId, "") : prev.aircraftId,
       aircraftName: assignedAircraft
         ? text(assignedAircraft.aircraftName || assignedAircraft.registrationNo || assignedAircraft.aircraftId, "")
@@ -2522,6 +2623,23 @@ export default function BookingsPage() {
       instructorId,
       instructorName: selected ? text(selected.name, "") : "",
     }));
+  }
+
+  function toggleSubstituteInstructor(enabled: boolean) {
+    setForm((prev) => {
+      const assignedInstructorId = text(prev.assignedInstructorId || prev.instructorId, "");
+      const assignedInstructorName = text(prev.assignedInstructorName || prev.instructorName, "");
+
+      return {
+        ...prev,
+        assignedInstructorId,
+        assignedInstructorName,
+        substituteInstructorEnabled: enabled,
+        substituteReason: enabled ? prev.substituteReason || "담당 교관 부재로 대체 비행" : "",
+        instructorId: enabled ? "" : assignedInstructorId,
+        instructorName: enabled ? "" : assignedInstructorName,
+      };
+    });
   }
 
   function selectAircraft(aircraftId: string) {
@@ -3706,8 +3824,13 @@ export default function BookingsPage() {
         return;
       }
 
-      if (isEducationForm && (!form.instructorId || !form.aircraftId)) {
-        alert("교육생의 배정 교관/항공기 정보가 없습니다. 교육생관리에서 배정 정보를 먼저 확인하세요.");
+      if (isEducationForm && (!form.assignedInstructorId || !form.aircraftId)) {
+        alert("교육생의 기본 배정 교관/항공기 정보가 없습니다. 교육생관리에서 배정 정보를 먼저 확인하세요.");
+        return;
+      }
+
+      if (isEducationForm && form.substituteInstructorEnabled && !form.instructorId) {
+        alert("대체 교관을 선택하세요.");
         return;
       }
 
@@ -3779,6 +3902,7 @@ if (form.instructorId) {
         paymentStatus: normalizePaymentStatusForSave(form.paymentStatus, normalizedBookingType),
         instructorId: form.instructorId,
         instructorName: form.instructorId ? form.instructorName : "",
+        memo: mergeSubstituteInstructorMemo(form.memo, form),
         ...(conflictWarningMessages.length > 0 ? { allowConflict: true } : {}),
       };
 
@@ -3823,6 +3947,10 @@ if (form.instructorId) {
         endTime: payload.endTime,
         status: bookingStatuses.includes("확정") ? "확정" : emptyForm.status,
         paymentStatus: savedType.includes("체험") ? paymentStatuses[0] || "미결제" : "",
+        assignedInstructorId: "",
+        assignedInstructorName: "",
+        substituteInstructorEnabled: false,
+        substituteReason: "",
       });
       setEditing(false);
       clearSelectedBooking();
@@ -4580,7 +4708,7 @@ if (form.instructorId) {
                     </div>
                     <div className="rounded-lg bg-white px-2 py-1.5">
                       <p className="text-[13px] font-semibold text-[#7b8da5]">담당</p>
-                      <p className="mt-0.5 truncate font-medium text-[#102544]">{text(selectedBooking.instructorName, "-")}</p>
+                      <p className="mt-0.5 truncate font-medium text-[#102544]">{substituteInstructorBadgeText(selectedBooking) || text(selectedBooking.instructorName, "-")}</p>
                     </div>
                     <div className="rounded-lg bg-white px-2 py-1.5">
                       <p className="text-[13px] font-semibold text-[#7b8da5]">전화번호</p>
@@ -4717,9 +4845,18 @@ if (form.instructorId) {
               ) : null}
 
               {!isRentalForm && !isOtherUseForm ? (
-                <Field label="담당 교관" required={isExperienceForm || isRideAlongForm} auto={isEducationForm && !!form.instructorId}>
-                  <select value={form.instructorId} onChange={(event) => selectInstructor(event.target.value)} className="input-base compact-input" disabled={isEducationForm && !!form.instructorId}>
-                    <option value="">{isEducationForm ? "자동 배정" : "교관 선택"}</option>
+                <Field
+                  label={isEducationForm && form.substituteInstructorEnabled ? "실제 비행 교관" : "담당 교관"}
+                  required={isExperienceForm || isRideAlongForm || (isEducationForm && form.substituteInstructorEnabled)}
+                  auto={isEducationForm && !form.substituteInstructorEnabled && !!form.instructorId}
+                >
+                  <select
+                    value={form.instructorId}
+                    onChange={(event) => selectInstructor(event.target.value)}
+                    className="input-base compact-input"
+                    disabled={isEducationForm && !form.substituteInstructorEnabled && !!form.instructorId}
+                  >
+                    <option value="">{isEducationForm ? (form.substituteInstructorEnabled ? "대체 교관 선택" : "자동 배정") : "교관 선택"}</option>
                     {instructors.filter((item) => isActiveValue(item.active)).map((item, index) => {
                       const instructorId = text(item.instructorId, "");
                       return <option key={`${instructorId}-${index}`} value={instructorId}>{text(item.name)} / {instructorId}</option>;
@@ -4782,6 +4919,51 @@ if (form.instructorId) {
                 <input value={form.endTime || "자동"} disabled className="input-disabled compact-input" />
               </Field>
             </FormGroup>
+
+            {isEducationForm && form.userId ? (
+              <div className="rounded-[14px] border border-[#e1eaf6] bg-[#fbfdff] px-3 py-2">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-[#10213f]">대체 교관</p>
+                    <p className="mt-0.5 text-[12px] font-medium text-[#60738d]">
+                      기본 담당 교관은 유지하고, 이 예약의 실제 비행 교관만 바꿉니다.
+                      {form.assignedInstructorName ? ` 기본: ${form.assignedInstructorName}` : ""}
+                    </p>
+                  </div>
+                  <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-xl border border-[#d4deeb] bg-white px-3 py-2 text-[13px] font-semibold text-[#28486d]">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.substituteInstructorEnabled)}
+                      onChange={(event) => toggleSubstituteInstructor(event.target.checked)}
+                      className="h-4 w-4 rounded border-[#b8c8dc]"
+                    />
+                    대체 교관 사용
+                  </label>
+                </div>
+
+                {form.substituteInstructorEnabled ? (
+                  <div className="mt-2 grid gap-2 md:grid-cols-[220px_1fr]">
+                    <select
+                      value={form.instructorId}
+                      onChange={(event) => selectInstructor(event.target.value)}
+                      className="input-base compact-input"
+                    >
+                      <option value="">대체 교관 선택</option>
+                      {instructors.filter((item) => isActiveValue(item.active)).map((item, index) => {
+                        const instructorId = text(item.instructorId, "");
+                        return <option key={`substitute-${instructorId}-${index}`} value={instructorId}>{text(item.name)} / {instructorId}</option>;
+                      })}
+                    </select>
+                    <input
+                      value={form.substituteReason || ""}
+                      onChange={(event) => updateForm("substituteReason", event.target.value)}
+                      placeholder="대체 사유 예: 담당 교관 부재로 대체 비행"
+                      className="input-base compact-input"
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             {(isEducationForm && form.userId) ? (
               <div className="grid gap-2 rounded-[14px] border border-blue-100 bg-blue-50/70 px-3 py-2 text-[13px] text-[#28486d] md:grid-cols-3">
@@ -4861,6 +5043,13 @@ if (form.instructorId) {
                   ) : (
                     <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">확정</p>
                   )}
+                </div>
+
+                <div className="rounded-lg bg-white px-2.5 py-1.5">
+                  <p className="text-[13px] font-semibold text-[#8292a8]">담당 교관</p>
+                  <p className="mt-1 truncate text-[13px] font-medium text-[#102544]">
+                    {form.instructorName || "-"}{form.substituteInstructorEnabled ? " · 대체" : ""}
+                  </p>
                 </div>
 
                 <div className="rounded-lg bg-white px-2.5 py-1.5">
