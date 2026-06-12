@@ -4800,12 +4800,6 @@ if (form.instructorId) {
               </div>
             ) : null}
 
-            {isRentalForm && selectedRentalPilot ? (
-              <div className={`rounded-[14px] border px-3 py-2 text-[13px] font-medium ${selectableAircraftForForm.length === 0 ? "border-rose-200 bg-rose-50 text-rose-800" : "border-orange-100 bg-orange-50 text-orange-800"}`}>
-                배정 항공기 {selectableAircraftForForm.length}대{selectableAircraftForForm.length > 0 ? `: ${assignedAircraftText(selectableAircraftForForm)}` : "가 없습니다."}
-              </div>
-            ) : null}
-
             {conflictWarnings.length > 0 ? (
               <div className={`rounded-[14px] border px-3 py-2 text-[13px] font-medium ${hasAircraftConflict ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
                 <div className="font-semibold">
